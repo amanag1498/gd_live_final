@@ -1,0 +1,50 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+
+class Agency extends Model
+{
+    protected $fillable = [
+        'owner_user_id',
+        'name',
+        'legal_name',
+        'contact_email',
+        'contact_phone',
+        'notes',
+        'is_blocked',
+    ];
+
+    protected $casts = [
+        'is_blocked'        => 'boolean',
+    ];
+
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_user_id');
+    }
+
+    public function hosts(): HasMany
+    {
+        return $this->hasMany(Host::class); // hosts.agency_id
+    }
+
+    public function payoutReports(): HasMany
+    {
+        return $this->hasMany(AgencyPayoutReport::class)->latest('period_start');
+    }
+
+    public function wallet(): HasOne
+    {
+        return $this->hasOne(AgencyWallet::class);
+    }
+
+    public function coinTransfers(): HasMany
+    {
+        return $this->hasMany(AgencyCoinTransfer::class)->latest('id');
+    }
+}

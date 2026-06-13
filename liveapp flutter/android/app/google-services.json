@@ -1,0 +1,70 @@
+{
+  "project_info": {
+    "project_number": "826349753111",
+    "project_id": "gdlive-da4e9",
+    "storage_bucket": "gdlive-da4e9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:826349753111:android:fd08204e4385905582dd52",
+        "android_client_info": {
+          "package_name": "com.techybugs.gdlive"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "826349753111-kmmg99em2bi72h53cistod2mmhnce333.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.techybugs.gdlive",
+            "certificate_hash": "0c71eb5375dcaaed3deb0471723e124b2eb92505"
+          }
+        },
+        {
+          "client_id": "826349753111-rc0r7hsatim6e3tcs2f8rhvijd2da52n.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.techybugs.gdlive",
+            "certificate_hash": "ccb6d8a31e66fb3f33fc9a904c52a8bfaa26fcb9"
+          }
+        },
+        {
+          "client_id": "826349753111-t9p7m5i4br7vnk1idc97572mn6t1iq36.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.techybugs.gdlive",
+            "certificate_hash": "92ad77fd4f9813a512d294c064009a6f59f3e18d"
+          }
+        },
+        {
+          "client_id": "826349753111-g7bc68865lpher4prlgfn8mb2rtkuecq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPB7e9WnmEEOHrO5iwX3bSDxr-rYjubaU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "826349753111-g7bc68865lpher4prlgfn8mb2rtkuecq.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "826349753111-h50qud0ltm2e0tqsf1fh7b7misfd4jkb.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.techybugs.gdLive"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
