@@ -147,6 +147,8 @@ class _SubscriptionsPageState extends State<SubscriptionsPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        iconTheme: IconThemeData(color: tokens.textPrimary),
+        actionsIconTheme: IconThemeData(color: tokens.textPrimary),
         title: Text(
           'Subscriptions',
           style: TextStyle(

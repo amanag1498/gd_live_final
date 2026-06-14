@@ -7,6 +7,7 @@ use App\Models\AgencyPayoutReport;
 use App\Models\AgencyPayoutReportItem;
 use App\Models\CallEarningLedger;
 use App\Models\Host;
+use App\Models\LiveRoom;
 use App\Models\LiveRoomGiftEarningLedger;
 use App\Models\User;
 use Carbon\Carbon;
@@ -106,13 +107,8 @@ class AgencyWeeklyPayoutReportService
                 $existing->delete();
             }
 
-            $hosts = Host::query()
-                ->with('user')
-                ->where('agency_id', $agency->id)
-                ->orderBy('id')
-                ->get();
-
             $callRows = CallEarningLedger::query()
+                ->join('hosts', 'hosts.id', '=', 'call_earning_ledgers.host_id')
                 ->join('call_sessions', 'call_sessions.id', '=', 'call_earning_ledgers.call_session_id')
                 ->selectRaw("
                     call_earning_ledgers.host_id as host_id,
@@ -122,77 +118,120 @@ class AgencyWeeklyPayoutReportService
                     SUM(call_earning_ledgers.total_coins) as call_gross,
                     SUM(CASE WHEN call_sessions.type = 'video' THEN call_earning_ledgers.billable_minutes ELSE 0 END) as video_call_minutes,
                     SUM(CASE WHEN call_sessions.type = 'video' THEN call_earning_ledgers.total_coins ELSE 0 END) as video_call_gross,
+                    SUM(CASE WHEN call_sessions.type = 'audio' THEN call_earning_ledgers.billable_minutes ELSE 0 END) as audio_call_minutes,
+                    SUM(CASE WHEN call_sessions.type = 'audio' THEN call_earning_ledgers.total_coins ELSE 0 END) as audio_call_gross,
                     SUM(call_earning_ledgers.host_earning) as ledger_host_share,
                     SUM(call_earning_ledgers.agency_earning) as ledger_agency_share,
                     SUM(call_earning_ledgers.platform_earning) as platform_share
                 ")
-                ->where('call_earning_ledgers.agency_id', $agency->id)
+                ->where(function ($query) use ($agency) {
+                    $query->where('call_earning_ledgers.agency_id', $agency->id)
+                        ->orWhere(function ($fallback) use ($agency) {
+                            $fallback->whereNull('call_earning_ledgers.agency_id')
+                                ->where('call_sessions.agency_id', $agency->id);
+                        })
+                        ->orWhere(function ($hostFallback) use ($agency) {
+                            $hostFallback->whereNull('call_earning_ledgers.agency_id')
+                                ->whereNull('call_sessions.agency_id')
+                                ->where('hosts.agency_id', $agency->id);
+                        });
+                })
+                ->where('call_sessions.status', 'ended')
+                ->where('call_earning_ledgers.total_coins', '>', 0)
                 ->whereBetween('call_earning_ledgers.created_at', [$periodStart, $periodEnd])
                 ->groupBy('call_earning_ledgers.host_id')
                 ->get()
                 ->keyBy('host_id');
 
             $giftRows = LiveRoomGiftEarningLedger::query()
+                ->join('hosts', 'hosts.id', '=', 'live_room_gift_earning_ledgers.host_id')
                 ->join('live_room_gifts', 'live_room_gifts.id', '=', 'live_room_gift_earning_ledgers.live_room_gift_id')
                 ->join('live_rooms', 'live_rooms.id', '=', 'live_room_gift_earning_ledgers.live_room_id')
+                ->leftJoin('live_room_pk_events', function ($join) {
+                    $join->on('live_room_pk_events.wallet_transaction_id', '=', 'live_room_gifts.transaction_id')
+                        ->where('live_room_pk_events.event_type', '=', 'gift');
+                })
                 ->selectRaw("
                     live_room_gift_earning_ledgers.host_id as host_id,
-                    COUNT(live_room_gift_earning_ledgers.id) as gift_events,
-                    COUNT(DISTINCT live_room_gift_earning_ledgers.live_room_id) as live_room_count,
-                    COUNT(DISTINCT live_room_gift_earning_ledgers.sender_user_id) as unique_gifters,
-                    SUM(COALESCE(live_room_gifts.quantity, 0)) as gift_quantity,
-                    SUM(live_room_gift_earning_ledgers.total_coins) as gift_gross,
-                    SUM(CASE WHEN live_rooms.room_type = 'video' THEN live_room_gift_earning_ledgers.total_coins ELSE 0 END) as video_gift_gross,
-                    SUM(live_room_gift_earning_ledgers.host_payout_coins) as ledger_host_share,
-                    SUM(live_room_gift_earning_ledgers.agency_payout_coins) as ledger_agency_share,
-                    SUM(live_room_gift_earning_ledgers.platform_revenue_coins) as platform_share
+                    SUM(CASE WHEN live_room_pk_events.id IS NULL THEN 1 ELSE 0 END) as gift_events,
+                    COUNT(DISTINCT CASE WHEN live_room_pk_events.id IS NULL THEN live_room_gift_earning_ledgers.live_room_id END) as live_room_count,
+                    COUNT(DISTINCT CASE WHEN live_room_pk_events.id IS NULL THEN live_room_gift_earning_ledgers.sender_user_id END) as unique_gifters,
+                    SUM(CASE WHEN live_room_pk_events.id IS NULL THEN COALESCE(live_room_gifts.quantity, 0) ELSE 0 END) as gift_quantity,
+                    SUM(CASE WHEN live_room_pk_events.id IS NULL THEN live_room_gift_earning_ledgers.total_coins ELSE 0 END) as gift_gross,
+                    SUM(CASE WHEN live_room_pk_events.id IS NULL AND live_rooms.room_type = 'video' THEN live_room_gift_earning_ledgers.total_coins ELSE 0 END) as video_gift_gross,
+                    SUM(CASE WHEN live_room_pk_events.id IS NULL AND live_rooms.room_type = 'audio' THEN live_room_gift_earning_ledgers.total_coins ELSE 0 END) as audio_gift_gross,
+                    SUM(CASE WHEN live_room_pk_events.id IS NULL THEN live_room_gift_earning_ledgers.host_payout_coins ELSE 0 END) as ledger_host_share,
+                    SUM(CASE WHEN live_room_pk_events.id IS NULL THEN live_room_gift_earning_ledgers.agency_payout_coins ELSE 0 END) as ledger_agency_share,
+                    SUM(CASE WHEN live_room_pk_events.id IS NULL THEN live_room_gift_earning_ledgers.platform_revenue_coins ELSE 0 END) as platform_share
                 ")
-                ->where('live_room_gift_earning_ledgers.agency_id', $agency->id)
+                ->where(function ($query) use ($agency) {
+                    $query->where('live_room_gift_earning_ledgers.agency_id', $agency->id)
+                        ->orWhere(function ($fallback) use ($agency) {
+                            $fallback->whereNull('live_room_gift_earning_ledgers.agency_id')
+                                ->where('hosts.agency_id', $agency->id);
+                        });
+                })
                 ->whereBetween('live_room_gift_earning_ledgers.created_at', [$periodStart, $periodEnd])
                 ->groupBy('live_room_gift_earning_ledgers.host_id')
                 ->get()
                 ->keyBy('host_id');
 
             $pkRows = LiveRoomGiftEarningLedger::query()
+                ->join('hosts', 'hosts.id', '=', 'live_room_gift_earning_ledgers.host_id')
                 ->join('live_room_gifts', 'live_room_gifts.id', '=', 'live_room_gift_earning_ledgers.live_room_gift_id')
                 ->join('live_room_pk_events', function ($join) {
                     $join->on('live_room_pk_events.wallet_transaction_id', '=', 'live_room_gifts.transaction_id')
                         ->where('live_room_pk_events.event_type', '=', 'gift');
                 })
                 ->selectRaw('live_room_gift_earning_ledgers.host_id as host_id, COUNT(live_room_pk_events.id) as pk_event_count, SUM(live_room_gift_earning_ledgers.total_coins) as pk_gross')
-                ->where('live_room_gift_earning_ledgers.agency_id', $agency->id)
+                ->where(function ($query) use ($agency) {
+                    $query->where('live_room_gift_earning_ledgers.agency_id', $agency->id)
+                        ->orWhere(function ($fallback) use ($agency) {
+                            $fallback->whereNull('live_room_gift_earning_ledgers.agency_id')
+                                ->where('hosts.agency_id', $agency->id);
+                        });
+                })
                 ->whereBetween('live_room_gift_earning_ledgers.created_at', [$periodStart, $periodEnd])
                 ->groupBy('live_room_gift_earning_ledgers.host_id')
                 ->get()
                 ->keyBy('host_id');
 
-            $roomRows = DB::table('live_rooms')
-                ->selectRaw("
-                    host_id,
-                    COUNT(*) as live_room_count,
-                    SUM(CASE WHEN room_type = 'video' THEN 1 ELSE 0 END) as video_room_count,
-                    SUM(CASE
-                        WHEN room_type = 'video' THEN GREATEST(
-                            TIMESTAMPDIFF(
-                                MINUTE,
-                                GREATEST(started_at, ?),
-                                LEAST(COALESCE(ended_at, last_activity_at, started_at), ?)
-                            ),
-                            0
-                        )
-                        ELSE 0
-                    END) as video_room_minutes
-                ", [
-                    $periodStart->toDateTimeString(),
-                    $periodEnd->toDateTimeString(),
-                ])
-                ->whereIn('host_id', $hosts->pluck('id'))
-                ->whereNotNull('started_at')
-                ->where('started_at', '<=', $periodEnd)
-                ->whereRaw('COALESCE(ended_at, last_activity_at, started_at) >= ?', [$periodStart->toDateTimeString()])
-                ->groupBy('host_id')
-                ->get()
-                ->keyBy('host_id');
+            $historicalHostIds = collect()
+                ->merge(Host::query()->where('agency_id', $agency->id)->pluck('id'))
+                ->merge($callRows->keys())
+                ->merge($giftRows->keys())
+                ->merge($pkRows->keys())
+                ->merge(
+                    DB::table('live_rooms')
+                        ->join('hosts', 'hosts.id', '=', 'live_rooms.host_id')
+                        ->where('hosts.agency_id', $agency->id)
+                        ->whereNotNull('live_rooms.started_at')
+                        ->where('live_rooms.started_at', '<=', $periodEnd)
+                        ->whereRaw('COALESCE(live_rooms.ended_at, live_rooms.last_activity_at, live_rooms.started_at) >= ?', [$periodStart->toDateTimeString()])
+                        ->distinct()
+                        ->pluck('live_rooms.host_id')
+                )
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            $hosts = Host::query()
+                ->with('user')
+                ->whereIn('id', $historicalHostIds)
+                ->orderBy('id')
+                ->get();
+
+            $roomRows = $this->buildRoomRows(
+                LiveRoom::query()
+                    ->whereIn('host_id', $hosts->pluck('id'))
+                    ->whereNotNull('started_at')
+                    ->where('started_at', '<=', $periodEnd)
+                    ->whereRaw('COALESCE(ended_at, last_activity_at, started_at) >= ?', [$periodStart->toDateTimeString()])
+                    ->get(['host_id', 'room_type', 'started_at', 'ended_at', 'last_activity_at']),
+                $periodStart,
+                $periodEnd,
+            );
 
             $generateZeroReports = (bool) config('agency_payouts.generate_zero_reports', true);
 
@@ -206,13 +245,30 @@ class AgencyWeeklyPayoutReportService
                 'gift_events' => 0,
                 'gift_quantity' => 0,
                 'live_room_count' => 0,
+                'audio_room_count' => 0,
                 'video_room_count' => 0,
+                'audio_room_minutes' => 0,
                 'video_room_minutes' => 0,
+                'audio_gift_gross' => 0,
                 'video_gift_gross' => 0,
+                'audio_call_minutes' => 0,
                 'video_call_minutes' => 0,
+                'audio_call_gross' => 0,
                 'video_call_gross' => 0,
                 'pk_event_count' => 0,
                 'total_payout' => 0,
+                'video_gift_coins' => 0,
+                'audio_gift_coins' => 0,
+                'pk_gift_coins' => 0,
+                'video_call_coins' => 0,
+                'audio_call_coins' => 0,
+                'bonus_coins' => 0,
+                'total_coins' => 0,
+                'agency_commission_coins' => 0,
+                'total_coins_to_be_paid' => 0,
+                'host_payout_inr' => 0.0,
+                'agency_commission_inr' => 0.0,
+                'total_inr' => 0.0,
             ];
 
             $items = [];
@@ -231,64 +287,108 @@ class AgencyWeeklyPayoutReportService
                 $billableMinutes = (int) ($call->billable_minutes ?? 0);
                 $videoCallMinutes = (int) ($call->video_call_minutes ?? 0);
                 $videoCallGross = (int) ($call->video_call_gross ?? 0);
+                $audioCallMinutes = (int) ($call->audio_call_minutes ?? 0);
+                $audioCallGross = (int) ($call->audio_call_gross ?? 0);
                 $giftEvents = (int) ($gift->gift_events ?? 0);
                 $giftQuantity = (int) ($gift->gift_quantity ?? 0);
                 $uniqueGifters = (int) ($gift->unique_gifters ?? 0);
                 $roomCount = (int) ($rooms->live_room_count ?? $gift->live_room_count ?? 0);
+                $audioRoomCount = (int) ($rooms->audio_room_count ?? 0);
                 $videoRoomCount = (int) ($rooms->video_room_count ?? 0);
+                $audioRoomMinutes = (int) ($rooms->audio_room_minutes ?? 0);
                 $videoRoomMinutes = (int) ($rooms->video_room_minutes ?? 0);
                 $videoGiftGross = (int) ($gift->video_gift_gross ?? 0);
+                $audioGiftGross = (int) ($gift->audio_gift_gross ?? 0);
                 $pkEventCount = (int) ($pk->pk_event_count ?? 0);
-                $hostShare = (int) (($call->ledger_host_share ?? 0) + ($gift->ledger_host_share ?? 0));
-                $agencyShare = (int) (($call->ledger_agency_share ?? 0) + ($gift->ledger_agency_share ?? 0));
-                $platformShare = (int) ($call->platform_share ?? 0) + (int) ($gift->platform_share ?? 0);
-                $gross = $callGross + $giftGross;
-                $totalPayout = $hostShare + $agencyShare;
+                $videoCallCoins = $videoCallGross;
+                $audioCallCoins = $audioCallGross;
+                $pkGiftCoins = $pkGross;
+                $bonusCoins = 0;
+                $agencyCommissionCoins = 0;
+                $totalCoins = $this->calculateTotalCoins([
+                    'video_gift_coins' => $videoGiftGross,
+                    'audio_gift_coins' => $audioGiftGross,
+                    'pk_gift_coins' => $pkGiftCoins,
+                    'video_call_coins' => $videoCallCoins,
+                    'audio_call_coins' => $audioCallCoins,
+                    'bonus_coins' => $bonusCoins,
+                ]);
+                $totalCoinsToBePaid = $this->calculateTotalCoinsToBePaid($totalCoins, $agencyCommissionCoins);
 
                 $items[] = [
                     'host_id' => $host->id,
                     'call_earnings' => $callGross,
                     'gift_earnings' => $giftGross,
                     'live_room_earnings' => $giftGross,
-                    'pk_earnings' => $pkGross,
-                    'gross_earnings' => $gross,
-                    'agency_commission' => $agencyShare,
-                    'host_share' => $hostShare,
-                    'final_payable' => $agencyShare,
+                    'pk_earnings' => $pkGiftCoins,
+                    'gross_earnings' => $totalCoins,
+                    'agency_commission' => $agencyCommissionCoins,
+                    'host_share' => $totalCoins,
+                    'final_payable' => $totalCoinsToBePaid,
                     'meta' => [
                         'call_count' => $callCount,
                         'completed_call_count' => $completedCallCount,
                         'billable_minutes' => $billableMinutes,
-                        'video_call_minutes' => $videoCallMinutes,
-                        'video_call_gross' => $videoCallGross,
                         'gift_events' => $giftEvents,
                         'gift_quantity' => $giftQuantity,
                         'unique_gifters' => $uniqueGifters,
                         'live_room_count' => $roomCount,
+                        'audio_room_count' => $audioRoomCount,
                         'video_room_count' => $videoRoomCount,
                         'video_room_minutes' => $videoRoomMinutes,
+                        'audio_room_minutes' => $audioRoomMinutes,
+                        'video_gift_coins' => $videoGiftGross,
                         'video_gift_gross' => $videoGiftGross,
+                        'audio_gift_coins' => $audioGiftGross,
+                        'audio_gift_gross' => $audioGiftGross,
+                        'pk_gift_coins' => $pkGiftCoins,
+                        'video_call_coins' => $videoCallCoins,
+                        'video_call_gross' => $videoCallCoins,
+                        'video_call_minutes' => $videoCallMinutes,
+                        'audio_call_coins' => $audioCallCoins,
+                        'audio_call_gross' => $audioCallCoins,
+                        'audio_call_minutes' => $audioCallMinutes,
+                        'bonus_coins' => $bonusCoins,
+                        'total_coins' => $totalCoins,
+                        'agency_commission_coins' => $agencyCommissionCoins,
+                        'total_coins_to_be_paid' => $totalCoinsToBePaid,
+                        'host_payout_inr' => 0,
+                        'agency_commission_inr' => 0,
+                        'total_inr' => 0,
+                        'admin_note' => '',
                         'pk_event_count' => $pkEventCount,
-                        'total_payout' => $totalPayout,
+                        'total_payout' => $totalCoinsToBePaid,
                     ],
                 ];
 
-                $totals['gross_earnings'] += $gross;
-                $totals['platform_commission'] += $platformShare;
-                $totals['agency_commission'] += $agencyShare;
-                $totals['host_share'] += $hostShare;
+                $totals['gross_earnings'] += $totalCoins;
+                $totals['agency_commission'] += $agencyCommissionCoins;
+                $totals['host_share'] += $totalCoins;
                 $totals['call_count'] += $callCount;
                 $totals['billable_minutes'] += $billableMinutes;
                 $totals['gift_events'] += $giftEvents;
                 $totals['gift_quantity'] += $giftQuantity;
                 $totals['live_room_count'] += $roomCount;
+                $totals['audio_room_count'] += $audioRoomCount;
                 $totals['video_room_count'] += $videoRoomCount;
+                $totals['audio_room_minutes'] += $audioRoomMinutes;
                 $totals['video_room_minutes'] += $videoRoomMinutes;
+                $totals['audio_gift_gross'] += $audioGiftGross;
                 $totals['video_gift_gross'] += $videoGiftGross;
+                $totals['audio_call_minutes'] += $audioCallMinutes;
                 $totals['video_call_minutes'] += $videoCallMinutes;
+                $totals['audio_call_gross'] += $audioCallGross;
                 $totals['video_call_gross'] += $videoCallGross;
                 $totals['pk_event_count'] += $pkEventCount;
-                $totals['total_payout'] += $totalPayout;
+                $totals['total_payout'] += $totalCoinsToBePaid;
+                $totals['video_gift_coins'] += $videoGiftGross;
+                $totals['audio_gift_coins'] += $audioGiftGross;
+                $totals['pk_gift_coins'] += $pkGiftCoins;
+                $totals['video_call_coins'] += $videoCallCoins;
+                $totals['audio_call_coins'] += $audioCallCoins;
+                $totals['total_coins'] += $totalCoins;
+                $totals['agency_commission_coins'] += $agencyCommissionCoins;
+                $totals['total_coins_to_be_paid'] += $totalCoinsToBePaid;
             }
 
             if (!$generateZeroReports && $totals['gross_earnings'] === 0 && $hosts->isEmpty()) {
@@ -299,12 +399,12 @@ class AgencyWeeklyPayoutReportService
                 'agency_id' => $agency->id,
                 'period_start' => $periodStart,
                 'period_end' => $periodEnd,
-                'gross_earnings' => $totals['gross_earnings'],
-                'platform_commission' => $totals['platform_commission'],
-                'agency_commission' => $totals['agency_commission'],
-                'host_share' => $totals['host_share'],
+                'gross_earnings' => $totals['total_coins'],
+                'platform_commission' => 0,
+                'agency_commission' => $totals['agency_commission_coins'],
+                'host_share' => $totals['total_coins'],
                 'deductions' => 0,
-                'final_payable' => $totals['agency_commission'],
+                'final_payable' => $totals['total_coins_to_be_paid'],
                 'status' => 'generated',
                 'generated_at' => now(config('app.timezone')),
                 'admin_remarks' => $force ? 'Regenerated from console/admin flow.' : null,
@@ -317,13 +417,30 @@ class AgencyWeeklyPayoutReportService
                         'gift_events' => $totals['gift_events'],
                         'gift_quantity' => $totals['gift_quantity'],
                         'live_room_count' => $totals['live_room_count'],
+                        'audio_room_count' => $totals['audio_room_count'],
                         'video_room_count' => $totals['video_room_count'],
+                        'audio_room_minutes' => $totals['audio_room_minutes'],
                         'video_room_minutes' => $totals['video_room_minutes'],
+                        'audio_gift_coins' => $totals['audio_gift_coins'],
+                        'video_gift_coins' => $totals['video_gift_coins'],
+                        'audio_gift_gross' => $totals['audio_gift_gross'],
                         'video_gift_gross' => $totals['video_gift_gross'],
+                        'audio_call_minutes' => $totals['audio_call_minutes'],
                         'video_call_minutes' => $totals['video_call_minutes'],
+                        'audio_call_coins' => $totals['audio_call_coins'],
+                        'video_call_coins' => $totals['video_call_coins'],
+                        'audio_call_gross' => $totals['audio_call_gross'],
                         'video_call_gross' => $totals['video_call_gross'],
+                        'pk_gift_coins' => $totals['pk_gift_coins'],
                         'pk_event_count' => $totals['pk_event_count'],
-                        'total_payout' => $totals['total_payout'],
+                        'bonus_coins' => $totals['bonus_coins'],
+                        'total_coins' => $totals['total_coins'],
+                        'agency_commission_coins' => $totals['agency_commission_coins'],
+                        'total_coins_to_be_paid' => $totals['total_coins_to_be_paid'],
+                        'host_payout_inr' => $totals['host_payout_inr'],
+                        'agency_commission_inr' => $totals['agency_commission_inr'],
+                        'total_inr' => $totals['total_inr'],
+                        'total_payout' => $totals['total_coins_to_be_paid'],
                     ],
                 ],
             ]);
@@ -417,57 +534,19 @@ class AgencyWeeklyPayoutReportService
                 ->firstOrFail();
 
             $before = $lockedItem->toArray();
-            $meta = $lockedItem->meta ?? [];
-            $columnKeys = [
-                'call_earnings',
-                'gift_earnings',
-                'pk_earnings',
-                'gross_earnings',
-                'agency_commission',
-                'host_share',
-                'final_payable',
-            ];
-            $metaIntegerKeys = [
-                'call_count',
-                'completed_call_count',
-                'billable_minutes',
-                'video_call_minutes',
-                'video_call_gross',
-                'gift_events',
-                'gift_quantity',
-                'unique_gifters',
-                'live_room_count',
-                'video_room_count',
-                'video_room_minutes',
-                'video_gift_gross',
-                'pk_event_count',
-                'total_payout',
-            ];
+            $normalized = $this->normalizeSettlementItemPayload($payload, $lockedItem->meta ?? []);
 
-            $itemChanges = [];
-            foreach ($columnKeys as $key) {
-                if (array_key_exists($key, $payload)) {
-                    $itemChanges[$key] = max(0, (int) $payload[$key]);
-                }
-            }
-
-            if (array_key_exists('gift_earnings', $itemChanges)) {
-                $itemChanges['live_room_earnings'] = $itemChanges['gift_earnings'];
-            }
-
-            foreach ($metaIntegerKeys as $key) {
-                if (array_key_exists($key, $payload)) {
-                    $meta[$key] = max(0, (int) $payload[$key]);
-                }
-            }
-
-            if (array_key_exists('admin_note', $payload)) {
-                $meta['admin_note'] = (string) ($payload['admin_note'] ?? '');
-            }
-
-            $lockedItem->forceFill(array_merge($itemChanges, [
-                'meta' => $meta,
-            ]))->save();
+            $lockedItem->forceFill([
+                'call_earnings' => $normalized['call_earnings'],
+                'gift_earnings' => $normalized['gift_earnings'],
+                'live_room_earnings' => $normalized['gift_earnings'],
+                'pk_earnings' => $normalized['pk_earnings'],
+                'gross_earnings' => $normalized['gross_earnings'],
+                'agency_commission' => $normalized['agency_commission'],
+                'host_share' => $normalized['host_share'],
+                'final_payable' => $normalized['final_payable'],
+                'meta' => $normalized['meta'],
+            ])->save();
 
             $reportStatus = $locked->status === 'approved'
                 ? ['status' => 'pending_review', 'approved_at' => null]
@@ -593,10 +672,6 @@ class AgencyWeeklyPayoutReportService
                 ->lockForUpdate()
                 ->findOrFail($report->id);
 
-            if ($locked->paid_at || $locked->status === 'paid') {
-                throw new InvalidArgumentException('Paid payout reports cannot be deleted.');
-            }
-
             $before = $locked->toArray();
             $owner = $locked->agency?->owner;
             $locked->delete();
@@ -631,28 +706,17 @@ class AgencyWeeklyPayoutReportService
                 'period_end' => optional($report->period_end)->toDateTimeString(),
                 'host_id' => $item->host_id,
                 'host_name' => $item->host?->user?->name ?? $item->host?->stage_name,
-                'call_earnings' => $item->call_earnings,
-                'call_count' => (int) data_get($item->meta, 'call_count', 0),
-                'completed_call_count' => (int) data_get($item->meta, 'completed_call_count', 0),
-                'billable_minutes' => (int) data_get($item->meta, 'billable_minutes', 0),
-                'video_call_minutes' => (int) data_get($item->meta, 'video_call_minutes', 0),
-                'video_call_gross' => (int) data_get($item->meta, 'video_call_gross', 0),
-                'gift_earnings' => $item->gift_earnings,
-                'gift_events' => (int) data_get($item->meta, 'gift_events', 0),
-                'gift_quantity' => (int) data_get($item->meta, 'gift_quantity', 0),
-                'unique_gifters' => (int) data_get($item->meta, 'unique_gifters', 0),
-                'live_room_count' => (int) data_get($item->meta, 'live_room_count', 0),
-                'video_room_count' => (int) data_get($item->meta, 'video_room_count', 0),
-                'video_room_minutes' => (int) data_get($item->meta, 'video_room_minutes', 0),
-                'video_gift_gross' => (int) data_get($item->meta, 'video_gift_gross', 0),
-                'pk_earnings' => $item->pk_earnings,
-                'pk_event_count' => (int) data_get($item->meta, 'pk_event_count', 0),
-                'gross_earnings' => $item->gross_earnings,
-                'agency_commission' => $item->agency_commission,
-                'host_share' => $item->host_share,
-                'total_payout' => (int) data_get($item->meta, 'total_payout', ((int) $item->agency_commission + (int) $item->host_share)),
-                'final_payable' => $item->final_payable,
-                'admin_note' => (string) data_get($item->meta, 'admin_note', ''),
+                'video_room_minutes' => $item->video_room_minutes,
+                'video_gift_coins' => $item->video_gift_coins,
+                'pk_gift_coins' => $item->pk_gift_coins,
+                'video_call_coins' => $item->video_call_coins,
+                'video_call_minutes' => $item->video_call_minutes,
+                'bonus_coins' => $item->bonus_coins,
+                'total_coins' => $item->total_coins,
+                'host_payout_inr' => $item->host_payout_inr,
+                'agency_commission_inr' => $item->agency_commission_inr,
+                'total_inr' => $item->total_inr,
+                'admin_note' => $item->admin_note,
                 'report_status' => $report->status,
                 'published_at' => optional($report->published_at)->toDateTimeString(),
             ];
@@ -732,10 +796,6 @@ class AgencyWeeklyPayoutReportService
         $report->unsetRelation('items');
         $report->load('items');
 
-        $grossEarnings = (int) $report->items->sum('gross_earnings');
-        $agencyCommission = (int) $report->items->sum('agency_commission');
-        $hostShare = (int) $report->items->sum('host_share');
-        $itemFinalPayable = (int) $report->items->sum('final_payable');
         $deductions = array_key_exists('deductions', $changes)
             ? max(0, (int) $changes['deductions'])
             : max(0, (int) $report->deductions);
@@ -745,36 +805,120 @@ class AgencyWeeklyPayoutReportService
         $meta['totals']['gift_events'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => (int) data_get($item->meta, 'gift_events', 0));
         $meta['totals']['gift_quantity'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => (int) data_get($item->meta, 'gift_quantity', 0));
         $meta['totals']['live_room_count'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => (int) data_get($item->meta, 'live_room_count', 0));
+        $meta['totals']['audio_room_count'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => (int) data_get($item->meta, 'audio_room_count', 0));
         $meta['totals']['video_room_count'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => (int) data_get($item->meta, 'video_room_count', 0));
+        $meta['totals']['audio_room_minutes'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => (int) data_get($item->meta, 'audio_room_minutes', 0));
         $meta['totals']['video_room_minutes'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => (int) data_get($item->meta, 'video_room_minutes', 0));
-        $meta['totals']['video_gift_gross'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => (int) data_get($item->meta, 'video_gift_gross', 0));
+        $meta['totals']['audio_gift_gross'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => $item->audio_gift_coins ?? 0);
+        $meta['totals']['video_gift_gross'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => $item->video_gift_coins);
+        $meta['totals']['audio_gift_coins'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => $item->audio_gift_coins ?? 0);
+        $meta['totals']['video_gift_coins'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => $item->video_gift_coins);
+        $meta['totals']['audio_call_minutes'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => (int) data_get($item->meta, 'audio_call_minutes', 0));
         $meta['totals']['video_call_minutes'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => (int) data_get($item->meta, 'video_call_minutes', 0));
-        $meta['totals']['video_call_gross'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => (int) data_get($item->meta, 'video_call_gross', 0));
+        $meta['totals']['audio_call_gross'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => $item->audio_call_coins ?? 0);
+        $meta['totals']['video_call_gross'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => $item->video_call_coins);
+        $meta['totals']['audio_call_coins'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => $item->audio_call_coins ?? 0);
+        $meta['totals']['video_call_coins'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => $item->video_call_coins);
         $meta['totals']['pk_event_count'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => (int) data_get($item->meta, 'pk_event_count', 0));
-        $meta['totals']['total_payout'] = (int) $report->items->sum(function (AgencyPayoutReportItem $item) {
-            return (int) data_get($item->meta, 'total_payout', ((int) $item->agency_commission + (int) $item->host_share));
-        });
+        $meta['totals']['pk_gift_coins'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => $item->pk_gift_coins);
+        $meta['totals']['bonus_coins'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => $item->bonus_coins);
+        $meta['totals']['total_coins'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => $item->total_coins);
+        $meta['totals']['agency_commission_coins'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => $item->agency_commission_coins);
+        $meta['totals']['total_coins_to_be_paid'] = (int) $report->items->sum(fn (AgencyPayoutReportItem $item) => $item->total_coins_to_be_paid);
+        $meta['totals']['host_payout_inr'] = round((float) $report->items->sum(fn (AgencyPayoutReportItem $item) => $item->host_payout_inr), 2);
+        $meta['totals']['agency_commission_inr'] = round((float) $report->items->sum(fn (AgencyPayoutReportItem $item) => $item->agency_commission_inr), 2);
+        $meta['totals']['total_inr'] = round((float) ($meta['totals']['host_payout_inr'] + $meta['totals']['agency_commission_inr']), 2);
+        $meta['totals']['total_payout'] = (int) $meta['totals']['total_coins_to_be_paid'];
 
         $payload = array_merge($changes, [
-            'gross_earnings' => $grossEarnings,
-            'platform_commission' => max(0, $grossEarnings - (int) $meta['totals']['total_payout']),
-            'agency_commission' => $agencyCommission,
-            'host_share' => $hostShare,
+            'gross_earnings' => (int) $meta['totals']['total_coins'],
+            'platform_commission' => 0,
+            'agency_commission' => (int) $meta['totals']['agency_commission_coins'],
+            'host_share' => (int) $meta['totals']['total_coins'],
             'deductions' => $deductions,
-            'final_payable' => max(0, $itemFinalPayable - $deductions),
+            'final_payable' => max(0, (int) $meta['totals']['total_coins_to_be_paid'] - $deductions),
             'meta' => $meta,
         ]);
 
         $report->forceFill($payload)->save();
     }
 
-    private function percentOfGross(int $gross, int $value): float
+    private function normalizeSettlementItemPayload(array $payload, array $existingMeta = []): array
     {
-        if ($gross <= 0) {
-            return 0.0;
-        }
+        $videoRoomMinutes = max(0, (int) ($payload['video_room_minutes'] ?? data_get($existingMeta, 'video_room_minutes', 0)));
+        $audioRoomMinutes = max(0, (int) data_get($existingMeta, 'audio_room_minutes', 0));
+        $videoGiftCoins = max(0, (int) ($payload['video_gift_coins'] ?? data_get($existingMeta, 'video_gift_coins', data_get($existingMeta, 'video_gift_gross', 0))));
+        $audioGiftCoins = max(0, (int) data_get($existingMeta, 'audio_gift_coins', data_get($existingMeta, 'audio_gift_gross', 0)));
+        $pkGiftCoins = max(0, (int) ($payload['pk_gift_coins'] ?? data_get($existingMeta, 'pk_gift_coins', 0)));
+        $videoCallCoins = max(0, (int) ($payload['video_call_coins'] ?? data_get($existingMeta, 'video_call_coins', data_get($existingMeta, 'video_call_gross', 0))));
+        $videoCallMinutes = max(0, (int) ($payload['video_call_minutes'] ?? data_get($existingMeta, 'video_call_minutes', 0)));
+        $audioCallCoins = max(0, (int) data_get($existingMeta, 'audio_call_coins', data_get($existingMeta, 'audio_call_gross', 0)));
+        $audioCallMinutes = max(0, (int) data_get($existingMeta, 'audio_call_minutes', 0));
+        $bonusCoins = max(0, (int) ($payload['bonus_coins'] ?? data_get($existingMeta, 'bonus_coins', 0)));
+        $agencyCommissionCoins = max(0, (int) data_get($existingMeta, 'agency_commission_coins', 0));
+        $hostPayoutInr = round(max(0, (float) ($payload['host_payout_inr'] ?? data_get($existingMeta, 'host_payout_inr', 0))), 2);
+        $agencyCommissionInr = round(max(0, (float) ($payload['agency_commission_inr'] ?? data_get($existingMeta, 'agency_commission_inr', 0))), 2);
+        $totalCoins = $this->calculateTotalCoins([
+            'video_gift_coins' => $videoGiftCoins,
+            'audio_gift_coins' => $audioGiftCoins,
+            'pk_gift_coins' => $pkGiftCoins,
+            'video_call_coins' => $videoCallCoins,
+            'audio_call_coins' => $audioCallCoins,
+            'bonus_coins' => $bonusCoins,
+        ]);
+        $totalCoinsToBePaid = $this->calculateTotalCoinsToBePaid($totalCoins, $agencyCommissionCoins);
+        $totalInr = round($hostPayoutInr + $agencyCommissionInr, 2);
 
-        return round(($value / $gross) * 100, 2);
+        return [
+            'call_earnings' => $videoCallCoins + $audioCallCoins,
+            'gift_earnings' => $videoGiftCoins + $audioGiftCoins,
+            'pk_earnings' => $pkGiftCoins,
+            'gross_earnings' => $totalCoins,
+            'agency_commission' => $agencyCommissionCoins,
+            'host_share' => $totalCoins,
+            'final_payable' => $totalCoinsToBePaid,
+            'meta' => array_merge($existingMeta, [
+                'video_room_minutes' => $videoRoomMinutes,
+                'audio_room_minutes' => $audioRoomMinutes,
+                'video_gift_coins' => $videoGiftCoins,
+                'video_gift_gross' => $videoGiftCoins,
+                'audio_gift_coins' => $audioGiftCoins,
+                'audio_gift_gross' => $audioGiftCoins,
+                'pk_gift_coins' => $pkGiftCoins,
+                'video_call_coins' => $videoCallCoins,
+                'video_call_gross' => $videoCallCoins,
+                'video_call_minutes' => $videoCallMinutes,
+                'audio_call_coins' => $audioCallCoins,
+                'audio_call_gross' => $audioCallCoins,
+                'audio_call_minutes' => $audioCallMinutes,
+                'bonus_coins' => $bonusCoins,
+                'total_coins' => $totalCoins,
+                'agency_commission_coins' => $agencyCommissionCoins,
+                'total_coins_to_be_paid' => $totalCoinsToBePaid,
+                'host_payout_inr' => $hostPayoutInr,
+                'agency_commission_inr' => $agencyCommissionInr,
+                'total_inr' => $totalInr,
+                'admin_note' => trim((string) ($payload['admin_note'] ?? data_get($existingMeta, 'admin_note', ''))),
+            ]),
+        ];
+    }
+
+    private function calculateTotalCoins(array $values): int
+    {
+        return max(
+            0,
+            (int) ($values['video_gift_coins'] ?? 0)
+            + (int) ($values['audio_gift_coins'] ?? 0)
+            + (int) ($values['pk_gift_coins'] ?? 0)
+            + (int) ($values['video_call_coins'] ?? 0)
+            + (int) ($values['audio_call_coins'] ?? 0)
+            + (int) ($values['bonus_coins'] ?? 0)
+        );
+    }
+
+    private function calculateTotalCoinsToBePaid(int $totalCoins, int $agencyCommissionCoins): int
+    {
+        return max(0, $totalCoins + $agencyCommissionCoins);
     }
 
     private function carbonWeekDay(string $name): int
@@ -789,6 +933,53 @@ class AgencyWeeklyPayoutReportService
             'saturday' => Carbon::SATURDAY,
             default => Carbon::MONDAY,
         };
+    }
+
+    private function buildRoomRows($rooms, CarbonInterface $periodStart, CarbonInterface $periodEnd)
+    {
+        return $rooms->groupBy('host_id')->map(function ($hostRooms) use ($periodStart, $periodEnd) {
+            $liveRoomCount = 0;
+            $audioRoomCount = 0;
+            $videoRoomCount = 0;
+            $audioMinutes = 0;
+            $videoMinutes = 0;
+
+            foreach ($hostRooms as $room) {
+                $roomStart = $room->started_at?->copy();
+                $roomEnd = ($room->ended_at ?? $room->last_activity_at ?? $room->started_at)?->copy();
+                if (!$roomStart || !$roomEnd) {
+                    continue;
+                }
+
+                $effectiveStart = $roomStart->greaterThan($periodStart) ? $roomStart : $periodStart->copy();
+                $effectiveEnd = $roomEnd->lessThan($periodEnd) ? $roomEnd : $periodEnd->copy();
+                if ($effectiveEnd->lessThanOrEqualTo($effectiveStart)) {
+                    continue;
+                }
+
+                $minutes = (int) floor($effectiveStart->diffInSeconds($effectiveEnd) / 60);
+                if ($minutes <= 0) {
+                    continue;
+                }
+
+                $liveRoomCount++;
+                if (($room->room_type ?? 'video') === 'audio') {
+                    $audioRoomCount++;
+                    $audioMinutes += $minutes;
+                } else {
+                    $videoRoomCount++;
+                    $videoMinutes += $minutes;
+                }
+            }
+
+            return (object) [
+                'live_room_count' => $liveRoomCount,
+                'audio_room_count' => $audioRoomCount,
+                'video_room_count' => $videoRoomCount,
+                'audio_room_minutes' => $audioMinutes,
+                'video_room_minutes' => $videoMinutes,
+            ];
+        });
     }
 
     private function assertTransitionAllowed(AgencyPayoutReport $report, array $allowedStatuses, string $message): void

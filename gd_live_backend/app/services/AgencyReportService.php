@@ -20,8 +20,7 @@ class AgencyReportService
         $base = CallSession::query()
             ->with(['agency', 'host.user'])
             ->whereBetween('created_at', [$from, $to]);
-        $liveBase = LiveRoom::query()
-            ->whereBetween('created_at', [$from, $to])
+        $liveBase = $this->liveRoomRangeQuery($from, $to)
             ->whereHas('host', fn ($query) => $query->whereNotNull('agency_id'));
         $giftBase = LiveRoomGiftEarningLedger::query()
             ->whereBetween('created_at', [$from, $to])
@@ -44,6 +43,8 @@ class AgencyReportService
                 'total_hosts' => Host::query()->count(),
                 'total_calls' => (clone $base)->count(),
                 'video_calls' => (clone $base)->where('type', 'video')->count(),
+                'video_call_minutes' => (int) (clone $base)->where('type', 'video')->sum('billable_minutes'),
+                'video_call_coins' => (int) (clone $base)->where('type', 'video')->sum('total_coins_charged'),
                 'completed_calls' => (clone $base)->where('status', 'ended')->count(),
                 'failed_calls' => (clone $base)->whereIn('status', ['failed', 'missed', 'rejected'])->count(),
                 'total_minutes' => (int) (clone $base)->sum('billable_minutes'),
@@ -51,8 +52,9 @@ class AgencyReportService
                 'host_earnings' => (int) (clone $base)->sum('host_earning'),
                 'agency_earnings' => (int) (clone $base)->sum('agency_earning'),
                 'live_rooms' => (int) (clone $liveBase)->count(),
-                'live_minutes' => (int) (clone $liveBase)->get()->sum(fn (LiveRoom $room) => (int) ($room->duration_minutes ?? 0)),
+                'live_minutes' => $this->sumLiveRoomMinutes((clone $liveBase)->get(), $from, $to),
                 'live_gift_coins' => (int) (clone $giftBase)->sum('total_coins'),
+                'room_gift_coins' => max(0, (int) (clone $giftBase)->sum('total_coins') - (int) (clone $pkBase)->sum('live_room_gift_earning_ledgers.total_coins')),
                 'live_host_earnings' => (int) (clone $giftBase)->sum('host_payout_coins'),
                 'live_agency_earnings' => (int) (clone $giftBase)->sum('agency_payout_coins'),
                 'pk_gift_coins' => (int) (clone $pkBase)->sum('live_room_gift_earning_ledgers.total_coins'),
@@ -82,9 +84,8 @@ class AgencyReportService
             ->with(['caller', 'receiver', 'host.user'])
             ->where('agency_id', $agency->id)
             ->whereBetween('created_at', [$from, $to]);
-        $liveBase = LiveRoom::query()
-            ->whereHas('host', fn ($query) => $query->where('agency_id', $agency->id))
-            ->whereBetween('created_at', [$from, $to]);
+        $liveBase = $this->liveRoomRangeQuery($from, $to)
+            ->whereHas('host', fn ($query) => $query->where('agency_id', $agency->id));
         $giftBase = LiveRoomGiftEarningLedger::query()
             ->where('agency_id', $agency->id)
             ->whereBetween('created_at', [$from, $to]);
@@ -99,9 +100,8 @@ class AgencyReportService
                 $calls = CallSession::query()
                     ->where('host_id', $host->id)
                     ->whereBetween('created_at', [$from, $to]);
-                $liveRooms = LiveRoom::query()
-                    ->where('host_id', $host->id)
-                    ->whereBetween('created_at', [$from, $to]);
+                $liveRooms = $this->liveRoomRangeQuery($from, $to)
+                    ->where('host_id', $host->id);
                 $liveGifts = LiveRoomGiftEarningLedger::query()
                     ->where('host_id', $host->id)
                     ->whereBetween('created_at', [$from, $to]);
@@ -112,11 +112,15 @@ class AgencyReportService
                     'calls' => (clone $calls)->count(),
                     'minutes' => (int) (clone $calls)->sum('billable_minutes'),
                     'coins' => (int) (clone $calls)->sum('total_coins_charged'),
+                    'video_call_minutes' => (int) (clone $calls)->where('type', 'video')->sum('billable_minutes'),
+                    'video_call_coins' => (int) (clone $calls)->where('type', 'video')->sum('total_coins_charged'),
                     'host_earnings' => (int) (clone $calls)->sum('host_earning'),
                     'agency_earnings' => (int) (clone $calls)->sum('agency_earning'),
                     'live_rooms' => (int) (clone $liveRooms)->count(),
+                    'live_minutes' => $this->sumLiveRoomMinutes((clone $liveRooms)->get(), $from, $to),
                     'live_gift_coins' => (int) (clone $liveGifts)->sum('total_coins'),
                     'pk_gift_coins' => (int) (clone $pkGifts)->sum('live_room_gift_earning_ledgers.total_coins'),
+                    'room_gift_coins' => max(0, (int) (clone $liveGifts)->sum('total_coins') - (int) (clone $pkGifts)->sum('live_room_gift_earning_ledgers.total_coins')),
                     'pk_host_earnings' => (int) (clone $pkGifts)->sum('live_room_gift_earning_ledgers.host_payout_coins'),
                     'pk_agency_earnings' => (int) (clone $pkGifts)->sum('live_room_gift_earning_ledgers.agency_payout_coins'),
                     'pk_event_count' => (int) (clone $pkGifts)->count(),
@@ -133,6 +137,8 @@ class AgencyReportService
                 'hosts' => $agency->hosts()->count(),
                 'calls' => (clone $base)->count(),
                 'video_calls' => (clone $base)->where('type', 'video')->count(),
+                'video_call_minutes' => (int) (clone $base)->where('type', 'video')->sum('billable_minutes'),
+                'video_call_coins' => (int) (clone $base)->where('type', 'video')->sum('total_coins_charged'),
                 'completed_calls' => (clone $base)->where('status', 'ended')->count(),
                 'failed_calls' => (clone $base)->whereIn('status', ['failed', 'missed', 'rejected'])->count(),
                 'minutes' => (int) (clone $base)->sum('billable_minutes'),
@@ -140,8 +146,9 @@ class AgencyReportService
                 'host_earnings' => (int) (clone $base)->sum('host_earning'),
                 'agency_earnings' => (int) (clone $base)->sum('agency_earning'),
                 'live_rooms' => (int) (clone $liveBase)->count(),
-                'live_minutes' => (int) (clone $liveBase)->get()->sum(fn (LiveRoom $room) => (int) ($room->duration_minutes ?? 0)),
+                'live_minutes' => $this->sumLiveRoomMinutes((clone $liveBase)->get(), $from, $to),
                 'live_gift_coins' => (int) (clone $giftBase)->sum('total_coins'),
+                'room_gift_coins' => max(0, (int) (clone $giftBase)->sum('total_coins') - (int) (clone $pkBase)->sum('live_room_gift_earning_ledgers.total_coins')),
                 'live_host_earnings' => (int) (clone $giftBase)->sum('host_payout_coins'),
                 'live_agency_earnings' => (int) (clone $giftBase)->sum('agency_payout_coins'),
                 'pk_gift_coins' => (int) (clone $pkBase)->sum('live_room_gift_earning_ledgers.total_coins'),
@@ -152,7 +159,7 @@ class AgencyReportService
             'hosts_table' => $hosts,
             'weekly_breakdown' => $this->agencyWeeklyBreakdown($agency, $from, $to),
             'recent_calls' => (clone $base)->latest('id')->limit(20)->get(),
-            'recent_live_rooms' => (clone $liveBase)->with('host.user')->latest('id')->limit(20)->get(),
+            'recent_live_rooms' => (clone $liveBase)->with('host.user')->latest('started_at')->limit(20)->get(),
         ];
     }
 
@@ -262,10 +269,9 @@ class AgencyReportService
 
     private function liveRoomsOverTime(Carbon $from, Carbon $to): array
     {
-        $rows = LiveRoom::query()
-            ->whereBetween('created_at', [$from, $to])
+        $rows = $this->liveRoomRangeQuery($from, $to)
             ->whereHas('host', fn ($query) => $query->whereNotNull('agency_id'))
-            ->selectRaw('DATE(created_at) as label, COUNT(*) as total')
+            ->selectRaw('DATE(started_at) as label, COUNT(*) as total')
             ->groupBy('label')
             ->orderBy('label')
             ->get()
@@ -305,9 +311,8 @@ class AgencyReportService
                 $calls = CallSession::query()
                     ->where('agency_id', $agency->id)
                     ->whereBetween('created_at', [$from, $to]);
-                $liveRooms = LiveRoom::query()
-                    ->whereHas('host', fn ($query) => $query->where('agency_id', $agency->id))
-                    ->whereBetween('created_at', [$from, $to]);
+                $liveRooms = $this->liveRoomRangeQuery($from, $to)
+                    ->whereHas('host', fn ($query) => $query->where('agency_id', $agency->id));
                 $liveGifts = LiveRoomGiftEarningLedger::query()
                     ->where('agency_id', $agency->id)
                     ->whereBetween('created_at', [$from, $to]);
@@ -326,10 +331,13 @@ class AgencyReportService
                     'calls' => (clone $calls)->count(),
                     'minutes' => (int) (clone $calls)->sum('billable_minutes'),
                     'coins' => (int) (clone $calls)->sum('total_coins_charged'),
+                    'video_call_minutes' => (int) (clone $calls)->where('type', 'video')->sum('billable_minutes'),
+                    'video_call_coins' => (int) (clone $calls)->where('type', 'video')->sum('total_coins_charged'),
                     'earnings' => (int) (clone $calls)->sum('agency_earning'),
                     'live_rooms' => (int) (clone $liveRooms)->count(),
-                    'live_minutes' => (int) (clone $liveRooms)->get()->sum(fn (LiveRoom $room) => (int) ($room->duration_minutes ?? 0)),
+                    'live_minutes' => $this->sumLiveRoomMinutes((clone $liveRooms)->get(), $from, $to),
                     'live_gift_coins' => (int) (clone $liveGifts)->sum('total_coins'),
+                    'room_gift_coins' => max(0, (int) (clone $liveGifts)->sum('total_coins') - (int) (clone $pkGifts)->sum('live_room_gift_earning_ledgers.total_coins')),
                     'live_agency_earnings' => (int) (clone $liveGifts)->sum('agency_payout_coins'),
                     'pk_gift_coins' => (int) (clone $pkGifts)->sum('live_room_gift_earning_ledgers.total_coins'),
                     'pk_agency_earnings' => (int) (clone $pkGifts)->sum('live_room_gift_earning_ledgers.agency_payout_coins'),
@@ -355,9 +363,8 @@ class AgencyReportService
             $calls = CallSession::query()
                 ->where('agency_id', $agency->id)
                 ->whereBetween('created_at', [$weekStart, $weekEnd]);
-            $liveRooms = LiveRoom::query()
-                ->whereHas('host', fn ($query) => $query->where('agency_id', $agency->id))
-                ->whereBetween('created_at', [$weekStart, $weekEnd]);
+            $liveRooms = $this->liveRoomRangeQuery($weekStart, $weekEnd)
+                ->whereHas('host', fn ($query) => $query->where('agency_id', $agency->id));
             $liveGifts = LiveRoomGiftEarningLedger::query()
                 ->where('agency_id', $agency->id)
                 ->whereBetween('created_at', [$weekStart, $weekEnd]);
@@ -368,11 +375,14 @@ class AgencyReportService
                 'calls' => (clone $calls)->count(),
                 'minutes' => (int) (clone $calls)->sum('billable_minutes'),
                 'coins' => (int) (clone $calls)->sum('total_coins_charged'),
+                'video_call_minutes' => (int) (clone $calls)->where('type', 'video')->sum('billable_minutes'),
+                'video_call_coins' => (int) (clone $calls)->where('type', 'video')->sum('total_coins_charged'),
                 'host_earnings' => (int) (clone $calls)->sum('host_earning'),
                 'agency_earnings' => (int) (clone $calls)->sum('agency_earning'),
                 'live_rooms' => (int) (clone $liveRooms)->count(),
-                'live_minutes' => (int) (clone $liveRooms)->get()->sum(fn (LiveRoom $room) => (int) ($room->duration_minutes ?? 0)),
+                'live_minutes' => $this->sumLiveRoomMinutes((clone $liveRooms)->get(), $weekStart, $weekEnd),
                 'live_gift_coins' => (int) (clone $liveGifts)->sum('total_coins'),
+                'room_gift_coins' => max(0, (int) (clone $liveGifts)->sum('total_coins') - (int) (clone $pkGifts)->sum('live_room_gift_earning_ledgers.total_coins')),
                 'live_agency_earnings' => (int) (clone $liveGifts)->sum('agency_payout_coins'),
                 'pk_gift_coins' => (int) (clone $pkGifts)->sum('live_room_gift_earning_ledgers.total_coins'),
                 'pk_agency_earnings' => (int) (clone $pkGifts)->sum('live_room_gift_earning_ledgers.agency_payout_coins'),
@@ -392,6 +402,35 @@ class AgencyReportService
             ->whereBetween('live_room_gift_earning_ledgers.created_at', [$from, $to])
             ->when($agencyId !== null, fn ($query) => $query->where('live_room_gift_earning_ledgers.agency_id', $agencyId))
             ->when($hostId !== null, fn ($query) => $query->where('live_room_gift_earning_ledgers.host_id', $hostId));
+    }
+
+    private function liveRoomRangeQuery(Carbon $from, Carbon $to)
+    {
+        return LiveRoom::query()
+            ->whereNotNull('started_at')
+            ->where('started_at', '<=', $to)
+            ->whereRaw('COALESCE(ended_at, last_activity_at, started_at) >= ?', [$from->toDateTimeString()]);
+    }
+
+    private function sumLiveRoomMinutes($rooms, Carbon $from, Carbon $to): int
+    {
+        return (int) $rooms->sum(function (LiveRoom $room) use ($from, $to) {
+            $roomStart = $room->started_at?->copy();
+            $roomEnd = ($room->ended_at ?? $room->last_activity_at ?? $room->started_at)?->copy();
+
+            if (!$roomStart || !$roomEnd) {
+                return 0;
+            }
+
+            $effectiveStart = $roomStart->greaterThan($from) ? $roomStart : $from->copy();
+            $effectiveEnd = $roomEnd->lessThan($to) ? $roomEnd : $to->copy();
+
+            if ($effectiveEnd->lessThanOrEqualTo($effectiveStart)) {
+                return 0;
+            }
+
+            return (int) floor($effectiveStart->diffInSeconds($effectiveEnd) / 60);
+        });
     }
 
     private function seriesFromDays(Carbon $from, Carbon $to, callable $resolver): array

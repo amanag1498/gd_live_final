@@ -5,6 +5,9 @@
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GD Live</title>
+  <script>
+    window.__FIREBASE_WEB_CONFIG__ = @json(config('firebase_web'));
+  </script>
   @php
     $viteManifestExists = file_exists(public_path('build/manifest.json'));
     $viteHotExists = file_exists(public_path('hot'));

@@ -157,6 +157,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           centerTitle: false,
+          iconTheme: IconThemeData(color: tokens.textPrimary),
+          actionsIconTheme: IconThemeData(color: tokens.textPrimary),
           title: Text(
             _isSelecting ? '${_selectedIds.length} selected' : 'Notifications',
             style: TextStyle(
@@ -198,33 +200,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
             ),
             slivers: [
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(18, 4, 18, 0),
-                sliver: SliverToBoxAdapter(
-                  child: _NotificationsHero(
-                    tokens: tokens,
-                    unreadCount: unreadCount,
-                    totalCount: _controller.items.length,
-                    selecting: _isSelecting,
-                    onMarkSelected: _markSelectedRead,
-                  ),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
-                sliver: SliverToBoxAdapter(
-                  child: _SearchSurface(
-                    tokens: tokens,
-                    controller: _queryController,
-                    onChanged: (_) => setState(() {}),
-                    onClear: () {
-                      _queryController.clear();
-                      setState(() {});
-                    },
-                  ),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+                padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
                 sliver: SliverToBoxAdapter(
                   child: _FilterRail(
                     tokens: tokens,

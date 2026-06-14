@@ -23,9 +23,11 @@ class AgencyReportController extends Controller
         $payoutReports = AgencyPayoutReport::query()
             ->with('publishedByAdmin')
             ->whereIn('agency_id', $agencyIds)
-            ->where('period_start', $from)
-            ->where('period_end', $to)
+            ->whereDate('period_start', $from->toDateString())
+            ->whereDate('period_end', $to->toDateString())
+            ->latest('id')
             ->get()
+            ->unique('agency_id')
             ->keyBy('agency_id');
 
         $report['weekly_rows'] = collect($report['weekly_rows'])->map(function (array $row) use ($payoutReports) {
@@ -46,8 +48,8 @@ class AgencyReportController extends Controller
         $report['payout_report'] = AgencyPayoutReport::query()
             ->with('publishedByAdmin')
             ->where('agency_id', $agency->id)
-            ->where('period_start', $from)
-            ->where('period_end', $to)
+            ->whereDate('period_start', $from->toDateString())
+            ->whereDate('period_end', $to->toDateString())
             ->latest('id')
             ->first();
 

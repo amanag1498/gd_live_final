@@ -135,6 +135,7 @@ class _VideoCallPageState extends State<VideoCallPage>
   String? _requestStatus;
   int? _pendingRequestRequestedById;
   String? _pendingRequestRequestedByName;
+  bool _lastSeatRequestWasHostInvite = false;
   bool _incomingSeatRequestDialogOpen = false;
   int? _lastIncomingSeatRequestId;
   List<Map<String, dynamic>> _pendingRequests = const [];
@@ -1414,7 +1415,9 @@ class _VideoCallPageState extends State<VideoCallPage>
       case 'accepted':
         return 'You are now live.';
       case 'rejected':
-        return 'Host declined your request.';
+        return _lastSeatRequestWasHostInvite
+            ? 'You declined the invite.'
+            : 'Host declined your request.';
       case 'removed':
         return 'You were moved back to audience.';
       case 'cancelled':
@@ -1721,11 +1724,6 @@ class _VideoCallPageState extends State<VideoCallPage>
               active: _micOn,
             ),
             _FooterActionItem(
-              icon: _camOn ? Icons.videocam_rounded : Icons.videocam_off_rounded,
-              onTap: _toggleCam,
-              active: _camOn,
-            ),
-            _FooterActionItem(
               icon: Icons.cameraswitch_rounded,
               onTap: _flipCamera,
             ),
@@ -1833,10 +1831,9 @@ class _VideoCallPageState extends State<VideoCallPage>
         _ResponsiveChatInputAction(
           icon: Icons.casino_rounded,
           label: 'Games',
-          compactLabel: 'Game',
           onTap: _openGamesSheet,
           accent: const Color(0xFFFFD966),
-          iconOnlyBelowWidth: 470,
+          iconOnlyBelowWidth: 0,
         ),
       if (showGiftInChatFooter)
         KeyedSubtree(
@@ -1848,31 +1845,29 @@ class _VideoCallPageState extends State<VideoCallPage>
             onTap: _giftBusy ? null : _openGiftSheet,
             accent: const Color(0xFFFF8BC2),
             busy: _giftBusy,
-            iconOnlyBelowWidth: 430,
+            iconOnlyBelowWidth: 0,
           ),
         ),
       if (!_pkActive)
         _ResponsiveChatInputAction(
           icon: pending ? Icons.close_rounded : Icons.mic_rounded,
           label: pending ? 'Cancel Stage Request' : 'Join Stage',
-          compactLabel: pending ? 'Cancel Stage' : 'Stage',
           onTap:
               _seatActionBusy
                   ? null
                   : (pending ? _cancelJoinRequest : _requestToJoinAsSpeaker),
           accent: const Color(0xFF5D8BFF),
           busy: _seatActionBusy,
-          iconOnlyBelowWidth: 350,
+          iconOnlyBelowWidth: 0,
         ),
       if (!_pkActive)
         _ResponsiveChatInputAction(
           icon: Icons.video_call_rounded,
           label: 'Request Video Call',
-          compactLabel: 'Video Call',
           onTap: _privateCallBusy ? null : _requestPrivateCallFromRoom,
           accent: const Color(0xFF34D399),
           busy: _privateCallBusy,
-          iconOnlyBelowWidth: 350,
+          iconOnlyBelowWidth: 0,
         ),
     ];
   }
@@ -2995,6 +2990,8 @@ class _VideoCallPageState extends State<VideoCallPage>
             _pendingRequestRequestedById = requestedBy;
             _pendingRequestRequestedByName =
                 requestedByUser['name']?.toString();
+            _lastSeatRequestWasHostInvite =
+                requestedBy != null && requestedBy != _myUserId;
             _seatError = null;
           });
           if (wasHostInvited && requestId != null) {
@@ -3524,6 +3521,8 @@ class _VideoCallPageState extends State<VideoCallPage>
         _pendingRequestRequestedByName =
             myPendingRequestedByUser['name']?.toString();
         _requestStatus = myRequestStatus;
+        _lastSeatRequestWasHostInvite =
+            myPendingRequestedById != null && myPendingRequestedById != _myUserId;
         _seatError = null;
       });
       if (myPendingRequestId != null &&
@@ -3883,12 +3882,13 @@ class _VideoCallPageState extends State<VideoCallPage>
     });
     try {
       await widget.live.cancelSpeakerRequest(widget.room.roomId, requestId);
-      setState(() {
-        _pendingRequestId = null;
-        _pendingRequestRequestedById = null;
-        _pendingRequestRequestedByName = null;
-        _requestStatus = 'cancelled';
-      });
+        setState(() {
+          _pendingRequestId = null;
+          _pendingRequestRequestedById = null;
+          _pendingRequestRequestedByName = null;
+          _requestStatus = 'cancelled';
+          _lastSeatRequestWasHostInvite = false;
+        });
       Haptics.light();
       await _refreshSeatSnapshot();
     } catch (e) {
@@ -3911,12 +3911,13 @@ class _VideoCallPageState extends State<VideoCallPage>
       await widget.live.acceptSpeakerRequest(widget.room.roomId, requestId);
       Haptics.success();
       if (mounted) {
-        setState(() {
-          _pendingRequestId = null;
-          _pendingRequestRequestedById = null;
-          _pendingRequestRequestedByName = null;
-          _requestStatus = 'accepted';
-        });
+          setState(() {
+            _pendingRequestId = null;
+            _pendingRequestRequestedById = null;
+            _pendingRequestRequestedByName = null;
+            _requestStatus = 'accepted';
+            _lastSeatRequestWasHostInvite = false;
+          });
       }
       await _refreshSeatSnapshot();
     } catch (e) {
@@ -3939,12 +3940,16 @@ class _VideoCallPageState extends State<VideoCallPage>
       await widget.live.rejectSpeakerRequest(widget.room.roomId, requestId);
       Haptics.warning();
       if (mounted) {
-        setState(() {
-          _pendingRequestId = null;
-          _pendingRequestRequestedById = null;
-          _pendingRequestRequestedByName = null;
-          _requestStatus = 'rejected';
-        });
+          setState(() {
+            final wasHostInvite =
+                _pendingRequestRequestedById != null &&
+                _pendingRequestRequestedById != _myUserId;
+            _pendingRequestId = null;
+            _pendingRequestRequestedById = null;
+            _pendingRequestRequestedByName = null;
+            _requestStatus = 'rejected';
+            _lastSeatRequestWasHostInvite = wasHostInvite;
+          });
       }
       await _refreshSeatSnapshot();
     } catch (e) {
@@ -5317,9 +5322,10 @@ class _VideoCallPageState extends State<VideoCallPage>
                           ? (isCompactDevice ? 0.38 : 0.54)
                           : (isCompactDevice ? 0.28 : 0.4),
                   showEmptyPrompt: false,
-                  stickMessagesToBottom: false,
+                  stickMessagesToBottom: true,
                   compactBubbles: _pkCapable && _pkActive,
-                  inputActions: _buildChatInputActions(),
+                  inputActions: const <Widget>[],
+                  footerActions: _buildChatInputActions(),
                   trailingActions: _buildChatTrailingActions(),
                   showSendButton: false,
                   onSend: _sendChatMessage,
@@ -6163,13 +6169,10 @@ class _ResponsiveChatInputAction extends StatelessWidget {
     );
     final screenWidth = MediaQuery.of(context).size.width;
     final iconOnly = iconOnlyBelowWidth > 0 && screenWidth <= iconOnlyBelowWidth;
-    final resolvedLabel =
-        !iconOnly && compactLabel != null && screenWidth < 390
-            ? compactLabel!
-            : label;
+    final resolvedLabel = label;
     final tint = accent ?? tokens.primaryButtonGradient.first;
     final enabled = onTap != null && !busy;
-    const controlSize = 46.0;
+    final controlSize = iconOnly ? 40.0 : 46.0;
 
     return Padding(
       padding: const EdgeInsets.only(left: 6),
@@ -6187,15 +6190,26 @@ class _ResponsiveChatInputAction extends StatelessWidget {
               padding:
                   iconOnly
                       ? EdgeInsets.zero
-                      : const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      : EdgeInsets.symmetric(
+                        horizontal: screenWidth < 390 ? 9 : 10,
+                        vertical: screenWidth < 390 ? 7 : 8,
+                      ),
               decoration: BoxDecoration(
-                color: tokens.chipColor.withOpacity(.82),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFF112134).withOpacity(.82),
+                    Color.lerp(const Color(0xFF1F3550), tint, .22)!.withOpacity(.72),
+                  ],
+                ),
+                color: const Color(0xFF0C1524).withOpacity(.78),
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: tokens.borderColor.withOpacity(.26)),
+                border: Border.all(color: Colors.white.withOpacity(.24)),
                 boxShadow: [
                   BoxShadow(
-                    color: tint.withOpacity(.14),
-                    blurRadius: 12,
+                    color: const Color(0xFF050A12).withOpacity(.20),
+                    blurRadius: 14,
                     offset: const Offset(0, 4),
                   ),
                 ],
@@ -6215,7 +6229,7 @@ class _ResponsiveChatInputAction extends StatelessWidget {
                                     ),
                                   ),
                                 )
-                                : Icon(icon, size: 18, color: tint),
+                                : Icon(icon, size: 18, color: Colors.white.withOpacity(.94)),
                       )
                       : Row(
                         mainAxisSize: MainAxisSize.min,
@@ -6232,12 +6246,12 @@ class _ResponsiveChatInputAction extends StatelessWidget {
                               ),
                             )
                           else
-                            Icon(icon, size: 15, color: tint),
+                            Icon(icon, size: 15, color: Colors.white.withOpacity(.92)),
                           const SizedBox(width: 6),
                           Text(
                             resolvedLabel,
                             style: TextStyle(
-                              color: tokens.textPrimary,
+                              color: Colors.white.withOpacity(.96),
                               fontSize: 11.6,
                               fontWeight: FontWeight.w800,
                             ),

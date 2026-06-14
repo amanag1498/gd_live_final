@@ -48,10 +48,11 @@
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Rooms</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Participants</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Call Coins</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Video Call</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Room Gifts / Coins</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Gift / PK</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Gross</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Host Payable</th>
-            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Agency Payable</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
@@ -75,6 +76,13 @@
             </td>
             <td class="px-4 py-4 text-gray-900 dark:text-white">{{ number_format($r['call_coins']) }}</td>
             <td class="px-4 py-4 text-gray-600 dark:text-gray-300">
+              {{ number_format($r['video_call_minutes']) }} min
+              <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ number_format($r['video_call_coins']) }} coins</div>
+            </td>
+            <td class="px-4 py-4 text-gray-900 dark:text-white">
+              {{ number_format($r['room_gift_coins']) }}
+            </td>
+            <td class="px-4 py-4 text-gray-600 dark:text-gray-300">
               {{ number_format($r['gift_coins']) }}
               <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">PK {{ number_format($r['pk_coins']) }} · {{ number_format($r['pk_events']) }} events</div>
             </td>
@@ -82,10 +90,9 @@
             <td class="px-4 py-4 text-gray-600 dark:text-gray-300">
               {{ number_format($r['host_payable']) }}
             </td>
-            <td class="px-4 py-4 text-gray-600 dark:text-gray-300">{{ number_format($r['agency_payable']) }}</td>
           </tr>
         @empty
-          <tr class="bg-white dark:bg-gray-900"><td colspan="9" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No host data in this range.</td></tr>
+          <tr class="bg-white dark:bg-gray-900"><td colspan="10" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No host data in this range.</td></tr>
         @endforelse
         </tbody>
       </table>

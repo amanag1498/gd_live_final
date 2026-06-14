@@ -196,153 +196,162 @@ class _LiveRoomChatOverlayState extends State<LiveRoomChatOverlay> {
                 maxWidth: overlayMaxWidth,
                 maxHeight: constrainedMaxHeight,
               ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Flexible(
-                      child: ValueListenableBuilder<List<LiveRoomChatMessage>>(
-                        valueListenable: widget.messagesListenable,
-                        builder: (context, messages, _) {
-                          if (messages.isEmpty) {
-                            if (!widget.showEmptyPrompt) {
-                              return const SizedBox.shrink();
-                            }
-                            return Padding(
-                              padding: EdgeInsets.fromLTRB(
-                                4,
-                                8,
-                                messageRightGutter,
-                                14,
-                              ),
-                              child: Text(
-                                'Room chat is live. Say something...',
-                                style: TextStyle(
-                                  color: viewerTokens.textSecondary.withValues(alpha: .86),
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12.2,
+              child: SizedBox(
+                height: constrainedMaxHeight,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.max,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: ValueListenableBuilder<List<LiveRoomChatMessage>>(
+                          valueListenable: widget.messagesListenable,
+                          builder: (context, messages, _) {
+                            if (messages.isEmpty) {
+                              if (!widget.showEmptyPrompt) {
+                                return const SizedBox.expand();
+                              }
+                              return Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                  4,
+                                  8,
+                                  messageRightGutter,
+                                  14,
                                 ),
-                              ),
-                            );
-                          }
-                          return LayoutBuilder(
-                            builder: (context, listConstraints) {
-                              return SingleChildScrollView(
-                                controller: _scrollController,
-                                padding: EdgeInsets.only(
-                                  right: messageRightGutter,
-                                  bottom: 10,
-                                ),
-                                child: ConstrainedBox(
-                                  constraints: BoxConstraints(
-                                    minHeight: listConstraints.maxHeight,
-                                  ),
-                                  child: Column(
-                                    mainAxisAlignment: widget.stickMessagesToBottom
-                                        ? MainAxisAlignment.end
-                                        : MainAxisAlignment.start,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      for (var index = 0; index < messages.length; index++)
-                                        () {
-                                          final message = messages[index];
-                                          final distanceFromLatest = messages.length - 1 - index;
-                                          final opacity = distanceFromLatest >= 6
-                                              ? .48
-                                              : distanceFromLatest >= 4
-                                              ? .62
-                                              : distanceFromLatest >= 2
-                                              ? .78
-                                              : 1.0;
-                                          return TweenAnimationBuilder<double>(
-                                            key: ValueKey(message.id),
-                                            tween: Tween<double>(begin: 0, end: 1),
-                                            duration: const Duration(milliseconds: 220),
-                                            curve: Curves.easeOutCubic,
-                                            builder: (context, progress, child) {
-                                              return Opacity(
-                                                opacity: opacity * progress,
-                                                child: Transform.translate(
-                                                  offset: Offset(0, (1 - progress) * 10),
-                                                  child: child,
-                                                ),
-                                              );
-                                            },
-                                            child: _ChatBubble(
-                                              message: message,
-                                              compact: widget.compactBubbles,
-                                              onSenderTap:
-                                                  widget.onMessageSenderTap == null
-                                                      ? null
-                                                      : () => widget.onMessageSenderTap!(message),
-                                            ),
-                                          );
-                                        }(),
-                                    ],
+                                child: Text(
+                                  'Room chat is live. Say something...',
+                                  style: TextStyle(
+                                    color: viewerTokens.textSecondary.withValues(alpha: .86),
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12.2,
                                   ),
                                 ),
                               );
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                    if (_inlineError != null) ...[
-                      const SizedBox(height: 4),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 4, bottom: 6),
-                        child: Text(
-                          _inlineError!,
-                          style: TextStyle(
-                            color: viewerTokens.dangerColor,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 11.5,
-                          ),
+                            }
+                            return LayoutBuilder(
+                              builder: (context, listConstraints) {
+                                return SingleChildScrollView(
+                                  controller: _scrollController,
+                                  padding: EdgeInsets.only(
+                                    right: messageRightGutter,
+                                    bottom: 10,
+                                  ),
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      minHeight: listConstraints.maxHeight,
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment: widget.stickMessagesToBottom
+                                          ? MainAxisAlignment.end
+                                          : MainAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        for (var index = 0; index < messages.length; index++)
+                                          () {
+                                            final message = messages[index];
+                                            final distanceFromLatest = messages.length - 1 - index;
+                                            final opacity = distanceFromLatest >= 6
+                                                ? .48
+                                                : distanceFromLatest >= 4
+                                                ? .62
+                                                : distanceFromLatest >= 2
+                                                ? .78
+                                                : 1.0;
+                                            return TweenAnimationBuilder<double>(
+                                              key: ValueKey(message.id),
+                                              tween: Tween<double>(begin: 0, end: 1),
+                                              duration: const Duration(milliseconds: 220),
+                                              curve: Curves.easeOutCubic,
+                                              builder: (context, progress, child) {
+                                                return Opacity(
+                                                  opacity: opacity * progress,
+                                                  child: Transform.translate(
+                                                    offset: Offset(0, (1 - progress) * 10),
+                                                    child: child,
+                                                  ),
+                                                );
+                                              },
+                                              child: _ChatBubble(
+                                                message: message,
+                                                compact: widget.compactBubbles,
+                                                onSenderTap:
+                                                    widget.onMessageSenderTap == null
+                                                        ? null
+                                                        : () => widget.onMessageSenderTap!(message),
+                                              ),
+                                            );
+                                          }(),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          },
                         ),
                       ),
-                    ],
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          child: _InputBar(
-                            controller: _input,
-                            tokens: viewerTokens,
-                            sending: _sending,
-                            enabled: widget.enabled,
-                            onSend: _submit,
-                            actions: widget.inputActions,
-                            showSendButton: widget.showSendButton,
-                          ),
-                        ),
-                        if (widget.trailingActions.isNotEmpty) ...[
-                          SizedBox(width: isCompactDevice ? 2 : 4),
-                          ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: trailingActionsMaxWidth,
+                      if (_inlineError != null) ...[
+                        const SizedBox(height: 4),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4, bottom: 6),
+                          child: Text(
+                            _inlineError!,
+                            style: TextStyle(
+                              color: viewerTokens.dangerColor,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11.5,
                             ),
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerRight,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: widget.trailingActions,
+                          ),
+                        ),
+                      ],
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: _InputBar(
+                              controller: _input,
+                              tokens: viewerTokens,
+                              sending: _sending,
+                              enabled: widget.enabled,
+                              onSend: _submit,
+                              actions: widget.inputActions,
+                              showSendButton: widget.showSendButton,
+                            ),
+                          ),
+                          if (widget.trailingActions.isNotEmpty) ...[
+                            SizedBox(width: isCompactDevice ? 2 : 4),
+                            ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: trailingActionsMaxWidth,
+                              ),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerRight,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: widget.trailingActions,
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ],
-                      ],
-                    ),
-                    if (widget.footerActions.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(children: widget.footerActions),
                       ),
+                      if (widget.footerActions.isNotEmpty) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4, right: 4, top: 6),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: widget.footerActions,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -384,7 +393,7 @@ class _InputBar extends StatelessWidget {
     final trailingInset =
         compact ? 3.0 : screenWidth < 360 ? 4.0 : screenWidth < 430 ? 6.0 : 8.0;
     return Container(
-      height: controlHeight,
+      constraints: BoxConstraints(minHeight: controlHeight),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
@@ -392,114 +401,141 @@ class _InputBar extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            tokens.cardGradient.first.withValues(alpha: .88),
-            tokens.chipColor.withValues(alpha: .84),
+            const Color(0xFF0F1C2E).withValues(alpha: .82),
+            const Color(0xFF1E3552).withValues(alpha: .68),
           ],
         ),
-        border: Border.all(color: tokens.borderColor.withValues(alpha: .18)),
+        color: const Color(0xFF0C1524).withValues(alpha: .78),
+        border: Border.all(color: Colors.white.withValues(alpha: .24)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: .08),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: const Color(0xFF050A12).withValues(alpha: .24),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(width: leadingInset),
-          Icon(
-            Icons.chat_bubble_outline_rounded,
-            size: 15,
-            color: tokens.textSecondary.withValues(alpha: .76),
-          ),
-          SizedBox(width: iconGap),
-          Expanded(
-            child: Material(
-              color: Colors.transparent,
-              child: TextField(
-                controller: controller,
-                minLines: 1,
-                maxLines: 1,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => onSend(),
-                enabled: enabled && !sending,
-                cursorColor: tokens.textPrimary,
-                style: TextStyle(
-                  color: tokens.textPrimary,
-                  fontWeight: FontWeight.w600,
-                  fontSize: compact ? 12.2 : 13,
-                ),
-                decoration: InputDecoration(
-                  isDense: true,
-                  isCollapsed: true,
-                  filled: false,
-                  fillColor: Colors.transparent,
-                  hoverColor: Colors.transparent,
-                  focusColor: Colors.transparent,
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  disabledBorder: InputBorder.none,
-                  hintText: enabled ? 'Say something...' : 'Chat unavailable',
-                  hintStyle: TextStyle(
-                    color: tokens.textSecondary.withValues(alpha: .74),
-                    fontWeight: FontWeight.w600,
-                    fontSize: compact ? 12.0 : 12.8,
-                  ),
-                ),
-              ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              leadingInset,
+              0,
+              trailingInset,
+                      actions.isNotEmpty ? 3 : 0,
             ),
-          ),
-          if (actions.isNotEmpty) ...[
-            SizedBox(width: actionGap),
-            ...actions,
-          ],
-          if (showSendButton) ...[
-            SizedBox(width: actionGap),
-            GestureDetector(
-              onTap: enabled && !sending ? onSend : null,
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 180),
-                opacity: enabled ? 1 : .45,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(colors: tokens.primaryButtonGradient),
-                    boxShadow: [
-                      BoxShadow(
-                        color: tokens.glowColor.withValues(alpha: .22),
-                        blurRadius: 16,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  size: 15,
+                  color: Colors.white.withValues(alpha: .82),
+                ),
+                SizedBox(width: iconGap),
+                Expanded(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: TextField(
+                      controller: controller,
+                      minLines: 1,
+                      maxLines: 1,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => onSend(),
+                      enabled: enabled && !sending,
+                      cursorColor: tokens.textPrimary,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: .96),
+                            fontWeight: FontWeight.w600,
+                            fontSize: compact ? 12.2 : 13,
+                          ),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        isCollapsed: true,
+                        filled: false,
+                        fillColor: Colors.transparent,
+                        hoverColor: Colors.transparent,
+                        focusColor: Colors.transparent,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        hintText: enabled ? 'Say something...' : 'Chat unavailable',
+                        hintStyle: TextStyle(
+                          color: Colors.white.withValues(alpha: .64),
+                          fontWeight: FontWeight.w600,
+                          fontSize: compact ? 12.0 : 12.8,
+                        ),
                       ),
-                    ],
-                  ),
-                  child: SizedBox(
-                    width: controlHeight,
-                    height: controlHeight,
-                      child: Center(
-                      child: sending
-                          ? SizedBox(
-                              width: compact ? 16 : 18,
-                              height: compact ? 16 : 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  tokens.textPrimary,
-                                ),
-                              ),
-                            )
-                          : Icon(
-                              Icons.arrow_upward_rounded,
-                              color: tokens.textPrimary,
-                              size: compact ? 18 : 20,
-                            ),
                     ),
                   ),
                 ),
+                if (showSendButton) ...[
+                  SizedBox(width: actionGap),
+                  GestureDetector(
+                    onTap: enabled && !sending ? onSend : null,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 180),
+                      opacity: enabled ? 1 : .45,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Colors.white.withValues(alpha: .22),
+                              const Color(0xFF7BC9FF).withValues(alpha: .20),
+                            ],
+                          ),
+                          color: const Color(0xFF102133).withValues(alpha: .84),
+                          border: Border.all(color: Colors.white.withValues(alpha: .26)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF050A12).withValues(alpha: .22),
+                              blurRadius: 16,
+                            ),
+                          ],
+                        ),
+                        child: SizedBox(
+                          width: controlHeight,
+                          height: controlHeight,
+                          child: Center(
+                            child: sending
+                                ? SizedBox(
+                                    width: compact ? 16 : 18,
+                                    height: compact ? 16 : 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        tokens.textPrimary,
+                                      ),
+                                    ),
+                                  )
+                                : Icon(
+                                    Icons.arrow_upward_rounded,
+                                    color: Colors.white.withValues(alpha: .96),
+                                    size: compact ? 18 : 20,
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (actions.isNotEmpty) ...[
+            Padding(
+              padding: EdgeInsets.fromLTRB(leadingInset, 0, trailingInset, 4),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(mainAxisSize: MainAxisSize.min, children: actions),
               ),
             ),
           ],
-          SizedBox(width: trailingInset),
         ],
       ),
     );
@@ -529,16 +565,24 @@ class _ChatBubble extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 8),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: tokens.chipColor.withValues(alpha: .86),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF102033).withValues(alpha: .78),
+                  const Color(0xFF244766).withValues(alpha: .58),
+                ],
+              ),
+              color: const Color(0xFF0C1624).withValues(alpha: .72),
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: tokens.borderColor.withValues(alpha: .24)),
+              border: Border.all(color: Colors.white.withValues(alpha: .22)),
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               child: Text(
                 message.message,
                 style: TextStyle(
-                  color: tokens.textSecondary,
+                  color: Colors.white.withValues(alpha: .84),
                   fontSize: 11.6,
                   fontWeight: FontWeight.w800,
                 ),
@@ -555,17 +599,17 @@ class _ChatBubble extends StatelessWidget {
     final bubbleGradient =
         message.senderIsVip
             ? <Color>[
-              tokens.primaryButtonGradient.first.withValues(alpha: .28),
-              tokens.cardGradient.last.withValues(alpha: .72),
+              const Color(0xFF23142B).withValues(alpha: .84),
+              const Color(0xFF55305D).withValues(alpha: .62),
             ]
             : message.senderIsHost
             ? <Color>[
-              tokens.primaryButtonGradient.last.withValues(alpha: .24),
-              tokens.cardGradient.first.withValues(alpha: .70),
+              const Color(0xFF102033).withValues(alpha: .84),
+              const Color(0xFF264A6A).withValues(alpha: .62),
             ]
             : <Color>[
-              tokens.cardGradient.first.withValues(alpha: .66),
-              tokens.cardGradient.last.withValues(alpha: .48),
+              const Color(0xFF101926).withValues(alpha: .84),
+              const Color(0xFF223447).withValues(alpha: .58),
             ];
 
     return Padding(
@@ -589,16 +633,16 @@ class _ChatBubble extends StatelessWidget {
                 colors: bubbleGradient,
               ),
               border: Border.all(
-                color: (message.senderIsHost || message.senderIsVip)
-                    ? tokens.borderColor.withValues(alpha: .78)
-                    : tokens.borderColor.withValues(alpha: .28),
+                color: Colors.white.withValues(
+                  alpha: message.senderIsHost || message.senderIsVip ? .24 : .18,
+                ),
                 width: message.senderIsHost ? 1.1 : 1,
               ),
               boxShadow: [
                 if (!compact && (message.senderIsVip || message.senderIsHost))
                   BoxShadow(
-                    color: tokens.glowColor.withValues(alpha: message.senderIsVip ? .22 : .14),
-                    blurRadius: 18,
+                    color: const Color(0xFF050A12).withValues(alpha: .18),
+                    blurRadius: 16,
                   ),
               ],
             ),
@@ -642,7 +686,7 @@ class _ChatBubble extends StatelessWidget {
                                 child: Text(
                                   message.senderName,
                                   style: TextStyle(
-                                    color: tokens.primaryButtonGradient.first,
+                                    color: Colors.white.withValues(alpha: .94),
                                     fontWeight: FontWeight.w900,
                                     fontSize: compact ? 11.7 : 12.8,
                                   ),
@@ -652,25 +696,23 @@ class _ChatBubble extends StatelessWidget {
                             if (message.senderIsHost)
                               _Badge(
                                 label: 'HOST',
-                                textColor: tokens.textPrimary,
-                                background: tokens.primaryButtonGradient.last,
-                                border: tokens.borderColor,
+                                textColor: Colors.white.withValues(alpha: .96),
+                                background: Colors.white.withValues(alpha: .14),
+                                border: Colors.white.withValues(alpha: .18),
                               ),
                             if (message.senderIsVip)
                               _Badge(
                                 label: 'VIP',
-                                textColor: tokens.textPrimary,
-                                background: tokens.primaryButtonGradient.first,
-                                border: tokens.borderColor,
+                                textColor: Colors.white.withValues(alpha: .96),
+                                background: Colors.white.withValues(alpha: .14),
+                                border: Colors.white.withValues(alpha: .18),
                               ),
                             if (message.senderLevel != null)
                               _Badge(
                                 label: 'LV ${message.senderLevel}',
-                                textColor: isHighLevel ? tokens.textPrimary : tokens.textSecondary,
-                                background: isHighLevel
-                                    ? tokens.chipColor.withValues(alpha: .96)
-                                    : tokens.chipColor.withValues(alpha: .76),
-                                border: tokens.borderColor.withValues(alpha: isHighLevel ? .68 : .24),
+                                textColor: isHighLevel ? Colors.white.withValues(alpha: .94) : Colors.white.withValues(alpha: .78),
+                                background: Colors.white.withValues(alpha: .12),
+                                border: Colors.white.withValues(alpha: .16),
                               ),
                           ],
                         ),
@@ -678,7 +720,7 @@ class _ChatBubble extends StatelessWidget {
                         Text(
                           message.message,
                           style: TextStyle(
-                            color: tokens.textPrimary,
+                            color: Colors.white.withValues(alpha: .96),
                             fontSize: compact ? 12.1 : 13.4,
                             height: compact ? 1.2 : 1.28,
                             fontWeight: FontWeight.w600,

@@ -316,7 +316,6 @@ class _SettingsPageState extends State<SettingsPage>
                   _AnimatedEntrance(
                     index: 3,
                     child: _SessionDock(
-                      onDeactivate: _confirmDeactivateAccount,
                       onLogout: () => _confirmLogout(auth),
                     ),
                   ),
@@ -334,7 +333,7 @@ class _SettingsPageState extends State<SettingsPage>
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  Future<void> _confirmDeactivateAccount() async {
+  Future<void> _confirmAccountDeletion() async {
     final tokens = _settingsTokens();
     final confirmed = await showDialog<bool>(
       context: context,
@@ -364,7 +363,7 @@ class _SettingsPageState extends State<SettingsPage>
                       ),
                       alignment: Alignment.center,
                       child: const Icon(
-                        Icons.person_off_rounded,
+                        Icons.delete_forever_rounded,
                         color: Color(0xFFE45C30),
                         size: 20,
                       ),
@@ -372,7 +371,7 @@ class _SettingsPageState extends State<SettingsPage>
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Deactivate account?',
+                        'Delete account?',
                         style: TextStyle(
                           color: tokens.textPrimary,
                           fontWeight: FontWeight.w900,
@@ -384,19 +383,11 @@ class _SettingsPageState extends State<SettingsPage>
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'This opens support so you can request account deactivation.',
+                  'This opens the account deletion page so you can complete the deletion process.',
                   style: TextStyle(
                     color: tokens.textSecondary,
                     fontWeight: FontWeight.w600,
                     height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Support email: ${AppUrls.supportEmail}',
-                  style: TextStyle(
-                    color: tokens.textSecondary.withOpacity(.9),
-                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -441,7 +432,7 @@ class _SettingsPageState extends State<SettingsPage>
     );
 
     if (confirmed == true) {
-      await _openExternal(AppUrls.deactivateAccountMailto);
+      await _openExternal(AppUrls.accountDeletionUrl);
     }
   }
 
@@ -709,29 +700,6 @@ class _AccountCard extends StatelessWidget {
                           size: 62,
                           initials: initials,
                           avatarUrl: avatarUrl,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      const Spacer(),
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(.14),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(.18),
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: const Icon(
-                          Icons.arrow_forward_rounded,
-                          color: Colors.white,
-                          size: 18,
                         ),
                       ),
                     ],
@@ -1073,10 +1041,9 @@ class _RailTile extends StatelessWidget {
 }
 
 class _SessionDock extends StatelessWidget {
-  final VoidCallback onDeactivate;
   final VoidCallback onLogout;
 
-  const _SessionDock({required this.onDeactivate, required this.onLogout});
+  const _SessionDock({required this.onLogout});
 
   @override
   Widget build(BuildContext context) {
@@ -1090,15 +1057,6 @@ class _SessionDock extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Expanded(
-            child: _SessionButton(
-              label: 'Deactivate',
-              icon: Icons.person_off_rounded,
-              tint: const [Color(0xFFFF9B54), Color(0xFFFFC76C)],
-              onTap: onDeactivate,
-            ),
-          ),
-          const SizedBox(width: 12),
           Expanded(
             child: _SessionButton(
               label: 'Logout',

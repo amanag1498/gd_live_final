@@ -7,6 +7,7 @@ use App\Models\Agency;
 use App\Models\Host;
 use App\Models\LiveRoom;
 use App\Models\LiveRoomPkBattle;
+use App\Models\LiveRoomPkEvent;
 use App\Services\NotifyUser;
 use App\Services\AgencyDashboardService;
 use App\Services\AgencyWalletService;
@@ -66,21 +67,24 @@ class AgencyAdminController extends Controller
 
     public function hosts(Agency $agency)
     {
+        $agency->load('owner');
         $dashboard = $this->dashboardService->build($agency, 25);
+        $hosts = $dashboard['hosts'];
+        $summary = $dashboard['summary'];
         $this->previewRoutes($agency, $overviewRoute, $hostsIndexRoute, $callsRoute, $payoutReportsRoute, $profileRoute, $videoRoomsRoute, $pkBattlesRoute);
 
-        return view('agency.hosts.index', [
-            'agency' => $agency,
-            'hosts' => $dashboard['hosts'],
-            'summary' => $dashboard['summary'],
-            'overviewRoute' => $overviewRoute,
-            'hostsIndexRoute' => $hostsIndexRoute,
-            'callsRoute' => $callsRoute,
-            'payoutReportsRoute' => $payoutReportsRoute,
-            'profileRoute' => $profileRoute,
-            'videoRoomsRoute' => $videoRoomsRoute,
-            'pkBattlesRoute' => $pkBattlesRoute,
-        ]);
+        return view('agency.hosts.index', compact(
+            'agency',
+            'hosts',
+            'summary',
+            'overviewRoute',
+            'hostsIndexRoute',
+            'callsRoute',
+            'payoutReportsRoute',
+            'profileRoute',
+            'videoRoomsRoute',
+            'pkBattlesRoute',
+        ));
     }
 
     public function hostShow(Agency $agency, Host $host)
@@ -89,7 +93,8 @@ class AgencyAdminController extends Controller
 
         $host->load(['user', 'user.hostAvailability', 'photos']);
         $detail = $this->dashboardService->hostDetail($agency, $host);
-        $this->previewRoutes($agency, $overviewRoute, $hostsIndexRoute, $callsRoute, $payoutReportsRoute, $profileRoute, $videoRoomsRoute, $pkBattlesRoute);
+        $this->previewRoutes($agency, $overviewRoute, $hostsIndexRoute, $baseCallsRoute, $payoutReportsRoute, $profileRoute, $videoRoomsRoute, $pkBattlesRoute);
+        $callsRoute = route('admin.agencies.calls.index', ['agency' => $agency->id, 'host_id' => $host->id]);
 
         return view('agency.hosts.show', [
             'agency' => $agency,
@@ -107,37 +112,154 @@ class AgencyAdminController extends Controller
 
     public function calls(Request $request, Agency $agency)
     {
-        return $this->dashboardOnlyRedirect($agency);
+        $report = $this->callReportService->forAgency($request, $agency);
+        $this->previewRoutes($agency, $overviewRoute, $hostsIndexRoute, $baseCallsRoute, $payoutReportsRoute, $profileRoute, $videoRoomsRoute, $pkBattlesRoute);
+
+        return view('agency.calls.index', [
+            'agency' => $agency,
+            'report' => $report,
+            'scopeLabel' => 'Calls to Agency Hosts',
+            'exportRoute' => route('admin.agencies.calls.export', array_merge(['agency' => $agency->id], $request->query())),
+            'tabs' => [
+                'all' => 'Calls to Agency Hosts',
+                'active' => 'Active Calls',
+                'completed' => 'Completed Calls',
+                'host_earnings' => 'Host-wise Earnings',
+            ],
+            'overviewRoute' => $overviewRoute,
+            'hostsIndexRoute' => $hostsIndexRoute,
+            'callsRoute' => route('admin.agencies.calls.index', $agency),
+            'profileRoute' => $profileRoute,
+            'payoutReportsRoute' => $payoutReportsRoute,
+            'videoRoomsRoute' => $videoRoomsRoute,
+            'pkBattlesRoute' => $pkBattlesRoute,
+        ]);
     }
 
     public function exportCalls(Request $request, Agency $agency)
     {
-        return $this->dashboardOnlyRedirect($agency);
+        abort_unless($this->callReportService->schemaReady(), 409, 'Call reporting tables are not available yet. Run php artisan migrate first.');
+
+        $rows = $this->callReportService->baseQuery($request)
+            ->with(['caller', 'receiver', 'host.user', 'agency'])
+            ->where('agency_id', $agency->id)
+            ->get();
+
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['id', 'caller', 'receiver', 'host', 'agency', 'type', 'status', 'end_reason', 'duration_seconds', 'billable_minutes', 'coins_charged', 'host_earning', 'agency_earning', 'platform_earning', 'created_at']);
+            foreach ($rows as $call) {
+                fputcsv($out, [
+                    $call->id,
+                    $call->caller?->name,
+                    $call->receiver?->name,
+                    $call->host?->user?->name,
+                    $call->agency?->name,
+                    $call->type,
+                    $call->status,
+                    $call->end_reason,
+                    $call->duration_seconds,
+                    $call->billable_minutes,
+                    $call->total_coins_charged,
+                    $call->host_earning,
+                    $call->agency_earning,
+                    $call->platform_earning,
+                    optional($call->created_at)?->toDateTimeString(),
+                ]);
+            }
+            fclose($out);
+        }, 'admin-agency-calls-' . $agency->id . '-' . now()->format('Ymd_His') . '.csv');
     }
 
     public function profile(Agency $agency)
     {
-        return $this->dashboardOnlyRedirect($agency);
+        $profile = $this->dashboardService->agencyProfile($agency);
+        $this->previewRoutes($agency, $overviewRoute, $hostsIndexRoute, $callsRoute, $payoutReportsRoute, $profileRoute, $videoRoomsRoute, $pkBattlesRoute);
+
+        return view('agency.profile.show', compact(
+            'agency',
+            'profile',
+            'overviewRoute',
+            'hostsIndexRoute',
+            'callsRoute',
+            'payoutReportsRoute',
+            'profileRoute',
+            'videoRoomsRoute',
+            'pkBattlesRoute',
+        ));
     }
 
     public function videoRooms(Request $request, Agency $agency)
     {
-        return $this->dashboardOnlyRedirect($agency);
+        return $this->roomIndex($request, $agency, 'video');
     }
 
     public function videoRoomShow(Agency $agency, LiveRoom $live_room)
     {
-        return $this->dashboardOnlyRedirect($agency);
+        return $this->roomShow($agency, $live_room, 'video');
     }
 
     public function pkBattles(Request $request, Agency $agency)
     {
-        return $this->dashboardOnlyRedirect($agency);
+        $query = LiveRoomPkBattle::query()
+            ->with(['roomA.host.user', 'roomB.host.user', 'hostA.user', 'hostB.user', 'winnerRoom'])
+            ->where(function ($inner) use ($agency) {
+                $inner->whereHas('hostA', fn ($q) => $q->where('agency_id', $agency->id))
+                    ->orWhereHas('hostB', fn ($q) => $q->where('agency_id', $agency->id));
+            })
+            ->whereHas('roomA', fn ($q) => $q->where('room_type', 'video'))
+            ->whereHas('roomB', fn ($q) => $q->where('room_type', 'video'))
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')->toString()));
+
+        $battles = $query->latest('id')->paginate(20)->withQueryString();
+        $summary = [
+            'active' => (clone $query)->where('status', 'active')->count(),
+            'pending' => (clone $query)->where('status', 'pending')->count(),
+            'completed' => (clone $query)->where('status', 'completed')->count(),
+            'total_pk_coins' => (int) LiveRoomPkEvent::query()
+                ->whereHas('battle', function ($inner) use ($agency) {
+                    $inner->where(function ($scope) use ($agency) {
+                        $scope->whereHas('hostA', fn ($q) => $q->where('agency_id', $agency->id))
+                            ->orWhereHas('hostB', fn ($q) => $q->where('agency_id', $agency->id));
+                    });
+                })
+                ->sum('coins'),
+        ];
+
+        $this->previewRoutes($agency, $overviewRoute, $hostsIndexRoute, $callsRoute, $payoutReportsRoute, $profileRoute, $videoRoomsRoute, $pkBattlesRoute);
+
+        return view('agency.pk-battles.index', compact(
+            'agency',
+            'battles',
+            'summary',
+            'overviewRoute',
+            'hostsIndexRoute',
+            'callsRoute',
+            'payoutReportsRoute',
+            'profileRoute',
+            'videoRoomsRoute',
+            'pkBattlesRoute',
+        ));
     }
 
     public function pkBattleShow(Agency $agency, LiveRoomPkBattle $pk_battle)
     {
-        return $this->dashboardOnlyRedirect($agency);
+        abort_unless((int) $pk_battle->hostA?->agency_id === (int) $agency->id || (int) $pk_battle->hostB?->agency_id === (int) $agency->id, 404);
+        $pk_battle->load(['roomA.host.user', 'roomB.host.user', 'hostA.user', 'hostB.user', 'winnerRoom', 'events.user', 'events.gift']);
+
+        $this->previewRoutes($agency, $overviewRoute, $hostsIndexRoute, $callsRoute, $payoutReportsRoute, $profileRoute, $videoRoomsRoute, $pkBattlesRoute);
+
+        return view('agency.pk-battles.show', compact(
+            'agency',
+            'pk_battle',
+            'overviewRoute',
+            'hostsIndexRoute',
+            'callsRoute',
+            'payoutReportsRoute',
+            'profileRoute',
+            'videoRoomsRoute',
+            'pkBattlesRoute',
+        ));
     }
 
     private function roomIndex(Request $request, Agency $agency, string $roomType)
@@ -232,13 +354,6 @@ class AgencyAdminController extends Controller
         $profileRoute = route('admin.agencies.profile.show', $agency);
         $videoRoomsRoute = route('admin.agencies.video-rooms.index', $agency);
         $pkBattlesRoute = route('admin.agencies.pk-battles.index', $agency);
-    }
-
-    private function dashboardOnlyRedirect(Agency $agency)
-    {
-        return redirect()
-            ->route('admin.agencies.dashboard', $agency)
-            ->with('error', 'Admin access is limited to the agency dashboard.');
     }
 
     public function update(Request $request, Agency $agency)

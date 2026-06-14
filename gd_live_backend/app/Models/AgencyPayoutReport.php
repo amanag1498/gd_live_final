@@ -134,6 +134,11 @@ class AgencyPayoutReport extends Model
         return (int) data_get($this->meta, 'totals.video_call_minutes', 0);
     }
 
+    public function getTotalVideoCallCoinsAttribute(): int
+    {
+        return (int) data_get($this->meta, 'totals.video_call_coins', $this->total_video_call_gross);
+    }
+
     public function getTotalVideoCallGrossAttribute(): int
     {
         return (int) data_get($this->meta, 'totals.video_call_gross', 0);
@@ -147,6 +152,51 @@ class AgencyPayoutReport extends Model
     public function getTotalVideoGiftGrossAttribute(): int
     {
         return (int) data_get($this->meta, 'totals.video_gift_gross', 0);
+    }
+
+    public function getTotalVideoGiftCoinsAttribute(): int
+    {
+        return (int) data_get($this->meta, 'totals.video_gift_coins', $this->total_video_gift_gross);
+    }
+
+    public function getTotalPkGiftCoinsAttribute(): int
+    {
+        return (int) data_get($this->meta, 'totals.pk_gift_coins', $this->total_pk_earnings);
+    }
+
+    public function getTotalBonusCoinsAttribute(): int
+    {
+        return (int) data_get($this->meta, 'totals.bonus_coins', 0);
+    }
+
+    public function getTotalCoinsAttribute(): int
+    {
+        return (int) data_get($this->meta, 'totals.total_coins', $this->gross_earnings);
+    }
+
+    public function getTotalAgencyCommissionCoinsAttribute(): int
+    {
+        return (int) data_get($this->meta, 'totals.agency_commission_coins', $this->agency_commission);
+    }
+
+    public function getTotalHostPayoutInrAttribute(): float
+    {
+        return (float) data_get($this->meta, 'totals.host_payout_inr', 0);
+    }
+
+    public function getTotalAgencyCommissionInrAttribute(): float
+    {
+        return (float) data_get($this->meta, 'totals.agency_commission_inr', 0);
+    }
+
+    public function getTotalCoinsToBePaidAttribute(): int
+    {
+        return (int) data_get($this->meta, 'totals.total_coins_to_be_paid', $this->final_payable);
+    }
+
+    public function getTotalInrAttribute(): float
+    {
+        return round($this->total_host_payout_inr + $this->total_agency_commission_inr, 2);
     }
 
     public function getTotalPayoutAttribute(): int

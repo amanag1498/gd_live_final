@@ -160,7 +160,7 @@
               <td class="px-4 py-4 text-right">
                 <div class="flex flex-wrap justify-end gap-2">
                   <x-ui.button variant="outline" size="sm" href="{{ route('admin.agency-payout-reports.show', $report) }}">View</x-ui.button>
-                  <x-ui.button variant="outline" size="sm" href="{{ route('admin.agency-payout-reports.export', $report) }}">CSV</x-ui.button>
+                  <x-ui.button variant="outline" size="sm" href="{{ route('admin.agency-payout-reports.export', $report) }}">PDF</x-ui.button>
                   @if($report->status === 'approved' && !$report->published_at)
                     <form method="post" action="{{ route('admin.agency-payout-reports.publish', $report) }}">
                       @csrf

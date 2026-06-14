@@ -27,7 +27,8 @@ class AgencyDashboardService
         $giftBase = LiveRoomGiftEarningLedger::query()->where('agency_id', $agency->id);
         $payoutBase = AgencyPayoutReport::query()
             ->where('agency_id', $agency->id)
-            ->whereIn('status', self::AGENCY_VISIBLE_PAYOUT_STATUSES);
+            ->whereIn('status', self::AGENCY_VISIBLE_PAYOUT_STATUSES)
+            ->whereNotNull('published_at');
 
         $activeHostCount = HostAvailability::query()
             ->whereIn('user_id', $hostUserIds)
@@ -212,6 +213,7 @@ class AgencyDashboardService
             'recentPayoutReports' => AgencyPayoutReport::query()
                 ->where('agency_id', $agency->id)
                 ->whereIn('status', self::AGENCY_VISIBLE_PAYOUT_STATUSES)
+                ->whereNotNull('published_at')
                 ->latest('period_start')
                 ->limit(5)
                 ->get(),

@@ -1,6 +1,6 @@
 @extends('layouts.agency-tailadmin')
 @section('title', 'Weekly Payout Reports')
-@section('page_intro', 'Read-only weekly payout reports scoped to your agency, with offline payout tracking and host-level breakdowns.')
+@section('page_intro', 'Read-only weekly payout reports scoped to your agency, with downloadable settlement PDFs.')
 
 @section('content')
   <div class="card mb-3">

@@ -37,12 +37,15 @@
         </div>
       </div>
     </x-slot:header>
-    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-      <x-admin.stat-card label="Agencies" :value="number_format($kpis['total_agencies'])" tone="brand" />
-      <x-admin.stat-card label="Active Agencies" :value="number_format($kpis['active_agencies'])" tone="success" />
-      <x-admin.stat-card label="Hosts" :value="number_format($kpis['total_hosts'])" />
-      <x-admin.stat-card label="Calls" :value="number_format($kpis['total_calls'])" tone="dark" />
-      <x-admin.stat-card label="Coins" :value="number_format($kpis['total_coins'])" tone="warning" />
+      <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+    <x-admin.stat-card label="Agencies" :value="number_format($kpis['total_agencies'])" tone="brand" />
+    <x-admin.stat-card label="Active Agencies" :value="number_format($kpis['active_agencies'])" tone="success" />
+    <x-admin.stat-card label="Hosts" :value="number_format($kpis['total_hosts'])" />
+    <x-admin.stat-card label="Calls" :value="number_format($kpis['total_calls'])" tone="dark" />
+    <x-admin.stat-card label="Coins" :value="number_format($kpis['total_coins'])" tone="warning" />
+    <x-admin.stat-card label="Video Call" :value="number_format($kpis['video_call_minutes']).' min'" :meta="number_format($kpis['video_call_coins']).' coins'" />
+    <x-admin.stat-card label="Room Gifts" :value="number_format($kpis['room_gift_coins'])" :meta="number_format($kpis['live_gift_coins']).' total live gifts'" />
+    <x-admin.stat-card label="PK Gifts" :value="number_format($kpis['pk_gift_coins'])" :meta="number_format($kpis['pk_event_count']).' events'" />
     </section>
   </x-common.component-card>
 
@@ -67,6 +70,8 @@
             <th class="px-4 py-3 text-left text-gray-500">Calls</th>
             <th class="px-4 py-3 text-left text-gray-500">Minutes</th>
             <th class="px-4 py-3 text-left text-gray-500">Coins</th>
+            <th class="px-4 py-3 text-left text-gray-500">Video Call</th>
+            <th class="px-4 py-3 text-left text-gray-500">Room Gifts / PK</th>
             <th class="px-4 py-3 text-left text-gray-500">Agency Earnings</th>
             <th class="px-4 py-3 text-left text-gray-500">Top Host</th>
             <th class="px-4 py-3 text-right text-gray-500">Actions</th>
@@ -84,6 +89,14 @@
               <td class="px-4 py-4 text-gray-600 dark:text-gray-300">{{ number_format($row['calls']) }}</td>
               <td class="px-4 py-4 text-gray-600 dark:text-gray-300">{{ number_format($row['minutes']) }}</td>
               <td class="px-4 py-4 font-semibold text-gray-900 dark:text-white">{{ number_format($row['coins']) }}</td>
+              <td class="px-4 py-4 text-gray-600 dark:text-gray-300">
+                {{ number_format($row['video_call_minutes']) }} min
+                <div class="text-xs text-gray-500 dark:text-gray-400">{{ number_format($row['video_call_coins']) }} coins</div>
+              </td>
+              <td class="px-4 py-4 text-gray-600 dark:text-gray-300">
+                {{ number_format($row['room_gift_coins']) }}
+                <div class="text-xs text-gray-500 dark:text-gray-400">PK {{ number_format($row['pk_gift_coins']) }} · {{ number_format($row['pk_event_count']) }} events</div>
+              </td>
               <td class="px-4 py-4 text-gray-600 dark:text-gray-300">{{ number_format($row['earnings']) }}</td>
               <td class="px-4 py-4 text-gray-600 dark:text-gray-300">
                 {{ $row['top_host'] ?: 'No ranked host yet' }}
@@ -98,7 +111,7 @@
               </td>
             </tr>
           @empty
-            <tr class="bg-white dark:bg-gray-900"><td colspan="8" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No agency data in this range.</td></tr>
+            <tr class="bg-white dark:bg-gray-900"><td colspan="10" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No agency data in this range.</td></tr>
           @endforelse
         </tbody>
       </table>

@@ -6,15 +6,21 @@
   $isAgencyPanel = request()->routeIs('agency.*');
   $agencyHostsRoute = $hostsIndexRoute ?? route('agency.hosts.index');
   $agencyCallsRoute = $callsRoute ?? route('agency.calls.index');
-  $agencyWalletRoute = $walletRoute ?? route('agency.wallet.show');
+  $agencyWalletRoute = $walletRoute ?? ($isAgencyPanel ? route('agency.wallet.show') : route('admin.agencies.wallet.show', $agency));
   $agencyPayoutRoute = $payoutReportsRoute ?? route('agency.payout-reports.index');
+  $agencyProfileRoute = $profileRoute ?? ($isAgencyPanel ? route('agency.profile.show') : route('admin.agencies.profile.show', $agency));
+  $agencyRoomsRoute = $videoRoomsRoute ?? ($isAgencyPanel ? route('agency.video-rooms.index') : route('admin.agencies.video-rooms.index', $agency));
+  $agencyPkRoute = $pkBattlesRoute ?? ($isAgencyPanel ? route('agency.pk-battles.index') : route('admin.agencies.pk-battles.index', $agency));
 @endphp
 
 @section('page_actions')
-  <a href="{{ $agencyHostsRoute }}" class="{{ $isAgencyPanel ? 'inline-flex' : 'hidden' }} items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">Hosts</a>
-  <a href="{{ $agencyCallsRoute }}" class="{{ $isAgencyPanel ? 'inline-flex' : 'hidden' }} items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">Call Reports</a>
-  <a href="{{ $agencyWalletRoute }}" class="{{ $isAgencyPanel && $agency ? 'inline-flex' : 'hidden' }} items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">Wallet</a>
-  <a href="{{ $agencyPayoutRoute }}" class="{{ $isAgencyPanel ? 'inline-flex' : 'hidden' }} items-center justify-center gap-2 rounded-lg bg-brand-500 px-3 py-2 text-xs font-medium text-white transition hover:bg-brand-600">Weekly Payout Reports</a>
+  <a href="{{ $agencyHostsRoute }}" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">Hosts</a>
+  <a href="{{ $agencyCallsRoute }}" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">Call Reports</a>
+  <a href="{{ $agencyRoomsRoute }}" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">Video Rooms</a>
+  <a href="{{ $agencyPkRoute }}" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">PK Battles</a>
+  <a href="{{ $agencyProfileRoute }}" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">Profile</a>
+  <a href="{{ $agencyWalletRoute }}" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">Wallet</a>
+  <a href="{{ $agencyPayoutRoute }}" class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-3 py-2 text-xs font-medium text-white transition hover:bg-brand-600">Weekly Payout Reports</a>
 @endsection
 
 @section('content')
@@ -190,7 +196,7 @@
               <h3 class="text-base font-semibold text-gray-900 dark:text-white">Recent Weekly Payout Reports</h3>
               <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Latest agency payout reporting windows and review state.</p>
             </div>
-            <a href="{{ $agencyPayoutRoute }}" class="{{ $isAgencyPanel ? 'inline-flex' : 'hidden' }} items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">View All</a>
+            <a href="{{ $agencyPayoutRoute }}" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">View All</a>
           </div>
         </x-slot:header>
         <div class="overflow-x-auto">
@@ -198,7 +204,9 @@
               <thead class="bg-gray-50 dark:bg-gray-950/60">
                 <tr>
                   <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Week</th>
+                  <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Total Coins</th>
                   <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Final Payable</th>
+                  <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Total INR</th>
                   <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Status</th>
                 </tr>
               </thead>
@@ -206,11 +214,13 @@
                 @forelse($recentPayoutReports as $report)
                   <tr class="bg-white dark:bg-gray-900">
                     <td class="px-4 py-3">{{ optional($report->period_start)->format('d M Y') }} - {{ optional($report->period_end)->format('d M Y') }}</td>
+                    <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">{{ number_format($report->total_coins) }}</td>
                     <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">{{ number_format($report->final_payable) }}</td>
+                    <td class="px-4 py-3">{{ number_format($report->total_inr, 2) }}</td>
                     <td class="px-4 py-3"><x-ui.badge color="dark">{{ ucwords(str_replace('_', ' ', $report->status)) }}</x-ui.badge></td>
                   </tr>
                 @empty
-                  <tr class="bg-white dark:bg-gray-900"><td colspan="3" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No payout reports yet.</td></tr>
+                  <tr class="bg-white dark:bg-gray-900"><td colspan="5" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No payout reports yet.</td></tr>
                 @endforelse
               </tbody>
             </table>
