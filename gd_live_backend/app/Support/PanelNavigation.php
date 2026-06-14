@@ -30,7 +30,13 @@ class PanelNavigation
                 'items' => [
                     self::item('Live Rooms', 'admin.live-rooms.index', 'video', ['admin.live-rooms.*']),
                     self::item('PK Battles', 'admin.pk-battles.index', 'sparkles', ['admin.pk-battles.*']),
-                    self::item('Moderation', 'admin.moderation.reports', 'shield', ['admin.moderation.*']),
+                    self::item('Moderation', 'admin.moderation.reports', 'shield', ['admin.moderation.*'], [
+                        self::subItem('Review Queue', 'admin.moderation.reports', ['admin.moderation.reports']),
+                        self::subItem('Blocked Users', 'admin.moderation.blocked-users', ['admin.moderation.blocked-users']),
+                        self::subItem('History', 'admin.moderation.history', ['admin.moderation.history']),
+                        self::subItem('Auto Rules', 'admin.moderation.rules', ['admin.moderation.rules']),
+                        self::subItem('Analytics', 'admin.moderation.analytics', ['admin.moderation.analytics']),
+                    ]),
                     self::item('Call Reports', 'admin.calls.index', 'phone', ['admin.calls.*']),
                 ],
             ],
@@ -127,6 +133,7 @@ class PanelNavigation
             'video' => '<svg viewBox="0 0 24 24" fill="none" class="h-5 w-5"><path d="M3 7a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" stroke="currentColor" stroke-width="1.8"/><path d="m16 10 5-3v10l-5-3v-4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
             'sparkles' => '<svg viewBox="0 0 24 24" fill="none" class="h-5 w-5"><path d="m12 3 1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8L12 3ZM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
             'shield' => '<svg viewBox="0 0 24 24" fill="none" class="h-5 w-5"><path d="M12 3 5 6v5c0 5 3.4 8 7 10 3.6-2 7-5 7-10V6l-7-3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+            'history' => '<svg viewBox="0 0 24 24" fill="none" class="h-5 w-5"><path d="M4 7V3M4 3H8M4 3l3.5 3.5A8 8 0 1 1 12 20a8 8 0 0 1-7.8-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 8v5l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
             'phone' => '<svg viewBox="0 0 24 24" fill="none" class="h-5 w-5"><path d="M6 4h4l1 5-2.5 1.5a16 16 0 0 0 5 5L15 13l5 1v4a2 2 0 0 1-2 2h-1C9.8 20 4 14.2 4 7V6a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
             'wallet' => '<svg viewBox="0 0 24 24" fill="none" class="h-5 w-5"><path d="M4 7a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v2H6a2 2 0 1 0 0 4h13v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z" stroke="currentColor" stroke-width="1.8"/><path d="M19 9h1a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-1V9ZM6 11h1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
             'credit-card' => '<svg viewBox="0 0 24 24" fill="none" class="h-5 w-5"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M3 9h18M7 15h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
@@ -145,12 +152,27 @@ class PanelNavigation
         };
     }
 
-    private static function item(string $label, string $route, string $icon, array $match): array
+    private static function item(string $label, string $route, string $icon, array $match, array $subItems = []): array
+    {
+        $item = [
+            'label' => $label,
+            'route' => $route,
+            'icon' => $icon,
+            'match' => $match,
+        ];
+
+        if ($subItems !== []) {
+            $item['subItems'] = $subItems;
+        }
+
+        return $item;
+    }
+
+    private static function subItem(string $label, string $route, array $match): array
     {
         return [
             'label' => $label,
             'route' => $route,
-            'icon' => $icon,
             'match' => $match,
         ];
     }

@@ -15,11 +15,22 @@ class MenuHelper
             return [
                 'title' => $group['title'],
                 'items' => array_map(function (array $item): array {
-                    return [
+                    $mapped = [
                         'name' => $item['label'],
                         'icon' => $item['icon'],
                         'path' => route($item['route']),
                     ];
+
+                    if (!empty($item['subItems'])) {
+                        $mapped['subItems'] = array_map(function (array $subItem): array {
+                            return [
+                                'name' => $subItem['label'],
+                                'path' => route($subItem['route']),
+                            ];
+                        }, $item['subItems']);
+                    }
+
+                    return $mapped;
                 }, $group['items']),
             ];
         }, $groups);
