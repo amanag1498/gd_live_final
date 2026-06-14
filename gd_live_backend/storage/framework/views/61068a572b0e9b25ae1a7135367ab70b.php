@@ -14,7 +14,7 @@
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['variant' => 'outline','size' => 'sm','href' => ''.e(route('admin.reports.follow-notifications')).'']); ?>Follow Alerts <?php echo $__env->renderComponent(); ?>
+<?php $component->withAttributes(['variant' => 'outline','size' => 'sm','href' => ''.e(route('admin.reports.follow-notifications')).'']); ?>Online Alerts <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
 <?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
@@ -42,7 +42,7 @@
       <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div class="max-w-2xl">
           <h3 class="text-base font-semibold text-gray-900 dark:text-white">Host Followers</h3>
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Review follower relationships, notification preferences, and the hosts drawing the strongest follow graph.</p>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Review follower relationships, online alert preferences, and the hosts drawing the strongest follow graph.</p>
         </div>
         <form method="get" class="flex gap-3">
           <select name="host_id" class="<?php echo e($inputClass); ?>">
@@ -115,7 +115,7 @@
             <tr>
               <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Host</th>
               <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Follower</th>
-              <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Alerts</th>
+              <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Online Alerts</th>
               <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Followed</th>
               <th class="px-4 py-3 text-right font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Action</th>
             </tr>
@@ -133,7 +133,6 @@
                 </td>
                 <td class="px-4 py-4 text-gray-600 dark:text-gray-300">
                   <div>Online: <?php echo e($row->notify_when_online ? 'Yes' : 'No'); ?></div>
-                  <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">Available: <?php echo e($row->notify_when_available ? 'Yes' : 'No'); ?></div>
                 </td>
                 <td class="px-4 py-4 text-gray-600 dark:text-gray-300"><?php echo e(optional($row->created_at)->format('d M Y, H:i')); ?></td>
                 <td class="px-4 py-4 text-right">

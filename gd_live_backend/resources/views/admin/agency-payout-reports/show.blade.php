@@ -3,8 +3,11 @@
 
 @section('content')
 @php
-  $locked = $report->published_at || $report->status === 'paid';
+  $locked = $report->status === 'paid' || $report->paid_at;
   $inputClass = 'h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 shadow-theme-xs outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white';
+  $dashboardHref = ($report->agency_id && \Illuminate\Support\Facades\Route::has('admin.agencies.dashboard'))
+      ? route('admin.agencies.dashboard', $report->agency_id)
+      : null;
 @endphp
 
 <div class="space-y-6">
@@ -34,7 +37,9 @@
         </div>
         <div class="flex flex-wrap gap-2">
           <x-ui.button variant="outline" size="sm" href="{{ route('admin.agency-payout-reports.index') }}">Back</x-ui.button>
-          <x-ui.button variant="outline" size="sm" href="{{ route('admin.agencies.dashboard', $report->agency_id) }}">Open Agency Dashboard</x-ui.button>
+          @if($dashboardHref)
+            <x-ui.button variant="outline" size="sm" href="{{ $dashboardHref }}">Open Agency Dashboard</x-ui.button>
+          @endif
           <x-ui.button variant="outline" size="sm" href="{{ route('admin.agency-payout-reports.export', $report) }}">Download PDF</x-ui.button>
         </div>
       </div>
@@ -68,7 +73,7 @@
           <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Admin Remarks</label>
           <textarea name="admin_remarks" rows="4" class="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 shadow-theme-xs outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white">{{ old('admin_remarks', $report->admin_remarks) }}</textarea>
         </div>
-        <x-ui.button type="submit" size="sm" @disabled(!in_array($report->status, ['generated', 'pending_review']))>Save Pending Review</x-ui.button>
+        <x-ui.button type="submit" size="sm" :disabled="!in_array($report->status, ['generated', 'pending_review'])">Save Pending Review</x-ui.button>
       </form>
     </x-common.component-card>
 
@@ -78,25 +83,25 @@
           @csrf
           <input type="hidden" name="deductions" value="{{ $report->deductions }}">
           <input type="text" name="admin_remarks" class="{{ $inputClass }}" value="{{ $report->admin_remarks }}" placeholder="Approval remarks">
-          <x-ui.button type="submit" size="sm" @disabled(!in_array($report->status, ['generated', 'pending_review']))>Approve Report</x-ui.button>
+          <x-ui.button type="submit" size="sm" :disabled="!in_array($report->status, ['generated', 'pending_review'])">Approve Report</x-ui.button>
         </form>
 
         <form method="post" action="{{ route('admin.agency-payout-reports.publish', $report) }}" class="grid gap-4">
           @csrf
           <input type="text" name="admin_remarks" class="{{ $inputClass }}" value="{{ $report->admin_remarks }}" placeholder="Publish remarks">
-          <x-ui.button type="submit" variant="secondary" size="sm" @disabled($report->status !== 'approved' || $report->published_at)>Publish To Agency</x-ui.button>
+          <x-ui.button type="submit" variant="secondary" size="sm" :disabled="$report->status !== 'approved' || $report->published_at">Publish To Agency</x-ui.button>
         </form>
 
         <form method="post" action="{{ route('admin.agency-payout-reports.mark-paid', $report) }}" class="grid gap-4">
           @csrf
           <input type="text" name="admin_remarks" class="{{ $inputClass }}" value="{{ $report->admin_remarks }}" placeholder="Paid remarks">
-          <x-ui.button type="submit" variant="success" size="sm" @disabled($report->status !== 'approved' || !$report->published_at || $report->status === 'paid')>Mark Paid</x-ui.button>
+          <x-ui.button type="submit" variant="success" size="sm" :disabled="$report->status !== 'approved' || !$report->published_at || $report->status === 'paid'">Mark Paid</x-ui.button>
         </form>
 
         <form method="post" action="{{ route('admin.agency-payout-reports.reject', $report) }}" class="grid gap-4">
           @csrf
           <textarea name="admin_remarks" rows="3" class="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 shadow-theme-xs outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white" placeholder="Rejection reason" @disabled(!in_array($report->status, ['generated', 'pending_review']))></textarea>
-          <x-ui.button type="submit" variant="danger" size="sm" @disabled(!in_array($report->status, ['generated', 'pending_review']))>Reject Report</x-ui.button>
+          <x-ui.button type="submit" variant="danger" size="sm" :disabled="!in_array($report->status, ['generated', 'pending_review'])">Reject Report</x-ui.button>
         </form>
       </div>
     </x-common.component-card>
@@ -147,7 +152,7 @@
                 <textarea name="admin_note" form="{{ $formId }}" rows="2" class="min-w-[220px] rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 shadow-theme-xs outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white" placeholder="Admin note" @disabled($locked)>{{ old('admin_note', $item->admin_note) }}</textarea>
               </td>
               <td class="sticky right-0 z-10 bg-white px-4 py-4 text-right dark:bg-gray-900">
-                <x-ui.button type="submit" size="sm" form="{{ $formId }}" @disabled($locked)>Save</x-ui.button>
+                <x-ui.button type="submit" size="sm" form="{{ $formId }}" :disabled="$locked">Save</x-ui.button>
               </td>
             </tr>
           @empty

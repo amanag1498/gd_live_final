@@ -205,7 +205,7 @@
             <div class="row g-3">
               <div class="col-md-6">
                 <div class="tp-summary-panel">
-                  <div class="tp-summary-title">Availability</div>
+                  <div class="tp-summary-title">Status</div>
                   <div class="tp-chip-row">
                     <span class="badge text-bg-<?php echo e($payload['settings']['enabled'] ? 'success' : 'danger'); ?>">
                       <?php echo e($payload['settings']['enabled'] ? 'Engine enabled' : 'Engine disabled'); ?>

@@ -2,7 +2,6 @@
   $calls = $report['calls'];
   $summary = $report['summary'];
   $filters = $report['filters'];
-  $earnings = $report['earnings'];
   $activeTab = request('tab', 'all');
   $schemaReady = $report['schema_ready'] ?? true;
   $setupMessage = $report['setup_message'] ?? null;
@@ -14,12 +13,8 @@
     'active' => 'Calls currently in progress',
     'completed' => 'Ended calls with settled billing',
     'missed_rejected' => 'Calls that did not complete',
-    'host_earnings' => 'Host-wise revenue leaderboard',
-    'agency_earnings' => 'Agency-wise revenue leaderboard',
   ];
-  $currentTabDescription = $tabMeta[$activeTab] ?? 'Call activity and earnings';
-  $topHost = $earnings['hosts']->first();
-  $topAgency = $earnings['agencies']->first();
+  $currentTabDescription = $tabMeta[$activeTab] ?? 'Call activity overview';
   $filterKeys = ['date_from', 'date_to', 'type', 'status', 'host_id', 'agency_id'];
   $activeFiltersCount = collect($filterKeys)->filter(fn ($key) => filled(request($key)))->count();
   $statusBreakdown = [
@@ -74,8 +69,8 @@
             </div>
             <div class="col-6">
               <div class="metric-chip w-100 justify-content-between">
-                <span><i class="ti ti-building-bank me-1"></i>Platform</span>
-                <strong><?php echo e(number_format($summary['total_platform_earnings'])); ?></strong>
+                <span><i class="ti ti-chart-histogram me-1"></i>Completed</span>
+                <strong><?php echo e(number_format($summary['completed_calls'])); ?></strong>
               </div>
             </div>
             <div class="col-6">
@@ -182,51 +177,11 @@
       </div>
     </div>
   </div>
-  <div class="col-md-6 col-xl-2">
-    <div class="card <?php echo e($isAdminStyle ? 'call-admin-card call-admin-kpi' : ''); ?>">
-      <div class="card-body">
-        <small class="text-muted">Host Earnings</small>
-        <div class="fs-4 fw-semibold mt-1"><?php echo e(number_format($summary['total_host_earnings'])); ?></div>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-6 col-xl-2">
-    <div class="card <?php echo e($isAdminStyle ? 'call-admin-card call-admin-kpi' : ''); ?>">
-      <div class="card-body">
-        <small class="text-muted">Agency Earnings</small>
-        <div class="fs-4 fw-semibold mt-1"><?php echo e(number_format($summary['total_agency_earnings'])); ?></div>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-12 col-xl-2">
-    <div class="card <?php echo e($isAdminStyle ? 'call-admin-card call-admin-kpi' : ''); ?>">
-      <div class="card-body">
-        <small class="text-muted">Platform Earnings</small>
-        <div class="fs-4 fw-semibold mt-1"><?php echo e(number_format($summary['total_platform_earnings'])); ?></div>
-      </div>
-    </div>
-  </div>
 </div>
 
 <?php if($isAdminStyle): ?>
   <div class="row g-3 mb-4">
-    <div class="col-lg-4">
-      <div class="call-admin-insight">
-        <div class="text-muted small mb-2">Top Host</div>
-        <div class="fw-semibold fs-5"><?php echo e($topHost?->host?->user?->name ?? 'No host data yet'); ?></div>
-        <div class="text-muted mt-2">Host earnings: <?php echo e(number_format((int) ($topHost->host_earning ?? 0))); ?></div>
-        <div class="text-muted">Billable minutes: <?php echo e(number_format((int) ($topHost->billable_minutes ?? 0))); ?></div>
-      </div>
-    </div>
-    <div class="col-lg-4">
-      <div class="call-admin-insight">
-        <div class="text-muted small mb-2">Top Agency</div>
-        <div class="fw-semibold fs-5"><?php echo e($topAgency?->agency?->name ?? 'No agency data yet'); ?></div>
-        <div class="text-muted mt-2">Agency earnings: <?php echo e(number_format((int) ($topAgency->agency_earning ?? 0))); ?></div>
-        <div class="text-muted">Billable minutes: <?php echo e(number_format((int) ($topAgency->billable_minutes ?? 0))); ?></div>
-      </div>
-    </div>
-    <div class="col-lg-4">
+    <div class="col-12">
       <div class="call-admin-insight">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <div class="text-muted small">Status Mix</div>
@@ -346,57 +301,6 @@
     </div>
   <?php endif; ?>
   <div class="card-body table-responsive">
-    <?php if($activeTab === 'host_earnings'): ?>
-      <table class="table align-middle <?php echo e($isAdminStyle ? 'call-admin-table' : ''); ?>">
-        <thead class="table-light">
-          <tr>
-            <th>Host</th>
-            <th>Total Coins</th>
-            <th>Minutes</th>
-            <th>Duration</th>
-            <th>Host Earnings</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php $__empty_1 = true; $__currentLoopData = $earnings['hosts']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-            <tr>
-              <td><?php echo e($row->host?->user?->name ?? ('Host #' . $row->host_id)); ?></td>
-              <td><?php echo e(number_format($row->total_coins)); ?></td>
-              <td><?php echo e(number_format($row->billable_minutes)); ?></td>
-              <td><?php echo e(number_format($row->duration_seconds)); ?></td>
-              <td><?php echo e(number_format($row->host_earning)); ?></td>
-            </tr>
-          <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-            <tr><td colspan="5" class="text-center text-muted py-4">No earnings found.</td></tr>
-          <?php endif; ?>
-        </tbody>
-      </table>
-    <?php elseif($activeTab === 'agency_earnings'): ?>
-      <table class="table align-middle <?php echo e($isAdminStyle ? 'call-admin-table' : ''); ?>">
-        <thead class="table-light">
-          <tr>
-            <th>Agency</th>
-            <th>Total Coins</th>
-            <th>Minutes</th>
-            <th>Duration</th>
-            <th>Agency Earnings</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php $__empty_1 = true; $__currentLoopData = $earnings['agencies']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-            <tr>
-              <td><?php echo e($row->agency?->name ?? ('Agency #' . $row->agency_id)); ?></td>
-              <td><?php echo e(number_format($row->total_coins)); ?></td>
-              <td><?php echo e(number_format($row->billable_minutes)); ?></td>
-              <td><?php echo e(number_format($row->duration_seconds)); ?></td>
-              <td><?php echo e(number_format($row->agency_earning)); ?></td>
-            </tr>
-          <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-            <tr><td colspan="5" class="text-center text-muted py-4">No earnings found.</td></tr>
-          <?php endif; ?>
-        </tbody>
-      </table>
-    <?php else: ?>
       <table class="table align-middle <?php echo e($isAdminStyle ? 'call-admin-table' : ''); ?>">
         <thead class="table-light">
           <tr>
@@ -412,9 +316,6 @@
             <th>Duration</th>
             <th>Minutes</th>
             <th>Coins</th>
-            <th>Host</th>
-            <th>Agency</th>
-            <th>Platform</th>
             <th>Created</th>
           </tr>
         </thead>
@@ -433,14 +334,11 @@
               <td><?php echo e($call->duration_seconds); ?></td>
               <td><?php echo e($call->billable_minutes); ?></td>
               <td><?php echo e(number_format($call->total_coins_charged)); ?></td>
-              <td><?php echo e(number_format($call->host_earning)); ?></td>
-              <td><?php echo e(number_format($call->agency_earning)); ?></td>
-              <td><?php echo e(number_format($call->platform_earning)); ?></td>
               <td><?php echo e($call->created_at?->format('d M Y H:i')); ?></td>
             </tr>
           <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
             <tr>
-              <td colspan="16" class="text-center text-muted py-4">No calls found.</td>
+              <td colspan="13" class="text-center text-muted py-4">No calls found.</td>
             </tr>
           <?php endif; ?>
         </tbody>
@@ -448,7 +346,6 @@
 
       <?php echo e($calls->links()); ?>
 
-    <?php endif; ?>
   </div>
 </div>
 <?php /**PATH /Users/amanagarwal/Desktop/gd_remake/gd_live_backend/resources/views/partials/call-report-table.blade.php ENDPATH**/ ?>

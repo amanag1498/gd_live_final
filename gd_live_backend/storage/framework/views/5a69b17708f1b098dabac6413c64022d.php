@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Agency Payout Report #<?php echo e($report->id); ?></title>
+  <style>
+    body { font-family: DejaVu Sans, sans-serif; font-size: 11px; color: #111827; }
+    h1, p { margin: 0; }
+    .header { margin-bottom: 16px; }
+    .meta { margin-top: 6px; color: #4b5563; }
+    .summary { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    .summary td { border: 1px solid #d1d5db; padding: 8px; vertical-align: top; width: 25%; }
+    .summary .label { font-size: 10px; color: #6b7280; }
+    .summary .value { margin-top: 4px; font-size: 14px; font-weight: 700; }
+    table.grid { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    table.grid th, table.grid td { border: 1px solid #d1d5db; padding: 6px; text-align: right; }
+    table.grid th:first-child, table.grid td:first-child { text-align: left; }
+    table.grid thead th { background: #f3f4f6; font-size: 10px; }
+    table.grid tfoot td { background: #f9fafb; font-weight: 700; }
+    .note { margin-top: 12px; padding: 10px; border: 1px solid #d1d5db; background: #f9fafb; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1><?php echo e($report->agency?->name ?? 'Agency'); ?> Settlement Report</h1>
+    <p class="meta">
+      Report #<?php echo e($report->id); ?> · <?php echo e(optional($report->period_start)->format('d M Y H:i')); ?> to <?php echo e(optional($report->period_end)->format('d M Y H:i')); ?> ·
+      Status: <?php echo e(ucwords(str_replace('_', ' ', $report->status))); ?> ·
+      Published: <?php echo e($report->published_at ? optional($report->published_at)->format('d M Y H:i') : 'Not yet'); ?>
+
+    </p>
+  </div>
+
+  <table class="summary">
+    <tr>
+      <td><div class="label">Total Hosts</div><div class="value"><?php echo e(number_format($report->total_hosts)); ?></div></td>
+      <td><div class="label">Active Hosts</div><div class="value"><?php echo e(number_format($report->active_hosts_count)); ?></div></td>
+      <td><div class="label">Total Coins</div><div class="value"><?php echo e(number_format($report->total_coins)); ?></div></td>
+      <td><div class="label">Total INR</div><div class="value"><?php echo e(number_format($report->total_inr, 2)); ?></div></td>
+    </tr>
+    <tr>
+      <td><div class="label">Video Room Timing</div><div class="value"><?php echo e(number_format($report->total_video_room_minutes)); ?> min</div></td>
+      <td><div class="label">Video Room Gifts</div><div class="value"><?php echo e(number_format($report->total_video_gift_coins)); ?></div></td>
+      <td><div class="label">PK Gifts</div><div class="value"><?php echo e(number_format($report->total_pk_gift_coins)); ?></div></td>
+      <td><div class="label">Video Calls</div><div class="value"><?php echo e(number_format($report->total_video_call_coins)); ?> / <?php echo e(number_format($report->total_video_call_minutes)); ?> min</div></td>
+    </tr>
+    <tr>
+      <td><div class="label">Bonus Coins</div><div class="value"><?php echo e(number_format($report->total_bonus_coins)); ?></div></td>
+      <td><div class="label">Host Payout INR</div><div class="value"><?php echo e(number_format($report->total_host_payout_inr, 2)); ?></div></td>
+      <td><div class="label">Agency Commission INR</div><div class="value"><?php echo e(number_format($report->total_agency_commission_inr, 2)); ?></div></td>
+      <td><div class="label">Published By</div><div class="value"><?php echo e($report->publishedByAdmin?->name ?? '—'); ?></div></td>
+    </tr>
+  </table>
+
+  <table class="grid">
+    <thead>
+      <tr>
+        <th>Host</th>
+        <th>Total Video Room Timing</th>
+        <th>Total Video Room Gifts</th>
+        <th>Total PK Gifts</th>
+        <th>Video Calls Coins</th>
+        <th>Video Calls Min</th>
+        <th>Bonus Coins</th>
+        <th>Total Coins</th>
+        <th>Host Payout INR</th>
+        <th>Agency Commission INR</th>
+        <th>Total INR</th>
+        <th>Admin Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <?php $__currentLoopData = $report->items; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+        <tr>
+          <td><?php echo e($item->host?->user?->name ?? $item->host?->stage_name ?? '—'); ?></td>
+          <td><?php echo e(number_format($item->video_room_minutes)); ?></td>
+          <td><?php echo e(number_format($item->video_gift_coins)); ?></td>
+          <td><?php echo e(number_format($item->pk_gift_coins)); ?></td>
+          <td><?php echo e(number_format($item->video_call_coins)); ?></td>
+          <td><?php echo e(number_format($item->video_call_minutes)); ?></td>
+          <td><?php echo e(number_format($item->bonus_coins)); ?></td>
+          <td><?php echo e(number_format($item->total_coins)); ?></td>
+          <td><?php echo e(number_format($item->host_payout_inr, 2)); ?></td>
+          <td><?php echo e(number_format($item->agency_commission_inr, 2)); ?></td>
+          <td><?php echo e(number_format($item->total_inr, 2)); ?></td>
+          <td><?php echo e($item->admin_note ?: '—'); ?></td>
+        </tr>
+      <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td>Grand Total</td>
+        <td><?php echo e(number_format($report->total_video_room_minutes)); ?></td>
+        <td><?php echo e(number_format($report->total_video_gift_coins)); ?></td>
+        <td><?php echo e(number_format($report->total_pk_gift_coins)); ?></td>
+        <td><?php echo e(number_format($report->total_video_call_coins)); ?></td>
+        <td><?php echo e(number_format($report->total_video_call_minutes)); ?></td>
+        <td><?php echo e(number_format($report->total_bonus_coins)); ?></td>
+        <td><?php echo e(number_format($report->total_coins)); ?></td>
+        <td><?php echo e(number_format($report->total_host_payout_inr, 2)); ?></td>
+        <td><?php echo e(number_format($report->total_agency_commission_inr, 2)); ?></td>
+        <td><?php echo e(number_format($report->total_inr, 2)); ?></td>
+        <td>—</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <?php if($report->admin_remarks): ?>
+    <div class="note">
+      <strong>Admin Remarks:</strong><br>
+      <?php echo e($report->admin_remarks); ?>
+
+    </div>
+  <?php endif; ?>
+</body>
+</html>
+<?php /**PATH /Users/amanagarwal/Desktop/gd_remake/gd_live_backend/resources/views/pdf/agency-payout-report.blade.php ENDPATH**/ ?>

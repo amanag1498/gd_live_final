@@ -1,17 +1,17 @@
-<?php $__env->startSection('title', 'Follow Alerts'); ?>
+<?php $__env->startSection('title', 'Online Alerts'); ?>
 
 <?php $__env->startSection('content'); ?>
 <div class="space-y-6">
-  <?php if (isset($component)) { $__componentOriginalb8dfe58016103e374219da4cf072c7cf = $component; } ?>
+<?php if (isset($component)) { $__componentOriginalb8dfe58016103e374219da4cf072c7cf = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginalb8dfe58016103e374219da4cf072c7cf = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.common.component-card','data' => ['title' => 'Follow Alerts','desc' => 'Track persisted host-online and host-available notifications sent to followers.']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.common.component-card','data' => ['title' => 'Online Alerts','desc' => 'Track persisted host-online notifications sent to followers.']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('common.component-card'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['title' => 'Follow Alerts','desc' => 'Track persisted host-online and host-available notifications sent to followers.']); ?>
+<?php $component->withAttributes(['title' => 'Online Alerts','desc' => 'Track persisted host-online notifications sent to followers.']); ?>
     <div class="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-800">
       <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
         <thead class="bg-gray-50 dark:bg-gray-950/60">
@@ -75,7 +75,7 @@
               <td class="px-4 py-4 text-gray-600 dark:text-gray-300"><?php echo e(optional($item->created_at)->format('d M Y, H:i')); ?></td>
             </tr>
           <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-            <tr class="bg-white dark:bg-gray-900"><td colspan="5" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No follow alerts recorded.</td></tr>
+            <tr class="bg-white dark:bg-gray-900"><td colspan="5" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No online alerts recorded.</td></tr>
           <?php endif; ?>
         </tbody>
       </table>

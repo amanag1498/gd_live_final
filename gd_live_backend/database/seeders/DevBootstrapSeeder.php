@@ -28,6 +28,11 @@ class DevBootstrapSeeder extends Seeder
             env('SEED_ALWAYS_ADMIN_NAME', 'Aman Agarwal')
         );
 
+        $additionalAdmin = $this->ensureAdminUser(
+            env('SEED_SECONDARY_ADMIN_EMAIL', 'avmlite@gmail.com'),
+            env('SEED_SECONDARY_ADMIN_NAME', 'AVM Lite')
+        );
+
         $agencyOwner = $this->makeUser('agency@example.com', 'Agency Owner', ['agency']);
         $agency = Agency::query()->updateOrCreate(
             ['owner_user_id' => $agencyOwner->id],
@@ -99,6 +104,9 @@ class DevBootstrapSeeder extends Seeder
         $this->seedWallet($admin, 2000, 'seed_admin');
         if ($alwaysAdmin->id !== $admin->id) {
             $this->seedWallet($alwaysAdmin, 2000, 'seed_always_admin');
+        }
+        if ($additionalAdmin->id !== $admin->id && $additionalAdmin->id !== $alwaysAdmin->id) {
+            $this->seedWallet($additionalAdmin, 2000, 'seed_secondary_admin');
         }
         $this->seedWallet($agencyOwner, 1500, 'seed_agency_owner');
         $this->seedWallet($hostUser, 800, 'seed_host');

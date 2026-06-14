@@ -51,7 +51,7 @@
 <?php endif; ?>
           </div>
           <h2 class="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">App Settings</h2>
-          <p class="mt-3 text-sm text-gray-600 dark:text-gray-300">Control maintenance mode, upgrades, and cross-platform feature availability from a single settings surface.</p>
+          <p class="mt-3 text-sm text-gray-600 dark:text-gray-300">Control maintenance mode, upgrades, and cross-platform feature toggles from a single settings surface.</p>
         </div>
         <div class="grid gap-3 sm:grid-cols-2">
           <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>

@@ -42,7 +42,7 @@
       <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div class="max-w-2xl">
           <h3 class="text-base font-semibold text-gray-900 dark:text-white">Host Performance Reports</h3>
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Track room output, call spend, gift activity, PK performance, and earned payout totals across daily or weekly slices.</p>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Track room output, video call coins, room gifts, PK gifts, and gross host performance across daily or weekly slices.</p>
         </div>
         <form class="grid gap-3 md:grid-cols-2 xl:grid-cols-[220px_160px_150px_150px_auto]" method="get">
           <select name="host_id" class="<?php echo e($inputClass); ?>">
@@ -109,11 +109,10 @@
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Host</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Rooms</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Participants</th>
-            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Call Coins</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Video Call</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Room Gifts / Coins</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Gift / PK</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Gross</th>
-            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Host Payable</th>
-            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Agency Payable</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
@@ -138,21 +137,23 @@
 
               <div class="mt-1 text-xs text-gray-500 dark:text-gray-400"><?php echo e($r['participants_unique']); ?> unique</div>
             </td>
-            <td class="px-4 py-4 text-gray-900 dark:text-white"><?php echo e(number_format($r['call_coins'])); ?></td>
+            <td class="px-4 py-4 text-gray-600 dark:text-gray-300">
+              <?php echo e(number_format($r['video_call_minutes'])); ?> min
+              <div class="mt-1 text-xs text-gray-500 dark:text-gray-400"><?php echo e(number_format($r['video_call_coins'])); ?> coins</div>
+            </td>
+            <td class="px-4 py-4 text-gray-900 dark:text-white">
+              <?php echo e(number_format($r['room_gift_coins'])); ?>
+
+            </td>
             <td class="px-4 py-4 text-gray-600 dark:text-gray-300">
               <?php echo e(number_format($r['gift_coins'])); ?>
 
               <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">PK <?php echo e(number_format($r['pk_coins'])); ?> · <?php echo e(number_format($r['pk_events'])); ?> events</div>
             </td>
             <td class="px-4 py-4 font-semibold text-gray-900 dark:text-white"><?php echo e(number_format($r['gross_coins'])); ?></td>
-            <td class="px-4 py-4 text-gray-600 dark:text-gray-300">
-              <?php echo e(number_format($r['host_payable'])); ?>
-
-            </td>
-            <td class="px-4 py-4 text-gray-600 dark:text-gray-300"><?php echo e(number_format($r['agency_payable'])); ?></td>
           </tr>
         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-          <tr class="bg-white dark:bg-gray-900"><td colspan="9" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No host data in this range.</td></tr>
+          <tr class="bg-white dark:bg-gray-900"><td colspan="8" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No host data in this range.</td></tr>
         <?php endif; ?>
         </tbody>
       </table>

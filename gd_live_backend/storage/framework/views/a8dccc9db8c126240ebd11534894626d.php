@@ -282,28 +282,30 @@
 
       <?php if (isset($component)) { $__componentOriginalb8dfe58016103e374219da4cf072c7cf = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginalb8dfe58016103e374219da4cf072c7cf = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.common.component-card','data' => ['title' => 'Weekly Payout Line Items','desc' => 'Most recent reporting windows for this host.']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.common.component-card','data' => ['title' => 'Weekly Payout Line Items','desc' => 'Most recent settlement windows for this host.']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('common.component-card'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['title' => 'Weekly Payout Line Items','desc' => 'Most recent reporting windows for this host.']); ?>
+<?php $component->withAttributes(['title' => 'Weekly Payout Line Items','desc' => 'Most recent settlement windows for this host.']); ?>
         <div class="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-800">
           <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-            <thead class="bg-gray-50 dark:bg-gray-950/60"><tr><th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Week</th><th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Gross</th><th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Agency</th><th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Host</th><th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Final</th></tr></thead>
+            <thead class="bg-gray-50 dark:bg-gray-950/60"><tr><th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Week</th><th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Video Room</th><th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Video Gifts</th><th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">PK Gifts</th><th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Video Call</th><th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Total Coins</th><th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Total INR</th></tr></thead>
             <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
               <?php $__empty_1 = true; $__currentLoopData = $detail['recentPayoutItems']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                 <tr class="bg-white dark:bg-gray-900">
                   <td class="px-4 py-3"><?php echo e(optional($item->report?->period_start)->format('d M Y') ?: '—'); ?></td>
-                  <td class="px-4 py-3"><?php echo e(number_format((int) $item->gross_earnings)); ?></td>
-                  <td class="px-4 py-3"><?php echo e(number_format((int) $item->agency_commission)); ?></td>
-                  <td class="px-4 py-3"><?php echo e(number_format((int) $item->host_share)); ?></td>
-                  <td class="px-4 py-3"><?php echo e(number_format((int) $item->final_payable)); ?></td>
+                  <td class="px-4 py-3"><?php echo e(number_format($item->video_room_minutes)); ?> min</td>
+                  <td class="px-4 py-3"><?php echo e(number_format($item->video_gift_coins)); ?></td>
+                  <td class="px-4 py-3"><?php echo e(number_format($item->pk_gift_coins)); ?></td>
+                  <td class="px-4 py-3"><?php echo e(number_format($item->video_call_coins)); ?> / <?php echo e(number_format($item->video_call_minutes)); ?> min</td>
+                  <td class="px-4 py-3"><?php echo e(number_format($item->total_coins)); ?></td>
+                  <td class="px-4 py-3"><?php echo e(number_format($item->total_inr, 2)); ?></td>
                 </tr>
               <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-                <tr class="bg-white dark:bg-gray-900"><td colspan="5" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No payout items yet.</td></tr>
+                <tr class="bg-white dark:bg-gray-900"><td colspan="7" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No payout items yet.</td></tr>
               <?php endif; ?>
             </tbody>
           </table>

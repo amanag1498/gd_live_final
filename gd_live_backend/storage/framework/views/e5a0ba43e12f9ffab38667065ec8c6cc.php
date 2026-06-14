@@ -5,15 +5,21 @@
   $isAgencyPanel = request()->routeIs('agency.*');
   $agencyHostsRoute = $hostsIndexRoute ?? route('agency.hosts.index');
   $agencyCallsRoute = $callsRoute ?? route('agency.calls.index');
-  $agencyWalletRoute = $walletRoute ?? route('agency.wallet.show');
+  $agencyWalletRoute = $walletRoute ?? ($isAgencyPanel ? route('agency.wallet.show') : route('admin.agencies.wallet.show', $agency));
   $agencyPayoutRoute = $payoutReportsRoute ?? route('agency.payout-reports.index');
+  $agencyProfileRoute = $profileRoute ?? ($isAgencyPanel ? route('agency.profile.show') : route('admin.agencies.profile.show', $agency));
+  $agencyRoomsRoute = $videoRoomsRoute ?? ($isAgencyPanel ? route('agency.video-rooms.index') : route('admin.agencies.video-rooms.index', $agency));
+  $agencyPkRoute = $pkBattlesRoute ?? ($isAgencyPanel ? route('agency.pk-battles.index') : route('admin.agencies.pk-battles.index', $agency));
 ?>
 
 <?php $__env->startSection('page_actions'); ?>
-  <a href="<?php echo e($agencyHostsRoute); ?>" class="<?php echo e($isAgencyPanel ? 'inline-flex' : 'hidden'); ?> items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">Hosts</a>
-  <a href="<?php echo e($agencyCallsRoute); ?>" class="<?php echo e($isAgencyPanel ? 'inline-flex' : 'hidden'); ?> items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">Call Reports</a>
-  <a href="<?php echo e($agencyWalletRoute); ?>" class="<?php echo e($isAgencyPanel && $agency ? 'inline-flex' : 'hidden'); ?> items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">Wallet</a>
-  <a href="<?php echo e($agencyPayoutRoute); ?>" class="<?php echo e($isAgencyPanel ? 'inline-flex' : 'hidden'); ?> items-center justify-center gap-2 rounded-lg bg-brand-500 px-3 py-2 text-xs font-medium text-white transition hover:bg-brand-600">Weekly Payout Reports</a>
+  <a href="<?php echo e($agencyHostsRoute); ?>" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">Hosts</a>
+  <a href="<?php echo e($agencyCallsRoute); ?>" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">Call Reports</a>
+  <a href="<?php echo e($agencyRoomsRoute); ?>" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">Video Rooms</a>
+  <a href="<?php echo e($agencyPkRoute); ?>" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">PK Battles</a>
+  <a href="<?php echo e($agencyProfileRoute); ?>" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">Profile</a>
+  <a href="<?php echo e($agencyWalletRoute); ?>" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">Wallet</a>
+  <a href="<?php echo e($agencyPayoutRoute); ?>" class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-3 py-2 text-xs font-medium text-white transition hover:bg-brand-600">Weekly Payout Reports</a>
 <?php $__env->stopSection(); ?>
 
 <?php $__env->startSection('content'); ?>
@@ -452,7 +458,7 @@
               <h3 class="text-base font-semibold text-gray-900 dark:text-white">Recent Weekly Payout Reports</h3>
               <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Latest agency payout reporting windows and review state.</p>
             </div>
-            <a href="<?php echo e($agencyPayoutRoute); ?>" class="<?php echo e($isAgencyPanel ? 'inline-flex' : 'hidden'); ?> items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">View All</a>
+            <a href="<?php echo e($agencyPayoutRoute); ?>" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">View All</a>
           </div>
          <?php $__env->endSlot(); ?>
         <div class="overflow-x-auto">
@@ -460,7 +466,9 @@
               <thead class="bg-gray-50 dark:bg-gray-950/60">
                 <tr>
                   <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Week</th>
+                  <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Total Coins</th>
                   <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Final Payable</th>
+                  <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Total INR</th>
                   <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Status</th>
                 </tr>
               </thead>
@@ -468,7 +476,9 @@
                 <?php $__empty_1 = true; $__currentLoopData = $recentPayoutReports; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $report): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                   <tr class="bg-white dark:bg-gray-900">
                     <td class="px-4 py-3"><?php echo e(optional($report->period_start)->format('d M Y')); ?> - <?php echo e(optional($report->period_end)->format('d M Y')); ?></td>
+                    <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white"><?php echo e(number_format($report->total_coins)); ?></td>
                     <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white"><?php echo e(number_format($report->final_payable)); ?></td>
+                    <td class="px-4 py-3"><?php echo e(number_format($report->total_inr, 2)); ?></td>
                     <td class="px-4 py-3"><?php if (isset($component)) { $__componentOriginalab7baa01105b3dfe1e0cf1dfc58879b4 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginalab7baa01105b3dfe1e0cf1dfc58879b4 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.badge','data' => ['color' => 'dark']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
@@ -490,7 +500,7 @@
 <?php endif; ?></td>
                   </tr>
                 <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-                  <tr class="bg-white dark:bg-gray-900"><td colspan="3" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No payout reports yet.</td></tr>
+                  <tr class="bg-white dark:bg-gray-900"><td colspan="5" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No payout reports yet.</td></tr>
                 <?php endif; ?>
               </tbody>
             </table>

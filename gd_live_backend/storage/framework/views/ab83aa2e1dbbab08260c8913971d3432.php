@@ -1,5 +1,5 @@
 <?php $__env->startSection('title', 'Weekly Payout Reports'); ?>
-<?php $__env->startSection('page_intro', 'Read-only weekly payout reports scoped to your agency, with offline payout tracking and host-level breakdowns.'); ?>
+<?php $__env->startSection('page_intro', 'Read-only weekly payout reports scoped to your agency, with downloadable settlement PDFs.'); ?>
 
 <?php $__env->startSection('content'); ?>
   <div class="card mb-3">

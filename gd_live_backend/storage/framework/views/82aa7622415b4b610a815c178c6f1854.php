@@ -243,11 +243,39 @@
         <div class="grid gap-4 sm:grid-cols-2">
           <div>
             <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Start</label>
-            <input type="date" name="start" class="<?php echo e($inputClass); ?>" value="<?php echo e(request('date_from')); ?>">
+            <div class="relative">
+              <input
+                type="date"
+                name="start"
+                class="<?php echo e($inputClass); ?> appearance-none pr-11"
+                value="<?php echo e(request('start', request('date_from'))); ?>"
+                onclick="this.showPicker()"
+                readonly
+              >
+              <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">
+                <svg class="size-5 fill-current" viewBox="0 0 20 20" aria-hidden="true">
+                  <path fill-rule="evenodd" clip-rule="evenodd" d="M5.5 2.5C5.91421 2.5 6.25 2.83579 6.25 3.25V4.25H13.75V3.25C13.75 2.83579 14.0858 2.5 14.5 2.5C14.9142 2.5 15.25 2.83579 15.25 3.25V4.25H16.5C17.7426 4.25 18.75 5.25736 18.75 6.5V15.5C18.75 16.7426 17.7426 17.75 16.5 17.75H3.5C2.25736 17.75 1.25 16.7426 1.25 15.5V6.5C1.25 5.25736 2.25736 4.25 3.5 4.25H4.75V3.25C4.75 2.83579 5.08579 2.5 5.5 2.5ZM3.5 5.75C3.08579 5.75 2.75 6.08579 2.75 6.5V7.75H17.25V6.5C17.25 6.08579 16.9142 5.75 16.5 5.75H15.25H4.75H3.5ZM17.25 9.25H2.75V15.5C2.75 15.9142 3.08579 16.25 3.5 16.25H16.5C16.9142 16.25 17.25 15.9142 17.25 15.5V9.25Z" />
+                </svg>
+              </span>
+            </div>
           </div>
           <div>
             <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">End</label>
-            <input type="date" name="end" class="<?php echo e($inputClass); ?>" value="<?php echo e(request('date_to')); ?>">
+            <div class="relative">
+              <input
+                type="date"
+                name="end"
+                class="<?php echo e($inputClass); ?> appearance-none pr-11"
+                value="<?php echo e(request('end', request('date_to'))); ?>"
+                onclick="this.showPicker()"
+                readonly
+              >
+              <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">
+                <svg class="size-5 fill-current" viewBox="0 0 20 20" aria-hidden="true">
+                  <path fill-rule="evenodd" clip-rule="evenodd" d="M5.5 2.5C5.91421 2.5 6.25 2.83579 6.25 3.25V4.25H13.75V3.25C13.75 2.83579 14.0858 2.5 14.5 2.5C14.9142 2.5 15.25 2.83579 15.25 3.25V4.25H16.5C17.7426 4.25 18.75 5.25736 18.75 6.5V15.5C18.75 16.7426 17.7426 17.75 16.5 17.75H3.5C2.25736 17.75 1.25 16.7426 1.25 15.5V6.5C1.25 5.25736 2.25736 4.25 3.5 4.25H4.75V3.25C4.75 2.83579 5.08579 2.5 5.5 2.5ZM3.5 5.75C3.08579 5.75 2.75 6.08579 2.75 6.5V7.75H17.25V6.5C17.25 6.08579 16.9142 5.75 16.5 5.75H15.25H4.75H3.5ZM17.25 9.25H2.75V15.5C2.75 15.9142 3.08579 16.25 3.5 16.25H16.5C16.9142 16.25 17.25 15.9142 17.25 15.5V9.25Z" />
+                </svg>
+              </span>
+            </div>
           </div>
         </div>
         <div>
@@ -509,7 +537,7 @@
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['variant' => 'outline','size' => 'sm','href' => ''.e(route('admin.agency-payout-reports.export', $report)).'']); ?>CSV <?php echo $__env->renderComponent(); ?>
+<?php $component->withAttributes(['variant' => 'outline','size' => 'sm','href' => ''.e(route('admin.agency-payout-reports.export', $report)).'']); ?>PDF <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
 <?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>

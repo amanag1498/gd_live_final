@@ -1,502 +1,667 @@
 <?php $__env->startSection('title', 'Agency Payout Report #' . $report->id); ?>
 
 <?php $__env->startSection('content'); ?>
-<style>
-  .payout-grid-table {
-    white-space: nowrap;
-  }
+<?php
+  $locked = $report->status === 'paid' || $report->paid_at;
+  $inputClass = 'h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 shadow-theme-xs outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white';
+  $dashboardHref = ($report->agency_id && \Illuminate\Support\Facades\Route::has('admin.agencies.dashboard'))
+      ? route('admin.agencies.dashboard', $report->agency_id)
+      : null;
+?>
 
-  .payout-grid-table th,
-  .payout-grid-table td {
-    vertical-align: middle;
-  }
-
-  .payout-grid-host {
-    min-width: 180px;
-    position: sticky;
-    left: 0;
-    background: #fff;
-    z-index: 1;
-  }
-
-  .payout-grid-save {
-    min-width: 88px;
-    position: sticky;
-    right: 0;
-    background: #fff;
-    z-index: 1;
-  }
-
-  .payout-grid-input {
-    width: 110px;
-    min-width: 110px;
-    text-align: right;
-    padding-inline: 0.55rem;
-    font-size: 0.82rem;
-    line-height: 1.35;
-    color: #111827;
-  }
-
-  .payout-grid-input.payout-grid-wide {
-    width: 132px;
-    min-width: 132px;
-  }
-
-  .payout-grid-input.payout-grid-percent {
-    width: 84px;
-    min-width: 84px;
-  }
-
-  .payout-grid-note {
-    width: 220px;
-    min-width: 220px;
-    white-space: normal;
-    font-size: 0.82rem;
-    line-height: 1.35;
-    color: #111827;
-  }
-</style>
-<div class="admin-page-shell">
-  <section class="admin-page-hero">
-    <div class="row g-4 align-items-center">
-      <div class="col-lg-8">
-        <span class="admin-page-eyebrow"><i class="ti ti-receipt-2"></i>Payout Detail</span>
-        <h1 class="admin-page-title"><?php echo e($report->agency?->name ?? 'Agency'); ?> · Report #<?php echo e($report->id); ?></h1>
-        <p class="admin-page-subtitle">
-          <?php echo e(optional($report->period_start)->format('d M Y H:i')); ?> to <?php echo e(optional($report->period_end)->format('d M Y H:i')); ?> ·
-          Status: <?php echo e(ucwords(str_replace('_', ' ', $report->status))); ?> ·
-          Agency visibility: <?php echo e($report->published_at ? 'Published' : 'Draft only'); ?>
-
-        </p>
-      </div>
-      <div class="col-lg-4">
-        <div class="admin-page-actions">
-          <a href="<?php echo e(route('admin.agency-payout-reports.index')); ?>" class="btn btn-light border">Back</a>
-          <a href="<?php echo e(route('admin.agencies.dashboard', $report->agency_id)); ?>" class="btn btn-outline-secondary">Open Agency Dashboard</a>
-          <a href="<?php echo e(route('admin.agency-payout-reports.export', $report)); ?>" class="btn btn-outline-primary">Export CSV</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
+<div class="space-y-6">
   <?php if(session('status')): ?>
-    <div class="alert alert-success"><?php echo e(session('status')); ?></div>
+    <?php if (isset($component)) { $__componentOriginal746de018ded8594083eb43be3f1332e1 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal746de018ded8594083eb43be3f1332e1 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.alert','data' => ['variant' => 'success']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.alert'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['variant' => 'success']); ?><?php echo e(session('status')); ?> <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal746de018ded8594083eb43be3f1332e1)): ?>
+<?php $attributes = $__attributesOriginal746de018ded8594083eb43be3f1332e1; ?>
+<?php unset($__attributesOriginal746de018ded8594083eb43be3f1332e1); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal746de018ded8594083eb43be3f1332e1)): ?>
+<?php $component = $__componentOriginal746de018ded8594083eb43be3f1332e1; ?>
+<?php unset($__componentOriginal746de018ded8594083eb43be3f1332e1); ?>
+<?php endif; ?>
   <?php endif; ?>
   <?php if($errors->any()): ?>
-    <div class="alert alert-danger">
-      <ul class="mb-0">
+    <?php if (isset($component)) { $__componentOriginal746de018ded8594083eb43be3f1332e1 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal746de018ded8594083eb43be3f1332e1 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.alert','data' => ['variant' => 'error']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.alert'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['variant' => 'error']); ?>
+      <ul class="list-disc pl-5">
         <?php $__currentLoopData = $errors->all(); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $error): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
           <li><?php echo e($error); ?></li>
         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
       </ul>
-    </div>
+     <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal746de018ded8594083eb43be3f1332e1)): ?>
+<?php $attributes = $__attributesOriginal746de018ded8594083eb43be3f1332e1; ?>
+<?php unset($__attributesOriginal746de018ded8594083eb43be3f1332e1); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal746de018ded8594083eb43be3f1332e1)): ?>
+<?php $component = $__componentOriginal746de018ded8594083eb43be3f1332e1; ?>
+<?php unset($__componentOriginal746de018ded8594083eb43be3f1332e1); ?>
+<?php endif; ?>
   <?php endif; ?>
 
-  <section class="row g-3 mb-3">
-    <div class="col-md-6 col-xl-3"><div class="card"><div class="card-body"><small class="text-muted">Total Hosts</small><div class="fs-3 fw-semibold mt-1"><?php echo e(number_format($report->total_hosts)); ?></div></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="card"><div class="card-body"><small class="text-muted">Active/Live Hosts</small><div class="fs-3 fw-semibold mt-1"><?php echo e(number_format($report->active_hosts_count)); ?></div></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="card"><div class="card-body"><small class="text-muted">Gross Earnings</small><div class="fs-3 fw-semibold mt-1"><?php echo e(number_format($report->gross_earnings)); ?></div></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="card"><div class="card-body"><small class="text-muted">Final Payable</small><div class="fs-3 fw-semibold mt-1"><?php echo e(number_format($report->final_payable)); ?></div></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="card"><div class="card-body"><small class="text-muted">Video Rooms</small><div class="fs-5 fw-semibold mt-1"><?php echo e(number_format($report->total_video_room_minutes)); ?> min</div><div class="text-muted small mt-1">Gifts <?php echo e(number_format($report->total_video_gift_gross)); ?></div></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="card"><div class="card-body"><small class="text-muted">Video Calls</small><div class="fs-5 fw-semibold mt-1"><?php echo e(number_format($report->total_video_call_minutes)); ?> min</div><div class="text-muted small mt-1">Gross <?php echo e(number_format($report->total_video_call_gross)); ?></div></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="card"><div class="card-body"><small class="text-muted">Platform Comm.</small><div class="fs-5 fw-semibold mt-1"><?php echo e(number_format($report->platform_commission)); ?></div></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="card"><div class="card-body"><small class="text-muted">Agency Payout</small><div class="fs-5 fw-semibold mt-1"><?php echo e(number_format($report->agency_commission)); ?></div></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="card"><div class="card-body"><small class="text-muted">Host Payout</small><div class="fs-5 fw-semibold mt-1"><?php echo e(number_format($report->host_share)); ?></div></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="card"><div class="card-body"><small class="text-muted">Combined Payout</small><div class="fs-5 fw-semibold mt-1"><?php echo e(number_format($report->total_payout)); ?></div></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="card"><div class="card-body"><small class="text-muted">Deductions</small><div class="fs-5 fw-semibold mt-1"><?php echo e(number_format($report->deductions)); ?></div></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="card"><div class="card-body"><small class="text-muted">Call Count</small><div class="fs-5 fw-semibold mt-1"><?php echo e(number_format($report->total_call_count)); ?></div></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="card"><div class="card-body"><small class="text-muted">Billable Minutes</small><div class="fs-5 fw-semibold mt-1"><?php echo e(number_format($report->total_billable_minutes)); ?></div></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="card"><div class="card-body"><small class="text-muted">Gift Events / Qty</small><div class="fs-5 fw-semibold mt-1"><?php echo e(number_format($report->total_gift_events)); ?> / <?php echo e(number_format($report->total_gift_quantity)); ?></div></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="card"><div class="card-body"><small class="text-muted">Live Rooms</small><div class="fs-5 fw-semibold mt-1"><?php echo e(number_format($report->total_live_room_count)); ?> · <?php echo e(number_format($report->total_video_room_count)); ?> video</div></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="card"><div class="card-body"><small class="text-muted">PK Gross / Events</small><div class="fs-5 fw-semibold mt-1"><?php echo e(number_format($report->total_pk_earnings)); ?> / <?php echo e(number_format($report->total_pk_event_count)); ?></div></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="card"><div class="card-body"><small class="text-muted">Report Timezone</small><div class="fs-5 fw-semibold mt-1"><?php echo e(data_get($report->meta, 'timezone', config('app.timezone'))); ?></div></div></div></div>
-    <div class="col-md-6 col-xl-3"><div class="card"><div class="card-body"><small class="text-muted">Published</small><div class="fs-5 fw-semibold mt-1"><?php echo e($report->published_at ? optional($report->published_at)->format('d M Y H:i') : 'Not yet'); ?></div><div class="text-muted small mt-1"><?php echo e($report->publishedByAdmin?->name ?? 'Agency cannot see this yet'); ?></div></div></div></div>
-  </section>
+  <?php if (isset($component)) { $__componentOriginalb8dfe58016103e374219da4cf072c7cf = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalb8dfe58016103e374219da4cf072c7cf = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.common.component-card','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('common.component-card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes([]); ?>
+     <?php $__env->slot('header', null, []); ?> 
+      <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h3 class="text-base font-semibold text-gray-900 dark:text-white"><?php echo e($report->agency?->name ?? 'Agency'); ?> · Report #<?php echo e($report->id); ?></h3>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            <?php echo e(optional($report->period_start)->format('d M Y H:i')); ?> to <?php echo e(optional($report->period_end)->format('d M Y H:i')); ?> ·
+            Status: <?php echo e(ucwords(str_replace('_', ' ', $report->status))); ?> ·
+            Agency visibility: <?php echo e($report->published_at ? 'Published' : 'Draft only'); ?>
 
-  <section class="row g-3 mb-3">
-    <div class="col-lg-6">
-      <div class="card">
-        <div class="card-header"><h5 class="mb-0">Review</h5></div>
-        <div class="card-body">
-          <form method="post" action="<?php echo e(route('admin.agency-payout-reports.review', $report)); ?>" class="row g-3">
-            <?php echo csrf_field(); ?>
-            <div class="col-md-4">
-              <label class="form-label">Deductions</label>
-              <input type="number" min="0" name="deductions" class="form-control" value="<?php echo e(old('deductions', $report->deductions)); ?>">
-            </div>
-            <div class="col-12">
-              <label class="form-label">Admin Remarks</label>
-              <textarea name="admin_remarks" class="form-control" rows="3"><?php echo e(old('admin_remarks', $report->admin_remarks)); ?></textarea>
-            </div>
-            <div class="col-12 d-flex gap-2">
-              <button class="btn btn-light border" <?php if(!in_array($report->status, ['generated', 'pending_review'])): echo 'disabled'; endif; ?>>Save Pending Review</button>
-            </div>
-          </form>
+          </p>
         </div>
-      </div>
-    </div>
-    <div class="col-lg-6">
-      <div class="card">
-        <div class="card-header"><h5 class="mb-0">Actions</h5></div>
-        <div class="card-body d-grid gap-3">
-          <form method="post" action="<?php echo e(route('admin.agency-payout-reports.approve', $report)); ?>" class="row g-2">
-            <?php echo csrf_field(); ?>
-            <div class="col-md-4">
-              <input type="number" min="0" name="deductions" class="form-control" value="<?php echo e($report->deductions); ?>" placeholder="Deductions">
-            </div>
-            <div class="col-md-8">
-              <input type="text" name="admin_remarks" class="form-control" value="<?php echo e($report->admin_remarks); ?>" placeholder="Approval remarks">
-            </div>
-            <div class="col-12">
-              <button class="btn btn-primary" <?php if(!in_array($report->status, ['generated', 'pending_review'])): echo 'disabled'; endif; ?>>Approve Report</button>
-            </div>
-          </form>
-
-          <form method="post" action="<?php echo e(route('admin.agency-payout-reports.publish', $report)); ?>" class="row g-2">
-            <?php echo csrf_field(); ?>
-            <div class="col-12">
-              <input type="text" name="admin_remarks" class="form-control" value="<?php echo e($report->admin_remarks); ?>" placeholder="Publish remarks">
-            </div>
-            <div class="col-12">
-              <button class="btn btn-outline-primary" <?php if($report->status !== 'approved' || $report->published_at): echo 'disabled'; endif; ?>>Publish To Agency</button>
-            </div>
-          </form>
-
-          <form method="post" action="<?php echo e(route('admin.agency-payout-reports.mark-paid', $report)); ?>" class="row g-2">
-            <?php echo csrf_field(); ?>
-            <div class="col-12">
-              <input type="text" name="admin_remarks" class="form-control" value="<?php echo e($report->admin_remarks); ?>" placeholder="Payment remarks">
-            </div>
-            <div class="col-12">
-              <button class="btn btn-success" <?php if($report->status !== 'approved' || $report->status === 'paid' || !$report->published_at): echo 'disabled'; endif; ?>>Mark as Paid</button>
-            </div>
-          </form>
-
-          <form method="post" action="<?php echo e(route('admin.agency-payout-reports.reject', $report)); ?>" class="row g-2">
-            <?php echo csrf_field(); ?>
-            <div class="col-12">
-              <textarea name="admin_remarks" class="form-control" rows="3" placeholder="Rejection reason" <?php if($report->status === 'paid'): echo 'disabled'; endif; ?>></textarea>
-            </div>
-            <div class="col-12">
-              <button class="btn btn-outline-danger" <?php if(!in_array($report->status, ['generated', 'pending_review'])): echo 'disabled'; endif; ?>>Reject Report</button>
-            </div>
-          </form>
-
-          <?php if($report->status !== 'paid'): ?>
-            <form method="post" action="<?php echo e(route('admin.agency-payout-reports.destroy', $report)); ?>" class="row g-2" onsubmit="return confirm('Delete this payout report draft? This cannot be undone.');">
-              <?php echo csrf_field(); ?>
-              <?php echo method_field('DELETE'); ?>
-              <div class="col-12">
-                <textarea name="admin_remarks" class="form-control" rows="2" placeholder="Delete reason (optional)"></textarea>
-              </div>
-              <div class="col-12">
-                <button class="btn btn-danger">Delete Report</button>
-              </div>
-            </form>
+        <div class="flex flex-wrap gap-2">
+          <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['variant' => 'outline','size' => 'sm','href' => ''.e(route('admin.agency-payout-reports.index')).'']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['variant' => 'outline','size' => 'sm','href' => ''.e(route('admin.agency-payout-reports.index')).'']); ?>Back <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+          <?php if($dashboardHref): ?>
+            <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['variant' => 'outline','size' => 'sm','href' => ''.e($dashboardHref).'']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['variant' => 'outline','size' => 'sm','href' => ''.e($dashboardHref).'']); ?>Open Agency Dashboard <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
           <?php endif; ?>
+          <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['variant' => 'outline','size' => 'sm','href' => ''.e(route('admin.agency-payout-reports.export', $report)).'']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['variant' => 'outline','size' => 'sm','href' => ''.e(route('admin.agency-payout-reports.export', $report)).'']); ?>Download PDF <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
         </div>
       </div>
-    </div>
-  </section>
+     <?php $__env->endSlot(); ?>
 
-  <section class="card">
-    <div class="card-header">
-      <h5 class="mb-0">Per-Host Breakdown</h5>
-      <div class="text-muted small mt-1">Edit rows here before publishing. Changing an approved row moves the report back to pending review.</div>
-    </div>
-    <div class="card-body table-responsive">
-      <table class="table align-middle payout-grid-table">
-        <thead class="table-light">
+    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Total Hosts','value' => number_format($report->total_hosts)]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('admin.stat-card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['label' => 'Total Hosts','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($report->total_hosts))]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $attributes = $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $component = $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+      <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Active Hosts','value' => number_format($report->active_hosts_count),'tone' => 'brand']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('admin.stat-card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['label' => 'Active Hosts','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($report->active_hosts_count)),'tone' => 'brand']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $attributes = $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $component = $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+      <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Total Coins','value' => number_format($report->total_coins),'tone' => 'dark']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('admin.stat-card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['label' => 'Total Coins','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($report->total_coins)),'tone' => 'dark']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $attributes = $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $component = $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+      <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Final Payable','value' => number_format($report->final_payable),'tone' => 'success']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('admin.stat-card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['label' => 'Final Payable','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($report->final_payable)),'tone' => 'success']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $attributes = $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $component = $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+      <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Video Room Timing','value' => number_format($report->total_video_room_minutes) . ' min']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('admin.stat-card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['label' => 'Video Room Timing','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($report->total_video_room_minutes) . ' min')]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $attributes = $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $component = $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+      <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Video Room Gifts','value' => number_format($report->total_video_gift_coins)]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('admin.stat-card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['label' => 'Video Room Gifts','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($report->total_video_gift_coins))]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $attributes = $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $component = $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+      <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'PK Gifts','value' => number_format($report->total_pk_gift_coins),'tone' => 'warning']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('admin.stat-card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['label' => 'PK Gifts','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($report->total_pk_gift_coins)),'tone' => 'warning']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $attributes = $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $component = $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+      <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Video Calls','value' => number_format($report->total_video_call_coins),'meta' => number_format($report->total_video_call_minutes) . ' min']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('admin.stat-card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['label' => 'Video Calls','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($report->total_video_call_coins)),'meta' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($report->total_video_call_minutes) . ' min')]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $attributes = $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $component = $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+      <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Bonus Coins','value' => number_format($report->total_bonus_coins)]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('admin.stat-card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['label' => 'Bonus Coins','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($report->total_bonus_coins))]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $attributes = $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $component = $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+      <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Host Payout INR','value' => number_format($report->total_host_payout_inr, 2)]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('admin.stat-card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['label' => 'Host Payout INR','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($report->total_host_payout_inr, 2))]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $attributes = $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $component = $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+      <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Agency Commission INR','value' => number_format($report->total_agency_commission_inr, 2)]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('admin.stat-card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['label' => 'Agency Commission INR','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($report->total_agency_commission_inr, 2))]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $attributes = $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $component = $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+      <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Total INR','value' => number_format($report->total_inr, 2),'tone' => 'success']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('admin.stat-card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['label' => 'Total INR','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($report->total_inr, 2)),'tone' => 'success']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $attributes = $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $component = $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+    </section>
+   <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalb8dfe58016103e374219da4cf072c7cf)): ?>
+<?php $attributes = $__attributesOriginalb8dfe58016103e374219da4cf072c7cf; ?>
+<?php unset($__attributesOriginalb8dfe58016103e374219da4cf072c7cf); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalb8dfe58016103e374219da4cf072c7cf)): ?>
+<?php $component = $__componentOriginalb8dfe58016103e374219da4cf072c7cf; ?>
+<?php unset($__componentOriginalb8dfe58016103e374219da4cf072c7cf); ?>
+<?php endif; ?>
+
+  <div class="grid gap-6 xl:grid-cols-2">
+    <?php if (isset($component)) { $__componentOriginalb8dfe58016103e374219da4cf072c7cf = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalb8dfe58016103e374219da4cf072c7cf = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.common.component-card','data' => ['title' => 'Review','desc' => 'Keep deductions and remarks at report level before approval.']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('common.component-card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['title' => 'Review','desc' => 'Keep deductions and remarks at report level before approval.']); ?>
+      <form method="post" action="<?php echo e(route('admin.agency-payout-reports.review', $report)); ?>" class="space-y-4">
+        <?php echo csrf_field(); ?>
+        <div>
+          <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Deductions</label>
+          <input type="number" min="0" name="deductions" class="<?php echo e($inputClass); ?>" value="<?php echo e(old('deductions', $report->deductions)); ?>">
+        </div>
+        <div>
+          <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Admin Remarks</label>
+          <textarea name="admin_remarks" rows="4" class="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 shadow-theme-xs outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white"><?php echo e(old('admin_remarks', $report->admin_remarks)); ?></textarea>
+        </div>
+        <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['type' => 'submit','size' => 'sm','disabled' => !in_array($report->status, ['generated', 'pending_review'])]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'submit','size' => 'sm','disabled' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(!in_array($report->status, ['generated', 'pending_review']))]); ?>Save Pending Review <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+      </form>
+     <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalb8dfe58016103e374219da4cf072c7cf)): ?>
+<?php $attributes = $__attributesOriginalb8dfe58016103e374219da4cf072c7cf; ?>
+<?php unset($__attributesOriginalb8dfe58016103e374219da4cf072c7cf); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalb8dfe58016103e374219da4cf072c7cf)): ?>
+<?php $component = $__componentOriginalb8dfe58016103e374219da4cf072c7cf; ?>
+<?php unset($__componentOriginalb8dfe58016103e374219da4cf072c7cf); ?>
+<?php endif; ?>
+
+    <?php if (isset($component)) { $__componentOriginalb8dfe58016103e374219da4cf072c7cf = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalb8dfe58016103e374219da4cf072c7cf = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.common.component-card','data' => ['title' => 'Actions','desc' => 'Publish only after row-level numbers are finalized.']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('common.component-card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['title' => 'Actions','desc' => 'Publish only after row-level numbers are finalized.']); ?>
+      <div class="space-y-4">
+        <form method="post" action="<?php echo e(route('admin.agency-payout-reports.approve', $report)); ?>" class="grid gap-4">
+          <?php echo csrf_field(); ?>
+          <input type="hidden" name="deductions" value="<?php echo e($report->deductions); ?>">
+          <input type="text" name="admin_remarks" class="<?php echo e($inputClass); ?>" value="<?php echo e($report->admin_remarks); ?>" placeholder="Approval remarks">
+          <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['type' => 'submit','size' => 'sm','disabled' => !in_array($report->status, ['generated', 'pending_review'])]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'submit','size' => 'sm','disabled' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(!in_array($report->status, ['generated', 'pending_review']))]); ?>Approve Report <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+        </form>
+
+        <form method="post" action="<?php echo e(route('admin.agency-payout-reports.publish', $report)); ?>" class="grid gap-4">
+          <?php echo csrf_field(); ?>
+          <input type="text" name="admin_remarks" class="<?php echo e($inputClass); ?>" value="<?php echo e($report->admin_remarks); ?>" placeholder="Publish remarks">
+          <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['type' => 'submit','variant' => 'secondary','size' => 'sm','disabled' => $report->status !== 'approved' || $report->published_at]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'submit','variant' => 'secondary','size' => 'sm','disabled' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($report->status !== 'approved' || $report->published_at)]); ?>Publish To Agency <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+        </form>
+
+        <form method="post" action="<?php echo e(route('admin.agency-payout-reports.mark-paid', $report)); ?>" class="grid gap-4">
+          <?php echo csrf_field(); ?>
+          <input type="text" name="admin_remarks" class="<?php echo e($inputClass); ?>" value="<?php echo e($report->admin_remarks); ?>" placeholder="Paid remarks">
+          <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['type' => 'submit','variant' => 'success','size' => 'sm','disabled' => $report->status !== 'approved' || !$report->published_at || $report->status === 'paid']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'submit','variant' => 'success','size' => 'sm','disabled' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($report->status !== 'approved' || !$report->published_at || $report->status === 'paid')]); ?>Mark Paid <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+        </form>
+
+        <form method="post" action="<?php echo e(route('admin.agency-payout-reports.reject', $report)); ?>" class="grid gap-4">
+          <?php echo csrf_field(); ?>
+          <textarea name="admin_remarks" rows="3" class="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 shadow-theme-xs outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white" placeholder="Rejection reason" <?php if(!in_array($report->status, ['generated', 'pending_review'])): echo 'disabled'; endif; ?>></textarea>
+          <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['type' => 'submit','variant' => 'danger','size' => 'sm','disabled' => !in_array($report->status, ['generated', 'pending_review'])]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'submit','variant' => 'danger','size' => 'sm','disabled' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(!in_array($report->status, ['generated', 'pending_review']))]); ?>Reject Report <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+        </form>
+      </div>
+     <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalb8dfe58016103e374219da4cf072c7cf)): ?>
+<?php $attributes = $__attributesOriginalb8dfe58016103e374219da4cf072c7cf; ?>
+<?php unset($__attributesOriginalb8dfe58016103e374219da4cf072c7cf); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalb8dfe58016103e374219da4cf072c7cf)): ?>
+<?php $component = $__componentOriginalb8dfe58016103e374219da4cf072c7cf; ?>
+<?php unset($__componentOriginalb8dfe58016103e374219da4cf072c7cf); ?>
+<?php endif; ?>
+  </div>
+
+  <?php if (isset($component)) { $__componentOriginalb8dfe58016103e374219da4cf072c7cf = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalb8dfe58016103e374219da4cf072c7cf = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.common.component-card','data' => ['title' => 'Host Settlement Grid','desc' => 'Format matches the desktop GD payout workflow with only the required fields.']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('common.component-card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['title' => 'Host Settlement Grid','desc' => 'Format matches the desktop GD payout workflow with only the required fields.']); ?>
+    <div class="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-800">
+      <table class="min-w-[1500px] divide-y divide-gray-200 text-sm dark:divide-gray-800">
+        <thead class="bg-gray-50 dark:bg-gray-950/60">
           <tr>
-            <th>Host</th>
-            <th>Call Earn</th>
-            <th>Call Count</th>
-            <th>Completed</th>
-            <th>Billable Min</th>
-            <th>Video Call Min</th>
-            <th>Video Call Gross</th>
-            <th>Gift Earn</th>
-            <th>Gift Events</th>
-            <th>Gift Qty</th>
-            <th>Unique Gifters</th>
-            <th>Live Rooms</th>
-            <th>Video Rooms</th>
-            <th>Video Room Min</th>
-            <th>Video Gifts</th>
-            <th>PK Gross</th>
-            <th>PK Events</th>
-            <th>Gross</th>
-            <th>Host Payout</th>
-            <th>Agency Payout</th>
-            <th>Total Payout</th>
-            <th>Final Payable</th>
-            <th>Admin Note</th>
-            <th class="text-end">Save</th>
+            <th class="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:bg-gray-950/60 dark:text-gray-400">Host</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total Video Room Timing</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total Video Room Gifts</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total PK Gifts</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Video Calls Coins</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Video Calls Min</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Bonus Coins</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total Coins</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Host Payout INR</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Agency Commission INR</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total INR</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Admin Notes</th>
+            <th class="sticky right-0 z-10 bg-gray-50 px-4 py-3 text-right font-medium uppercase tracking-[0.18em] text-gray-500 dark:bg-gray-950/60 dark:text-gray-400">Save</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
           <?php $__empty_1 = true; $__currentLoopData = $report->items; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
             <?php ($formId = 'payout-row-' . $item->id); ?>
-            <tr>
-              <td class="payout-grid-host">
+            <tr class="bg-white dark:bg-gray-900">
+              <td class="sticky left-0 z-10 bg-white px-4 py-4 dark:bg-gray-900">
                 <form id="<?php echo e($formId); ?>" method="post" action="<?php echo e(route('admin.agency-payout-reports.items.update', [$report, $item])); ?>">
                   <?php echo csrf_field(); ?>
                 </form>
-                <div class="fw-semibold"><?php echo e($item->host?->user?->name ?? $item->host?->stage_name ?? '—'); ?></div>
-                <div class="text-muted small"><?php echo e($item->host?->stage_name ?? '—'); ?></div>
+                <div class="font-semibold text-gray-900 dark:text-white"><?php echo e($item->host?->user?->name ?? $item->host?->stage_name ?? '—'); ?></div>
+                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400"><?php echo e($item->host?->stage_name ?? '—'); ?></div>
               </td>
-              <td><input type="number" min="0" name="call_earnings" form="<?php echo e($formId); ?>" class="form-control form-control-sm payout-grid-input payout-grid-wide" value="<?php echo e(old('call_earnings', $item->call_earnings)); ?>" <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>></td>
-              <td><input type="number" min="0" name="call_count" form="<?php echo e($formId); ?>" class="form-control form-control-sm payout-grid-input" value="<?php echo e(old('call_count', (int) data_get($item->meta, 'call_count', 0))); ?>" <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>></td>
-              <td><input type="number" min="0" name="completed_call_count" form="<?php echo e($formId); ?>" class="form-control form-control-sm payout-grid-input" value="<?php echo e(old('completed_call_count', (int) data_get($item->meta, 'completed_call_count', 0))); ?>" <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>></td>
-              <td><input type="number" min="0" name="billable_minutes" form="<?php echo e($formId); ?>" class="form-control form-control-sm payout-grid-input" value="<?php echo e(old('billable_minutes', (int) data_get($item->meta, 'billable_minutes', 0))); ?>" <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>></td>
-              <td><input type="number" min="0" name="video_call_minutes" form="<?php echo e($formId); ?>" class="form-control form-control-sm payout-grid-input" value="<?php echo e(old('video_call_minutes', (int) data_get($item->meta, 'video_call_minutes', 0))); ?>" <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>></td>
-              <td><input type="number" min="0" name="video_call_gross" form="<?php echo e($formId); ?>" class="form-control form-control-sm payout-grid-input payout-grid-wide" value="<?php echo e(old('video_call_gross', (int) data_get($item->meta, 'video_call_gross', 0))); ?>" <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>></td>
-              <td><input type="number" min="0" name="gift_earnings" form="<?php echo e($formId); ?>" class="form-control form-control-sm payout-grid-input payout-grid-wide" value="<?php echo e(old('gift_earnings', $item->gift_earnings)); ?>" <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>></td>
-              <td><input type="number" min="0" name="gift_events" form="<?php echo e($formId); ?>" class="form-control form-control-sm payout-grid-input" value="<?php echo e(old('gift_events', (int) data_get($item->meta, 'gift_events', 0))); ?>" <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>></td>
-              <td><input type="number" min="0" name="gift_quantity" form="<?php echo e($formId); ?>" class="form-control form-control-sm payout-grid-input" value="<?php echo e(old('gift_quantity', (int) data_get($item->meta, 'gift_quantity', 0))); ?>" <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>></td>
-              <td><input type="number" min="0" name="unique_gifters" form="<?php echo e($formId); ?>" class="form-control form-control-sm payout-grid-input" value="<?php echo e(old('unique_gifters', (int) data_get($item->meta, 'unique_gifters', 0))); ?>" <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>></td>
-              <td><input type="number" min="0" name="live_room_count" form="<?php echo e($formId); ?>" class="form-control form-control-sm payout-grid-input" value="<?php echo e(old('live_room_count', (int) data_get($item->meta, 'live_room_count', 0))); ?>" <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>></td>
-              <td><input type="number" min="0" name="video_room_count" form="<?php echo e($formId); ?>" class="form-control form-control-sm payout-grid-input" value="<?php echo e(old('video_room_count', (int) data_get($item->meta, 'video_room_count', 0))); ?>" <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>></td>
-              <td><input type="number" min="0" name="video_room_minutes" form="<?php echo e($formId); ?>" class="form-control form-control-sm payout-grid-input" value="<?php echo e(old('video_room_minutes', (int) data_get($item->meta, 'video_room_minutes', 0))); ?>" <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>></td>
-              <td><input type="number" min="0" name="video_gift_gross" form="<?php echo e($formId); ?>" class="form-control form-control-sm payout-grid-input payout-grid-wide" value="<?php echo e(old('video_gift_gross', (int) data_get($item->meta, 'video_gift_gross', 0))); ?>" <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>></td>
-              <td><input type="number" min="0" name="pk_earnings" form="<?php echo e($formId); ?>" class="form-control form-control-sm payout-grid-input payout-grid-wide" value="<?php echo e(old('pk_earnings', $item->pk_earnings)); ?>" <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>></td>
-              <td><input type="number" min="0" name="pk_event_count" form="<?php echo e($formId); ?>" class="form-control form-control-sm payout-grid-input" value="<?php echo e(old('pk_event_count', (int) data_get($item->meta, 'pk_event_count', 0))); ?>" <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>></td>
-              <td><input type="number" min="0" name="gross_earnings" form="<?php echo e($formId); ?>" class="form-control form-control-sm payout-grid-input payout-grid-wide" value="<?php echo e(old('gross_earnings', $item->gross_earnings)); ?>" <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>></td>
-              <td style="min-width: 132px;">
-                <input
-                  type="number"
-                  min="0"
-                  name="host_share"
-                  form="<?php echo e($formId); ?>"
-                  class="form-control form-control-sm payout-grid-input payout-grid-wide"
-                  value="<?php echo e(old('host_share', $item->host_share)); ?>"
-                  <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>
-                >
+              <td class="px-4 py-4"><input type="number" min="0" name="video_room_minutes" form="<?php echo e($formId); ?>" class="<?php echo e($inputClass); ?>" value="<?php echo e(old('video_room_minutes', $item->video_room_minutes)); ?>" <?php if($locked): echo 'disabled'; endif; ?>></td>
+              <td class="px-4 py-4"><input type="number" min="0" name="video_gift_coins" form="<?php echo e($formId); ?>" class="<?php echo e($inputClass); ?>" value="<?php echo e(old('video_gift_coins', $item->video_gift_coins)); ?>" <?php if($locked): echo 'disabled'; endif; ?>></td>
+              <td class="px-4 py-4"><input type="number" min="0" name="pk_gift_coins" form="<?php echo e($formId); ?>" class="<?php echo e($inputClass); ?>" value="<?php echo e(old('pk_gift_coins', $item->pk_gift_coins)); ?>" <?php if($locked): echo 'disabled'; endif; ?>></td>
+              <td class="px-4 py-4"><input type="number" min="0" name="video_call_coins" form="<?php echo e($formId); ?>" class="<?php echo e($inputClass); ?>" value="<?php echo e(old('video_call_coins', $item->video_call_coins)); ?>" <?php if($locked): echo 'disabled'; endif; ?>></td>
+              <td class="px-4 py-4"><input type="number" min="0" name="video_call_minutes" form="<?php echo e($formId); ?>" class="<?php echo e($inputClass); ?>" value="<?php echo e(old('video_call_minutes', $item->video_call_minutes)); ?>" <?php if($locked): echo 'disabled'; endif; ?>></td>
+              <td class="px-4 py-4"><input type="number" min="0" name="bonus_coins" form="<?php echo e($formId); ?>" class="<?php echo e($inputClass); ?>" value="<?php echo e(old('bonus_coins', $item->bonus_coins)); ?>" <?php if($locked): echo 'disabled'; endif; ?>></td>
+              <td class="px-4 py-4 text-gray-700 dark:text-gray-200"><?php echo e(number_format($item->total_coins)); ?></td>
+              <td class="px-4 py-4"><input type="number" step="0.01" min="0" name="host_payout_inr" form="<?php echo e($formId); ?>" class="<?php echo e($inputClass); ?>" value="<?php echo e(old('host_payout_inr', number_format($item->host_payout_inr, 2, '.', ''))); ?>" <?php if($locked): echo 'disabled'; endif; ?>></td>
+              <td class="px-4 py-4"><input type="number" step="0.01" min="0" name="agency_commission_inr" form="<?php echo e($formId); ?>" class="<?php echo e($inputClass); ?>" value="<?php echo e(old('agency_commission_inr', number_format($item->agency_commission_inr, 2, '.', ''))); ?>" <?php if($locked): echo 'disabled'; endif; ?>></td>
+              <td class="px-4 py-4 text-gray-700 dark:text-gray-200"><?php echo e(number_format($item->total_inr, 2)); ?></td>
+              <td class="px-4 py-4">
+                <textarea name="admin_note" form="<?php echo e($formId); ?>" rows="2" class="min-w-[220px] rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 shadow-theme-xs outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white" placeholder="Admin note" <?php if($locked): echo 'disabled'; endif; ?>><?php echo e(old('admin_note', $item->admin_note)); ?></textarea>
               </td>
-              <td style="min-width: 132px;">
-                <input
-                  type="number"
-                  min="0"
-                  name="agency_commission"
-                  form="<?php echo e($formId); ?>"
-                  class="form-control form-control-sm payout-grid-input payout-grid-wide"
-                  value="<?php echo e(old('agency_commission', $item->agency_commission)); ?>"
-                  <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>
-                >
-              </td>
-              <td><input type="number" min="0" name="total_payout" form="<?php echo e($formId); ?>" class="form-control form-control-sm payout-grid-input payout-grid-wide" value="<?php echo e(old('total_payout', $item->total_payout)); ?>" <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>></td>
-              <td style="min-width: 132px;">
-                <input
-                  type="number"
-                  min="0"
-                  name="final_payable"
-                  form="<?php echo e($formId); ?>"
-                  class="form-control form-control-sm payout-grid-input payout-grid-wide"
-                  value="<?php echo e(old('final_payable', $item->final_payable)); ?>"
-                  <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>
-                >
-              </td>
-              <td style="min-width: 180px;">
-                <textarea
-                  name="admin_note"
-                  form="<?php echo e($formId); ?>"
-                  rows="2"
-                  class="form-control form-control-sm payout-grid-note"
-                  placeholder="Admin note"
-                  <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>
-                ><?php echo e(old('admin_note', data_get($item->meta, 'admin_note', ''))); ?></textarea>
-              </td>
-              <td class="text-end payout-grid-save">
-                <button class="btn btn-sm btn-light border" type="submit" form="<?php echo e($formId); ?>" <?php if($report->published_at || $report->status === 'paid'): echo 'disabled'; endif; ?>>Save</button>
+              <td class="sticky right-0 z-10 bg-white px-4 py-4 text-right dark:bg-gray-900">
+                <?php if (isset($component)) { $__componentOriginala8bb031a483a05f647cb99ed3a469847 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala8bb031a483a05f647cb99ed3a469847 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.button','data' => ['type' => 'submit','size' => 'sm','form' => ''.e($formId).'','disabled' => $locked]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.button'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['type' => 'submit','size' => 'sm','form' => ''.e($formId).'','disabled' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($locked)]); ?>Save <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__attributesOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala8bb031a483a05f647cb99ed3a469847)): ?>
+<?php $component = $__componentOriginala8bb031a483a05f647cb99ed3a469847; ?>
+<?php unset($__componentOriginala8bb031a483a05f647cb99ed3a469847); ?>
+<?php endif; ?>
               </td>
             </tr>
           <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-            <tr><td colspan="28" class="text-center text-muted py-4">No host rows in this report.</td></tr>
+            <tr class="bg-white dark:bg-gray-900">
+              <td colspan="13" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No host rows in this report.</td>
+            </tr>
           <?php endif; ?>
         </tbody>
       </table>
     </div>
-  </section>
-
-  <?php ($recon = $reconciliation); ?>
-  <section class="mt-3">
-    <div class="card mb-3">
-      <div class="card-header"><h5 class="mb-0">Reconciliation Summary</h5></div>
-      <div class="card-body">
-        <div class="row g-3">
-          <div class="col-md-6 col-xl-3"><div class="border rounded p-3 h-100"><small class="text-muted d-block">Raw Call Ledger</small><div class="fs-5 fw-semibold mt-1"><?php echo e(number_format($recon['summary']['call_rows'])); ?> rows</div><div class="text-muted small mt-1">Gross <?php echo e(number_format($recon['summary']['call_gross'])); ?></div></div></div>
-          <div class="col-md-6 col-xl-3"><div class="border rounded p-3 h-100"><small class="text-muted d-block">Raw Live Gift Ledger</small><div class="fs-5 fw-semibold mt-1"><?php echo e(number_format($recon['summary']['gift_rows'])); ?> rows</div><div class="text-muted small mt-1">Gross <?php echo e(number_format($recon['summary']['gift_gross'])); ?></div></div></div>
-          <div class="col-md-6 col-xl-3"><div class="border rounded p-3 h-100"><small class="text-muted d-block">PK-Linked Gift Rows</small><div class="fs-5 fw-semibold mt-1"><?php echo e(number_format($recon['summary']['pk_rows'])); ?> rows</div><div class="text-muted small mt-1">Gross <?php echo e(number_format($recon['summary']['pk_gross'])); ?></div></div></div>
-          <div class="col-md-6 col-xl-3"><div class="border rounded p-3 h-100"><small class="text-muted d-block">Final Split Trace</small><div class="fs-5 fw-semibold mt-1">Host <?php echo e(number_format($recon['summary']['host_payout'])); ?></div><div class="text-muted small mt-1">Agency <?php echo e(number_format($recon['summary']['agency_payout'])); ?></div></div></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card mb-3">
-      <div class="card-header"><h5 class="mb-0">Final Host / Agency Split Trace</h5></div>
-      <div class="card-body table-responsive">
-        <table class="table align-middle">
-          <thead class="table-light">
-            <tr>
-              <th>Host</th>
-              <th>Call Gross</th>
-              <th>Live Gift Gross</th>
-              <th>PK Gross</th>
-              <th>Gross Used</th>
-              <th>Host Payout</th>
-              <th>Agency Payout</th>
-              <th>Total Payout</th>
-              <th>Final Payable</th>
-            </tr>
-          </thead>
-          <tbody>
-            <?php $__empty_1 = true; $__currentLoopData = $recon['split_rows']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-              <tr>
-                <td>
-                  <div class="fw-semibold"><?php echo e($item->host?->user?->name ?? $item->host?->stage_name ?? '—'); ?></div>
-                  <div class="text-muted small"><?php echo e($item->host?->stage_name ?? '—'); ?></div>
-                </td>
-                <td><?php echo e(number_format($item->call_earnings)); ?></td>
-                <td><?php echo e(number_format($item->gift_earnings)); ?></td>
-                <td><?php echo e(number_format($item->pk_earnings)); ?></td>
-                <td><?php echo e(number_format($item->gross_earnings)); ?></td>
-                <td><?php echo e(number_format($item->host_share)); ?></td>
-                <td><?php echo e(number_format($item->agency_commission)); ?></td>
-                <td><?php echo e(number_format($item->total_payout)); ?></td>
-                <td><?php echo e(number_format($item->final_payable)); ?></td>
-              </tr>
-            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-              <tr><td colspan="9" class="text-center text-muted py-4">No split rows found.</td></tr>
-            <?php endif; ?>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="card mb-3">
-      <div class="card-header"><h5 class="mb-0">Raw Call Ledger Rows</h5></div>
-      <div class="card-body table-responsive">
-        <table class="table align-middle">
-          <thead class="table-light">
-            <tr>
-              <th>Ledger</th>
-              <th>Host</th>
-              <th>Caller</th>
-              <th>Session</th>
-              <th>Type / Status</th>
-              <th>Billable Min</th>
-              <th>Total Coins</th>
-              <th>Host / Agency / Platform</th>
-              <th>Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            <?php $__empty_1 = true; $__currentLoopData = $recon['call_rows']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-              <tr>
-                <td>#<?php echo e($row->id); ?></td>
-                <td><?php echo e($row->host?->user?->name ?? $row->host?->stage_name ?? '—'); ?></td>
-                <td><?php echo e($row->caller?->name ?? '—'); ?></td>
-                <td>#<?php echo e($row->call_session_id); ?></td>
-                <td><?php echo e(strtoupper((string) ($row->callSession?->type ?? '—'))); ?> / <?php echo e($row->callSession?->status ?? '—'); ?></td>
-                <td><?php echo e(number_format($row->billable_minutes)); ?></td>
-                <td><?php echo e(number_format($row->total_coins)); ?></td>
-                <td><?php echo e(number_format($row->host_earning)); ?> / <?php echo e(number_format($row->agency_earning)); ?> / <?php echo e(number_format($row->platform_earning)); ?></td>
-                <td><?php echo e(optional($row->created_at)->format('d M Y H:i')); ?></td>
-              </tr>
-            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-              <tr><td colspan="9" class="text-center text-muted py-4">No call ledger rows found in this report period.</td></tr>
-            <?php endif; ?>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="card mb-3">
-      <div class="card-header"><h5 class="mb-0">Raw Live Gift Ledger Rows</h5></div>
-      <div class="card-body table-responsive">
-        <table class="table align-middle">
-          <thead class="table-light">
-            <tr>
-              <th>Ledger</th>
-              <th>Host</th>
-              <th>Sender</th>
-              <th>Room</th>
-              <th>Gift</th>
-              <th>Qty</th>
-              <th>Total Coins</th>
-              <th>Host / Agency / Platform</th>
-              <th>Txn</th>
-              <th>Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            <?php $__empty_1 = true; $__currentLoopData = $recon['gift_rows']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-              <tr>
-                <td>#<?php echo e($row->id); ?></td>
-                <td><?php echo e($row->host?->user?->name ?? $row->host?->stage_name ?? '—'); ?></td>
-                <td><?php echo e($row->sender?->name ?? '—'); ?></td>
-                <td>
-                  <div class="fw-semibold"><?php echo e($row->room?->title ?? ($row->room?->room_id ? 'Room '.$row->room->room_id : '—')); ?></div>
-                  <div class="text-muted small"><?php echo e(strtoupper((string) ($row->room?->room_type ?? '—'))); ?></div>
-                </td>
-                <td><?php echo e($row->roomGift?->gift?->name ?? '—'); ?></td>
-                <td><?php echo e(number_format((int) ($row->roomGift?->quantity ?? 0))); ?></td>
-                <td><?php echo e(number_format($row->total_coins)); ?></td>
-                <td><?php echo e(number_format($row->host_payout_coins)); ?> / <?php echo e(number_format($row->agency_payout_coins)); ?> / <?php echo e(number_format($row->platform_revenue_coins)); ?></td>
-                <td><?php echo e($row->roomGift?->transaction_id ?? '—'); ?></td>
-                <td><?php echo e(optional($row->created_at)->format('d M Y H:i')); ?></td>
-              </tr>
-            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-              <tr><td colspan="10" class="text-center text-muted py-4">No live gift ledger rows found in this report period.</td></tr>
-            <?php endif; ?>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header"><h5 class="mb-0">PK-Linked Gift Rows</h5></div>
-      <div class="card-body table-responsive">
-        <table class="table align-middle">
-          <thead class="table-light">
-            <tr>
-              <th>PK Event</th>
-              <th>Battle</th>
-              <th>Host</th>
-              <th>Sender</th>
-              <th>Room</th>
-              <th>Gift</th>
-              <th>Event / Ledger Coins</th>
-              <th>Split H / A / P</th>
-              <th>Wallet Txn</th>
-              <th>Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            <?php $__empty_1 = true; $__currentLoopData = $recon['pk_gift_rows']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-              <tr>
-                <td>#<?php echo e($row->pk_event_id); ?></td>
-                <td>#<?php echo e($row->pk_battle_id ?? '—'); ?></td>
-                <td><?php echo e($row->host?->user?->name ?? $row->host?->stage_name ?? '—'); ?></td>
-                <td><?php echo e($row->sender?->name ?? '—'); ?></td>
-                <td>
-                  <div class="fw-semibold"><?php echo e($row->room?->title ?? ($row->room?->room_id ? 'Room '.$row->room->room_id : '—')); ?></div>
-                  <div class="text-muted small"><?php echo e(strtoupper((string) ($row->room?->room_type ?? '—'))); ?></div>
-                </td>
-                <td><?php echo e($row->roomGift?->gift?->name ?? '—'); ?></td>
-                <td><?php echo e(number_format((int) ($row->pk_event_coins ?? 0))); ?> / <?php echo e(number_format($row->total_coins)); ?></td>
-                <td><?php echo e(number_format($row->host_payout_coins)); ?> / <?php echo e(number_format($row->agency_payout_coins)); ?> / <?php echo e(number_format($row->platform_revenue_coins)); ?></td>
-                <td><?php echo e($row->pk_wallet_transaction_id ?? ($row->roomGift?->transaction_id ?? '—')); ?></td>
-                <td><?php echo e($row->pk_created_at ? \Carbon\Carbon::parse($row->pk_created_at)->format('d M Y H:i') : optional($row->created_at)->format('d M Y H:i')); ?></td>
-              </tr>
-            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-              <tr><td colspan="10" class="text-center text-muted py-4">No PK-linked gift rows found in this report period.</td></tr>
-            <?php endif; ?>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
+   <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalb8dfe58016103e374219da4cf072c7cf)): ?>
+<?php $attributes = $__attributesOriginalb8dfe58016103e374219da4cf072c7cf; ?>
+<?php unset($__attributesOriginalb8dfe58016103e374219da4cf072c7cf); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalb8dfe58016103e374219da4cf072c7cf)): ?>
+<?php $component = $__componentOriginalb8dfe58016103e374219da4cf072c7cf; ?>
+<?php unset($__componentOriginalb8dfe58016103e374219da4cf072c7cf); ?>
+<?php endif; ?>
 </div>
 <?php $__env->stopSection(); ?>
 

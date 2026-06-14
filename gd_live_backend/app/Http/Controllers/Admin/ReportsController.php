@@ -127,11 +127,10 @@ class ReportsController extends Controller
                 $participants = optional($partAgg->get($key))->firstWhere('host_id', $hid);
                 $duration = optional($durAgg->get($key))->firstWhere('host_id', $hid);
 
-                $callCoins = (int) ($call->call_coins ?? 0);
                 $giftCoins = (int) ($gift->gift_coins ?? 0);
                 $pkCoins = (int) ($pk->pk_coins ?? 0);
                 $roomGiftCoins = max(0, $giftCoins - $pkCoins);
-                $grossCoins = $callCoins + $giftCoins;
+                $grossCoins = (int) ($call->video_call_coins ?? 0) + $roomGiftCoins + $pkCoins;
 
                 $days->push([
                     'date' => $key,
@@ -140,7 +139,6 @@ class ReportsController extends Controller
                     'duration_min' => (int) round(((int) ($duration->duration_sec ?? 0)) / 60),
                     'participants_total' => (int) ($participants->participants_total ?? 0),
                     'participants_unique' => (int) ($participants->participants_unique ?? 0),
-                    'call_coins' => $callCoins,
                     'call_count' => (int) ($call->call_count ?? 0),
                     'video_call_minutes' => (int) ($call->video_call_minutes ?? 0),
                     'video_call_coins' => (int) ($call->video_call_coins ?? 0),
@@ -150,8 +148,6 @@ class ReportsController extends Controller
                     'pk_coins' => $pkCoins,
                     'pk_events' => (int) ($pk->pk_events ?? 0),
                     'gross_coins' => $grossCoins,
-                    'host_payable' => (int) (($call->host_earning ?? 0) + ($gift->host_earnings ?? 0)),
-                    'agency_payable' => (int) (($call->agency_earning ?? 0) + ($gift->agency_earnings ?? 0)),
                 ]);
             }
         }
@@ -172,7 +168,6 @@ class ReportsController extends Controller
                             'duration_min' => (int) $group->sum('duration_min'),
                             'participants_total' => (int) $group->sum('participants_total'),
                             'participants_unique' => (int) $group->sum('participants_unique'),
-                            'call_coins' => (int) $group->sum('call_coins'),
                             'call_count' => (int) $group->sum('call_count'),
                             'video_call_minutes' => (int) $group->sum('video_call_minutes'),
                             'video_call_coins' => (int) $group->sum('video_call_coins'),
@@ -182,7 +177,6 @@ class ReportsController extends Controller
                             'pk_coins' => (int) $group->sum('pk_coins'),
                             'pk_events' => (int) $group->sum('pk_events'),
                             'gross_coins' => $grossCoins,
-                            'host_payable' => (int) $group->sum('host_payable'),
                         ];
                     })->values();
                 })
@@ -217,8 +211,8 @@ class ReportsController extends Controller
         return response()->stream(function () use ($rows, $data) {
             $out = fopen('php://output', 'w');
             fputcsv($out, $data['range'] === 'weekly'
-                ? ['week_start', 'host_id', 'rooms', 'duration_min', 'participants_total', 'participants_unique', 'call_coins', 'call_count', 'video_call_minutes', 'video_call_coins', 'room_gift_coins', 'gift_coins', 'gift_events', 'pk_coins', 'pk_events', 'gross_coins', 'host_payable']
-                : ['date', 'host_id', 'rooms', 'duration_min', 'participants_total', 'participants_unique', 'call_coins', 'call_count', 'video_call_minutes', 'video_call_coins', 'room_gift_coins', 'gift_coins', 'gift_events', 'pk_coins', 'pk_events', 'gross_coins', 'host_payable']
+                ? ['week_start', 'host_id', 'rooms', 'duration_min', 'participants_total', 'participants_unique', 'call_count', 'video_call_minutes', 'video_call_coins', 'room_gift_coins', 'gift_coins', 'gift_events', 'pk_coins', 'pk_events', 'gross_coins']
+                : ['date', 'host_id', 'rooms', 'duration_min', 'participants_total', 'participants_unique', 'call_count', 'video_call_minutes', 'video_call_coins', 'room_gift_coins', 'gift_coins', 'gift_events', 'pk_coins', 'pk_events', 'gross_coins']
             );
 
             foreach ($rows as $row) {
@@ -230,7 +224,6 @@ class ReportsController extends Controller
                         $row['duration_min'],
                         $row['participants_total'],
                         $row['participants_unique'],
-                        $row['call_coins'],
                         $row['call_count'],
                         $row['video_call_minutes'],
                         $row['video_call_coins'],
@@ -240,7 +233,6 @@ class ReportsController extends Controller
                         $row['pk_coins'],
                         $row['pk_events'],
                         $row['gross_coins'],
-                        $row['host_payable'],
                     ]);
                 } else {
                     fputcsv($out, [
@@ -250,7 +242,6 @@ class ReportsController extends Controller
                         $row['duration_min'],
                         $row['participants_total'],
                         $row['participants_unique'],
-                        $row['call_coins'],
                         $row['call_count'],
                         $row['video_call_minutes'],
                         $row['video_call_coins'],
@@ -260,7 +251,6 @@ class ReportsController extends Controller
                         $row['pk_coins'],
                         $row['pk_events'],
                         $row['gross_coins'],
-                        $row['host_payable'],
                     ]);
                 }
             }

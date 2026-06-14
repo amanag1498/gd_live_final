@@ -167,14 +167,14 @@
 <?php endif; ?>
     <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Availability','value' => !empty($values[$enabledKey]) ? 'Enabled' : 'Disabled','meta' => !empty($values[$visibleKey]) ? 'Visible in video room strip' : 'Hidden from room strip','tone' => 'success']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Status','value' => !empty($values[$enabledKey]) ? 'Enabled' : 'Disabled','meta' => !empty($values[$visibleKey]) ? 'Visible in video room strip' : 'Hidden from room strip','tone' => 'success']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('admin.stat-card'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['label' => 'Availability','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(!empty($values[$enabledKey]) ? 'Enabled' : 'Disabled'),'meta' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(!empty($values[$visibleKey]) ? 'Visible in video room strip' : 'Hidden from room strip'),'tone' => 'success']); ?>
+<?php $component->withAttributes(['label' => 'Status','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(!empty($values[$enabledKey]) ? 'Enabled' : 'Disabled'),'meta' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(!empty($values[$visibleKey]) ? 'Visible in video room strip' : 'Hidden from room strip'),'tone' => 'success']); ?>
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>

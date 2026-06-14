@@ -94,14 +94,14 @@
     <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Calls','value' => number_format($summary['calls']),'tone' => 'brand']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Rooms','value' => number_format($summary['live_rooms']),'meta' => number_format($summary['live_minutes']) . ' min','tone' => 'brand']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('admin.stat-card'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['label' => 'Calls','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($summary['calls'])),'tone' => 'brand']); ?>
+<?php $component->withAttributes(['label' => 'Rooms','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($summary['live_rooms'])),'meta' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($summary['live_minutes']) . ' min'),'tone' => 'brand']); ?>
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
@@ -114,14 +114,14 @@
 <?php endif; ?>
       <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Minutes','value' => number_format($summary['minutes']),'tone' => 'dark']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Participants','value' => number_format($summary['participants_total']),'meta' => number_format($summary['participants_unique']) . ' unique','tone' => 'dark']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('admin.stat-card'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['label' => 'Minutes','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($summary['minutes'])),'tone' => 'dark']); ?>
+<?php $component->withAttributes(['label' => 'Participants','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($summary['participants_total'])),'meta' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($summary['participants_unique']) . ' unique'),'tone' => 'dark']); ?>
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
@@ -134,14 +134,14 @@
 <?php endif; ?>
       <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Coins','value' => number_format($summary['coins']),'tone' => 'success']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Video Call','value' => number_format($summary['video_call_minutes']).' min','meta' => number_format($summary['video_call_coins']).' coins']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('admin.stat-card'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['label' => 'Coins','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($summary['coins'])),'tone' => 'success']); ?>
+<?php $component->withAttributes(['label' => 'Video Call','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($summary['video_call_minutes']).' min'),'meta' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($summary['video_call_coins']).' coins')]); ?>
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
@@ -154,54 +154,14 @@
 <?php endif; ?>
       <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Agency Earnings','value' => number_format($summary['agency_earnings']),'tone' => 'warning']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Room Gift Coins','value' => number_format($summary['room_gift_coins']),'meta' => number_format($summary['live_gift_coins']).' total live gifts']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('admin.stat-card'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['label' => 'Agency Earnings','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($summary['agency_earnings'])),'tone' => 'warning']); ?>
-<?php echo $__env->renderComponent(); ?>
-<?php endif; ?>
-<?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
-<?php $attributes = $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
-<?php unset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
-<?php endif; ?>
-<?php if (isset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
-<?php $component = $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
-<?php unset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
-<?php endif; ?>
-      <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Live Rooms','value' => number_format($summary['live_rooms'])]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
-<?php $component->withName('admin.stat-card'); ?>
-<?php if ($component->shouldRender()): ?>
-<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
-<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
-<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
-<?php endif; ?>
-<?php $component->withAttributes(['label' => 'Live Rooms','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($summary['live_rooms']))]); ?>
-<?php echo $__env->renderComponent(); ?>
-<?php endif; ?>
-<?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
-<?php $attributes = $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
-<?php unset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
-<?php endif; ?>
-<?php if (isset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
-<?php $component = $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
-<?php unset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
-<?php endif; ?>
-      <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Live Gift Coins','value' => number_format($summary['live_gift_coins'])]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
-<?php $component->withName('admin.stat-card'); ?>
-<?php if ($component->shouldRender()): ?>
-<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
-<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
-<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
-<?php endif; ?>
-<?php $component->withAttributes(['label' => 'Live Gift Coins','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($summary['live_gift_coins']))]); ?>
+<?php $component->withAttributes(['label' => 'Room Gift Coins','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($summary['room_gift_coins'])),'meta' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($summary['live_gift_coins']).' total live gifts')]); ?>
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
@@ -222,6 +182,26 @@
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
 <?php $component->withAttributes(['label' => 'PK Coins','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($summary['pk_gift_coins'])),'meta' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($summary['pk_event_count']).' events')]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $attributes = $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
+<?php $component = $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6; ?>
+<?php unset($__componentOriginal3c3cb599308b2d9971dae437d0b6bab6); ?>
+<?php endif; ?>
+      <?php if (isset($component)) { $__componentOriginal3c3cb599308b2d9971dae437d0b6bab6 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.admin.stat-card','data' => ['label' => 'Gross','value' => number_format($summary['gross_coins']),'tone' => 'success']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('admin.stat-card'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['label' => 'Gross','value' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute(number_format($summary['gross_coins'])),'tone' => 'success']); ?>
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginal3c3cb599308b2d9971dae437d0b6bab6)): ?>
@@ -304,7 +284,7 @@
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['variant' => 'outline','size' => 'sm','href' => ''.e(route('admin.agency-payout-reports.export', $payoutReport)).'']); ?>CSV <?php echo $__env->renderComponent(); ?>
+<?php $component->withAttributes(['variant' => 'outline','size' => 'sm','href' => ''.e(route('admin.agency-payout-reports.export', $payoutReport)).'']); ?>PDF <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginala8bb031a483a05f647cb99ed3a469847)): ?>
 <?php $attributes = $__attributesOriginala8bb031a483a05f647cb99ed3a469847; ?>
@@ -339,8 +319,8 @@
 <?php $component->withAttributes(['title' => 'Hosts','padding' => 'compact']); ?>
     <div class="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-800">
       <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-        <thead class="bg-gray-50 dark:bg-gray-950/60"><tr><th class="px-4 py-3 text-left text-gray-500">Host</th><th class="px-4 py-3 text-left text-gray-500">Followers</th><th class="px-4 py-3 text-left text-gray-500">Calls</th><th class="px-4 py-3 text-left text-gray-500">Minutes</th><th class="px-4 py-3 text-left text-gray-500">Coins</th><th class="px-4 py-3 text-left text-gray-500">Agency Earnings</th></tr></thead>
-        <tbody class="divide-y divide-gray-200 dark:divide-gray-800"><?php $__empty_1 = true; $__currentLoopData = $hosts; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?><tr class="bg-white dark:bg-gray-900"><td class="px-4 py-3"><a class="font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-300" href="<?php echo e(route('admin.reports.hosts.show', ['host' => $row['host']->id, 'from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')])); ?>"><?php echo e($row['host']->user?->name ?? $row['host']->stage_name); ?></a><div class="text-xs text-gray-500 dark:text-gray-400"><?php echo e($row['host']->stage_name); ?></div></td><td class="px-4 py-3"><?php echo e(number_format($row['host']->followers_count ?? 0)); ?></td><td class="px-4 py-3"><?php echo e(number_format($row['calls'])); ?></td><td class="px-4 py-3"><?php echo e(number_format($row['minutes'])); ?></td><td class="px-4 py-3"><?php echo e(number_format($row['coins'])); ?></td><td class="px-4 py-3"><?php echo e(number_format($row['agency_earnings'])); ?></td></tr><?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?><tr class="bg-white dark:bg-gray-900"><td colspan="6" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No hosts attached to this agency.</td></tr><?php endif; ?></tbody>
+        <thead class="bg-gray-50 dark:bg-gray-950/60"><tr><th class="px-4 py-3 text-left text-gray-500">Host</th><th class="px-4 py-3 text-left text-gray-500">Followers</th><th class="px-4 py-3 text-left text-gray-500">Rooms</th><th class="px-4 py-3 text-left text-gray-500">Participants</th><th class="px-4 py-3 text-left text-gray-500">Video Call</th><th class="px-4 py-3 text-left text-gray-500">Room Gifts / Coins</th><th class="px-4 py-3 text-left text-gray-500">Gift / PK</th><th class="px-4 py-3 text-left text-gray-500">Gross</th></tr></thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-800"><?php $__empty_1 = true; $__currentLoopData = $hosts; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?><tr class="bg-white dark:bg-gray-900"><td class="px-4 py-3"><a class="font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-300" href="<?php echo e(route('admin.reports.hosts.show', ['host' => $row['host']->id, 'from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')])); ?>"><?php echo e($row['host']->user?->name ?? $row['host']->stage_name); ?></a><div class="text-xs text-gray-500 dark:text-gray-400"><?php echo e($row['host']->stage_name); ?></div></td><td class="px-4 py-3"><?php echo e(number_format($row['host']->followers_count ?? 0)); ?></td><td class="px-4 py-3"><?php echo e(number_format($row['live_rooms'])); ?><div class="text-xs text-gray-500 dark:text-gray-400"><?php echo e(number_format($row['live_minutes'])); ?> min</div></td><td class="px-4 py-3"><?php echo e(number_format($row['participants_total'])); ?><div class="text-xs text-gray-500 dark:text-gray-400"><?php echo e(number_format($row['participants_unique'])); ?> unique</div></td><td class="px-4 py-3"><?php echo e(number_format($row['video_call_minutes'])); ?> min<div class="text-xs text-gray-500 dark:text-gray-400"><?php echo e(number_format($row['video_call_coins'])); ?> coins</div></td><td class="px-4 py-3"><?php echo e(number_format($row['room_gift_coins'])); ?></td><td class="px-4 py-3"><?php echo e(number_format($row['live_gift_coins'])); ?><div class="text-xs text-gray-500 dark:text-gray-400">PK <?php echo e(number_format($row['pk_gift_coins'])); ?> · <?php echo e(number_format($row['pk_event_count'])); ?> events</div></td><td class="px-4 py-3 font-semibold text-gray-900 dark:text-white"><?php echo e(number_format($row['gross_coins'])); ?></td></tr><?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?><tr class="bg-white dark:bg-gray-900"><td colspan="8" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No hosts attached to this agency.</td></tr><?php endif; ?></tbody>
       </table>
     </div>
    <?php echo $__env->renderComponent(); ?>
@@ -367,8 +347,8 @@
 <?php $component->withAttributes(['title' => 'Weekly Breakdown','padding' => 'compact']); ?>
       <div class="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-800">
         <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-          <thead class="bg-gray-50 dark:bg-gray-950/60"><tr><th class="px-4 py-3 text-left text-gray-500">Week</th><th class="px-4 py-3 text-left text-gray-500">Calls</th><th class="px-4 py-3 text-left text-gray-500">Minutes</th><th class="px-4 py-3 text-left text-gray-500">Coins</th><th class="px-4 py-3 text-left text-gray-500">Agency Earnings</th></tr></thead>
-          <tbody class="divide-y divide-gray-200 dark:divide-gray-800"><?php $__empty_1 = true; $__currentLoopData = $weeks; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $week): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?><tr class="bg-white dark:bg-gray-900"><td class="px-4 py-3"><?php echo e(\Carbon\Carbon::parse($week['week_start'])->format('d M Y')); ?></td><td class="px-4 py-3"><?php echo e(number_format($week['calls'])); ?></td><td class="px-4 py-3"><?php echo e(number_format($week['minutes'])); ?></td><td class="px-4 py-3"><?php echo e(number_format($week['coins'])); ?></td><td class="px-4 py-3"><?php echo e(number_format($week['agency_earnings'])); ?></td></tr><?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?><tr class="bg-white dark:bg-gray-900"><td colspan="5" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No weekly data.</td></tr><?php endif; ?></tbody>
+          <thead class="bg-gray-50 dark:bg-gray-950/60"><tr><th class="px-4 py-3 text-left text-gray-500">Week</th><th class="px-4 py-3 text-left text-gray-500">Rooms</th><th class="px-4 py-3 text-left text-gray-500">Participants</th><th class="px-4 py-3 text-left text-gray-500">Video Call</th><th class="px-4 py-3 text-left text-gray-500">Room Gifts / Coins</th><th class="px-4 py-3 text-left text-gray-500">Gift / PK</th><th class="px-4 py-3 text-left text-gray-500">Gross</th></tr></thead>
+          <tbody class="divide-y divide-gray-200 dark:divide-gray-800"><?php $__empty_1 = true; $__currentLoopData = $weeks; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $week): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?><tr class="bg-white dark:bg-gray-900"><td class="px-4 py-3"><?php echo e(\Carbon\Carbon::parse($week['week_start'])->format('d M Y')); ?></td><td class="px-4 py-3"><?php echo e(number_format($week['live_rooms'])); ?><div class="text-xs text-gray-500 dark:text-gray-400"><?php echo e(number_format($week['live_minutes'])); ?> min</div></td><td class="px-4 py-3"><?php echo e(number_format($week['participants_total'])); ?><div class="text-xs text-gray-500 dark:text-gray-400"><?php echo e(number_format($week['participants_unique'])); ?> unique</div></td><td class="px-4 py-3"><?php echo e(number_format($week['video_call_minutes'])); ?> min<div class="text-xs text-gray-500 dark:text-gray-400"><?php echo e(number_format($week['video_call_coins'])); ?> coins</div></td><td class="px-4 py-3"><?php echo e(number_format($week['room_gift_coins'])); ?></td><td class="px-4 py-3"><?php echo e(number_format($week['live_gift_coins'])); ?><div class="text-xs text-gray-500 dark:text-gray-400">PK <?php echo e(number_format($week['pk_gift_coins'])); ?> · <?php echo e(number_format($week['pk_event_count'])); ?> events</div></td><td class="px-4 py-3 font-semibold text-gray-900 dark:text-white"><?php echo e(number_format($week['gross_coins'])); ?></td></tr><?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?><tr class="bg-white dark:bg-gray-900"><td colspan="7" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No weekly data.</td></tr><?php endif; ?></tbody>
         </table>
       </div>
      <?php echo $__env->renderComponent(); ?>

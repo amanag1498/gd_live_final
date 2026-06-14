@@ -518,10 +518,6 @@ class AgencyWeeklyPayoutReportService
                 throw new InvalidArgumentException('Paid payout reports are locked.');
             }
 
-            if ($locked->published_at) {
-                throw new InvalidArgumentException('Published payout reports cannot be edited.');
-            }
-
             $allowedStatuses = ['generated', 'pending_review', 'approved'];
             if (!in_array($locked->status, $allowedStatuses, true)) {
                 throw new InvalidArgumentException('Only draft or approved reports can be edited.');
@@ -548,9 +544,12 @@ class AgencyWeeklyPayoutReportService
                 'meta' => $normalized['meta'],
             ])->save();
 
-            $reportStatus = $locked->status === 'approved'
-                ? ['status' => 'pending_review', 'approved_at' => null]
-                : [];
+            $reportStatus = [
+                'status' => 'pending_review',
+                'approved_at' => null,
+                'published_at' => null,
+                'published_by_admin_user_id' => null,
+            ];
 
             $this->syncReportTotals($locked, $reportStatus);
 

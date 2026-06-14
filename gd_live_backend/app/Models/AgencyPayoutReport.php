@@ -67,10 +67,9 @@ class AgencyPayoutReport extends Model
     public function getActiveHostsCountAttribute(): int
     {
         return (int) $this->items->filter(function (AgencyPayoutReportItem $item) {
-            return $item->gross_earnings > 0
-                || $item->gift_earnings > 0
-                || $item->live_room_earnings > 0
-                || $item->pk_earnings > 0;
+            return $item->total_coins > 0
+                || $item->video_room_minutes > 0
+                || $item->video_call_minutes > 0;
         })->count();
     }
 
@@ -146,7 +145,7 @@ class AgencyPayoutReport extends Model
 
     public function getTotalVideoRoomMinutesAttribute(): int
     {
-        return (int) data_get($this->meta, 'totals.video_room_minutes', 0);
+        return (int) data_get($this->meta, 'totals.video_room_minutes', $this->items->sum(fn (AgencyPayoutReportItem $item) => $item->video_room_minutes));
     }
 
     public function getTotalVideoGiftGrossAttribute(): int
@@ -156,17 +155,17 @@ class AgencyPayoutReport extends Model
 
     public function getTotalVideoGiftCoinsAttribute(): int
     {
-        return (int) data_get($this->meta, 'totals.video_gift_coins', $this->total_video_gift_gross);
+        return (int) data_get($this->meta, 'totals.video_gift_coins', $this->items->sum(fn (AgencyPayoutReportItem $item) => $item->video_gift_coins));
     }
 
     public function getTotalPkGiftCoinsAttribute(): int
     {
-        return (int) data_get($this->meta, 'totals.pk_gift_coins', $this->total_pk_earnings);
+        return (int) data_get($this->meta, 'totals.pk_gift_coins', $this->items->sum(fn (AgencyPayoutReportItem $item) => $item->pk_gift_coins));
     }
 
     public function getTotalBonusCoinsAttribute(): int
     {
-        return (int) data_get($this->meta, 'totals.bonus_coins', 0);
+        return (int) data_get($this->meta, 'totals.bonus_coins', $this->items->sum(fn (AgencyPayoutReportItem $item) => $item->bonus_coins));
     }
 
     public function getTotalCoinsAttribute(): int
@@ -181,12 +180,12 @@ class AgencyPayoutReport extends Model
 
     public function getTotalHostPayoutInrAttribute(): float
     {
-        return (float) data_get($this->meta, 'totals.host_payout_inr', 0);
+        return round((float) data_get($this->meta, 'totals.host_payout_inr', $this->items->sum(fn (AgencyPayoutReportItem $item) => $item->host_payout_inr)), 2);
     }
 
     public function getTotalAgencyCommissionInrAttribute(): float
     {
-        return (float) data_get($this->meta, 'totals.agency_commission_inr', 0);
+        return round((float) data_get($this->meta, 'totals.agency_commission_inr', $this->items->sum(fn (AgencyPayoutReportItem $item) => $item->agency_commission_inr)), 2);
     }
 
     public function getTotalCoinsToBePaidAttribute(): int

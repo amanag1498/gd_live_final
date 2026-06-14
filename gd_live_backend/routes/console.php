@@ -80,6 +80,26 @@ Artisan::command('prod:reset-purged-auto-increments {--keep-user=1} {--dry-run} 
     return 0;
 })->purpose('Reset auto-increment counters for tables emptied by prod:purge-user-data');
 
+Artisan::command('users:make-admin {email}', function (string $email) {
+    $user = User::query()->where('email', $email)->first();
+
+    if (!$user) {
+        $this->error("No user found for {$email}.");
+        return 1;
+    }
+
+    try {
+        $user->assignRole('admin');
+    } catch (\Throwable $e) {
+        $this->error("Failed to assign admin role: {$e->getMessage()}");
+        return 1;
+    }
+
+    $this->info("Assigned admin role to {$user->email} (user #{$user->id}).");
+
+    return 0;
+})->purpose('Assign the admin role to an existing user by email');
+
 Artisan::command('queue:work-safe {connection?}', function (?string $connection = null) {
     $connection ??= config('queue.default');
     $policy = (array) config('queue.worker', []);
