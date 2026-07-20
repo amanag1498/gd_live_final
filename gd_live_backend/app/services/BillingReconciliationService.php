@@ -39,7 +39,7 @@ class BillingReconciliationService
                             ->where('payment_orders.status', $request->string('recharge_status'));
                     });
             })
-            ->when($request->filled('call_id'), fn ($q) => $q->where('reference', $this->billingReference($request->integer('call_id'))))
+            ->when($request->filled('call_id'), fn ($q) => $q->where('reference', 'like', $this->billingReferencePattern($request->integer('call_id'))))
             ->when($request->filled('user_id'), function ($q) use ($request) {
                 $q->whereHas('wallet', fn ($wallet) => $wallet->where('user_id', $request->integer('user_id')));
             })
@@ -70,7 +70,7 @@ class BillingReconciliationService
 
         $callsMissingWallet = $billedEndedCalls->filter(function (CallSession $call) {
             return !WalletTransaction::query()
-                ->where('reference', $this->billingReference($call->id))
+                ->where('reference', 'like', $this->billingReferencePattern($call->id))
                 ->exists();
         })->count();
 
@@ -108,5 +108,10 @@ class BillingReconciliationService
     public function billingReference(int $callId): string
     {
         return 'call_billing:' . $callId;
+    }
+
+    public function billingReferencePattern(int $callId): string
+    {
+        return $this->billingReference($callId) . ':%';
     }
 }
