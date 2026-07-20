@@ -14,6 +14,16 @@ use InvalidArgumentException;
 
 class RechargeOrderService
 {
+    private const GD_LIVE_APP_CODE = 'gdlive';
+    private const GD_LIVE_APP_SLUG = 'gd_live';
+    private const GD_LIVE_RECEIPT_PREFIX = 'gdl_';
+    private const ALLOWED_RAZORPAY_WEBHOOK_EVENTS = [
+        'payment.authorized',
+        'payment.failed',
+        'payment.captured',
+        'payment.dispute.created',
+    ];
+
     public function __construct(
         private RazorpayGatewayService $razorpay,
     ) {
@@ -70,7 +80,7 @@ class RechargeOrderService
         }
 
         $selectedGateway = $this->resolveGateway($gateway);
-        $appOrderId = 'tko_' . Str::lower((string) Str::ulid());
+        $appOrderId = self::GD_LIVE_RECEIPT_PREFIX . Str::lower((string) Str::ulid());
 
         if ($selectedGateway === 'razorpay') {
             if (!$this->paymentOrderGatewayColumnsAvailable()) {
@@ -83,6 +93,9 @@ class RechargeOrderService
                 'receipt' => $appOrderId,
                 'notes' => [
                     'app_order_id' => $appOrderId,
+                    'app_code' => self::GD_LIVE_APP_CODE,
+                    'app_slug' => self::GD_LIVE_APP_SLUG,
+                    'app_name' => config('app.name', 'GD Live'),
                     'user_id' => (string) $user->id,
                     'plan_id' => (string) $plan->id,
                 ],
@@ -395,6 +408,14 @@ class RechargeOrderService
         $gatewayOrderId = trim((string) (($payment['order_id'] ?? null) ?: ($gatewayOrder['id'] ?? '')));
         $gatewayPaymentId = trim((string) ($payment['id'] ?? ''));
 
+        if (!in_array($event, self::ALLOWED_RAZORPAY_WEBHOOK_EVENTS, true)) {
+            return [
+                'processed' => false,
+                'reason' => 'event_ignored',
+                'event' => $event,
+            ];
+        }
+
         if ($gatewayOrderId === '') {
             return [
                 'processed' => false,
@@ -426,6 +447,54 @@ class RechargeOrderService
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            $existingTx = WalletTransaction::query()
+                ->where('wallet_id', $wallet->id)
+                ->where('reference_type', 'payment_order')
+                ->where('reference_id', $order->id)
+                ->where('category', 'recharge')
+                ->first();
+
+            if ($order->status === 'success' && $existingTx) {
+                return $this->existingProcessedResult($order, $wallet, $existingTx) + [
+                    'processed' => true,
+                    'reason' => 'already_success',
+                    'event' => $event,
+                ];
+            }
+
+            $gatewayOrderData = $this->resolveGatewayOrderData($gatewayOrderId, is_array($gatewayOrder) ? $gatewayOrder : null);
+            if ($this->gatewayOrderAppMatches($order, $gatewayOrderData) !== true) {
+                return $this->persistRazorpayFailure(
+                    $order,
+                    $wallet,
+                    $gatewayPaymentId !== '' ? $gatewayPaymentId : $order->gateway_payment_id,
+                    'failed',
+                    [
+                        'webhook_event' => $event,
+                        'webhook_payload' => $body,
+                        'payment' => is_array($payment) ? $payment : null,
+                        'order' => $gatewayOrderData,
+                        'error' => 'gateway_app_mismatch',
+                    ],
+                ) + ['processed' => true];
+            }
+
+            if ($event === 'payment.dispute.created') {
+                return $this->persistGatewayPending(
+                    $order,
+                    $wallet,
+                    $order->status !== '' ? $order->status : 'created',
+                    $gatewayPaymentId !== '' ? $gatewayPaymentId : $order->gateway_payment_id,
+                    [
+                        'webhook_event' => $event,
+                        'webhook_payload' => $body,
+                        'payment' => is_array($payment) ? $payment : null,
+                        'order' => $gatewayOrderData,
+                        'dispute_created' => true,
+                    ],
+                ) + ['processed' => true];
+            }
+
             if (in_array($event, ['payment.failed'], true)) {
                 return $this->persistRazorpayFailure(
                     $order,
@@ -436,7 +505,7 @@ class RechargeOrderService
                         'webhook_event' => $event,
                         'webhook_payload' => $body,
                         'payment' => is_array($payment) ? $payment : null,
-                        'order' => is_array($gatewayOrder) ? $gatewayOrder : null,
+                        'order' => $gatewayOrderData,
                     ],
                 ) + ['processed' => true];
             }
@@ -455,7 +524,7 @@ class RechargeOrderService
                     [
                         'webhook_event' => $event,
                         'webhook_payload' => $body,
-                        'order' => is_array($gatewayOrder) ? $gatewayOrder : null,
+                        'order' => $gatewayOrderData,
                     ],
                 ) + ['processed' => true];
             }
@@ -467,7 +536,7 @@ class RechargeOrderService
                 [
                     'webhook_event' => $event,
                     'webhook_payload' => $body,
-                    'order' => is_array($gatewayOrder) ? $gatewayOrder : null,
+                    'order' => $gatewayOrderData,
                 ],
             ) + ['processed' => true];
         });
@@ -525,6 +594,21 @@ class RechargeOrderService
                     }
 
                     $payment = $this->razorpay->fetchPayment($paymentId);
+                    $gatewayOrder = $this->resolveGatewayOrderData($order->gateway_order_id);
+                    if ($this->gatewayOrderAppMatches($order, $gatewayOrder) === false) {
+                        return $this->persistRazorpayFailure(
+                            $order,
+                            $wallet,
+                            $paymentId,
+                            'failed',
+                            [
+                                'reconciled' => true,
+                                'payment' => $payment,
+                                'order' => $gatewayOrder,
+                                'error' => 'gateway_app_mismatch',
+                            ],
+                        );
+                    }
 
                     return $this->syncRazorpayGatewayState(
                         $order,
@@ -532,6 +616,7 @@ class RechargeOrderService
                         $payment,
                         [
                             'reconciled' => true,
+                            'order' => $gatewayOrder,
                         ],
                     );
                 });
@@ -624,6 +709,23 @@ class RechargeOrderService
             throw new InvalidArgumentException('Payment signature verification failed.');
         }
 
+        $gatewayOrder = $this->resolveGatewayOrderData($gatewayOrderId);
+        if ($this->gatewayOrderAppMatches($order, $gatewayOrder) === false) {
+            $this->persistRazorpayFailure(
+                $order,
+                $wallet,
+                $gatewayPaymentId,
+                'failed',
+                [
+                    'verify_payload' => $gatewayResponse,
+                    'order' => $gatewayOrder,
+                    'error' => 'gateway_app_mismatch',
+                ],
+            );
+
+            throw new InvalidArgumentException('Payment does not belong to GD Live.');
+        }
+
         $payment = $this->razorpay->fetchPayment($gatewayPaymentId);
 
         return $this->syncRazorpayGatewayState(
@@ -633,6 +735,7 @@ class RechargeOrderService
             [
                 'verify_payload' => $gatewayResponse,
                 'signature_verified' => true,
+                'order' => $gatewayOrder,
             ],
         );
     }
@@ -918,5 +1021,71 @@ class RechargeOrderService
         }
 
         throw new InvalidArgumentException('Payment gateway is not configured.');
+    }
+
+    private function resolveGatewayOrderData(string $gatewayOrderId, ?array $gatewayOrder = null): array
+    {
+        if ($gatewayOrder !== null && ($gatewayOrder['id'] ?? null) === $gatewayOrderId) {
+            return $gatewayOrder;
+        }
+
+        return $this->razorpay->fetchOrder($gatewayOrderId);
+    }
+
+    private function gatewayOrderAppMatches(PaymentOrder $order, array $gatewayOrder): ?bool
+    {
+        $explicitChecks = [];
+
+        $receipt = strtolower(trim((string) ($gatewayOrder['receipt'] ?? '')));
+        if ($receipt !== '') {
+            $explicitChecks[] = str_starts_with($receipt, self::GD_LIVE_RECEIPT_PREFIX);
+        }
+
+        $notes = is_array($gatewayOrder['notes'] ?? null) ? $gatewayOrder['notes'] : [];
+        $appCode = strtolower(trim((string) ($notes['app_code'] ?? '')));
+        if ($appCode !== '') {
+            $explicitChecks[] = $appCode === self::GD_LIVE_APP_CODE;
+        }
+
+        $appSlug = strtolower(trim((string) ($notes['app_slug'] ?? '')));
+        if ($appSlug !== '') {
+            $explicitChecks[] = in_array($appSlug, [self::GD_LIVE_APP_SLUG, self::GD_LIVE_APP_CODE], true);
+        }
+
+        $appName = strtolower(trim((string) ($notes['app_name'] ?? '')));
+        if ($appName !== '') {
+            $explicitChecks[] = str_contains($appName, 'gd live');
+        }
+
+        if ($explicitChecks !== []) {
+            return !in_array(false, $explicitChecks, true);
+        }
+
+        $localCreateOrder = data_get($order->gateway_response, 'create_order');
+        if (is_array($localCreateOrder)) {
+            $localChecks = [];
+
+            $localReceipt = strtolower(trim((string) ($localCreateOrder['receipt'] ?? '')));
+            if ($localReceipt !== '') {
+                $localChecks[] = str_starts_with($localReceipt, self::GD_LIVE_RECEIPT_PREFIX);
+            }
+
+            $localNotes = is_array($localCreateOrder['notes'] ?? null) ? $localCreateOrder['notes'] : [];
+            $localAppCode = strtolower(trim((string) ($localNotes['app_code'] ?? '')));
+            if ($localAppCode !== '') {
+                $localChecks[] = $localAppCode === self::GD_LIVE_APP_CODE;
+            }
+
+            $localAppSlug = strtolower(trim((string) ($localNotes['app_slug'] ?? '')));
+            if ($localAppSlug !== '') {
+                $localChecks[] = in_array($localAppSlug, [self::GD_LIVE_APP_SLUG, self::GD_LIVE_APP_CODE], true);
+            }
+
+            if ($localChecks !== []) {
+                return !in_array(false, $localChecks, true);
+            }
+        }
+
+        return null;
     }
 }
