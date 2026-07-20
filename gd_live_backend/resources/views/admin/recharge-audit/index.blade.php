@@ -7,7 +7,7 @@
 @endphp
 
 @section('page_actions')
-  <x-ui.button size="sm" href="{{ route('admin.recharge-audit.pdf', ['month' => $selectedMonthKey] + request()->only(['status', 'gateway', 'q', 'payment_method', 'vpa', 'rrn', 'contact', 'email', 'signature_verified'])) }}">
+  <x-ui.button size="sm" href="{{ route('admin.recharge-audit.pdf', request()->only(['from', 'to', 'status', 'gateway', 'q', 'payment_method', 'vpa', 'rrn', 'contact', 'email', 'signature_verified'])) }}">
     Download PDF
   </x-ui.button>
 @endsection
@@ -18,14 +18,18 @@
     <x-slot:header>
       <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div class="max-w-2xl">
-          <h3 class="text-base font-semibold text-gray-900 dark:text-white">Monthly Recharge Audit</h3>
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Track recharge outcomes, gateway reliability, and month-wise order trends for finance reviews and reconciliation.</p>
+          <h3 class="text-base font-semibold text-gray-900 dark:text-white">Recharge Audit</h3>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Track recharge outcomes, gateway reliability, and custom date-range order trends for finance reviews and reconciliation.</p>
         </div>
 
         <form method="get" action="{{ route('admin.recharge-audit.index') }}" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div>
-            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Month</label>
-            <input type="month" name="month" value="{{ request('month', $selectedMonthKey) }}" class="{{ $inputClass }}">
+            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">From</label>
+            <input type="date" name="from" value="{{ request('from', $fromDate->format('Y-m-d')) }}" class="{{ $inputClass }}">
+          </div>
+          <div>
+            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">To</label>
+            <input type="date" name="to" value="{{ request('to', $toDate->format('Y-m-d')) }}" class="{{ $inputClass }}">
           </div>
           <div>
             <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
@@ -81,28 +85,17 @@
     </x-slot:header>
 
     <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-      <x-admin.stat-card label="Orders" :value="number_format((int) ($summary->total_orders ?? 0))" :meta="$selectedMonth->format('F Y')" />
+      <x-admin.stat-card label="Orders" :value="number_format((int) ($summary->total_orders ?? 0))" :meta="$selectedRangeLabel" />
       <x-admin.stat-card label="Successful" :value="number_format((int) ($summary->successful_orders ?? 0))" :meta="'Pending '.number_format((int) ($summary->pending_orders ?? 0))" tone="success" />
       <x-admin.stat-card label="Gross Amount" :value="'Rs '.number_format((float) ($summary->rupees_total ?? 0), 2)" meta="GST inclusive" tone="dark" />
       <x-admin.stat-card label="Taxable" :value="'Rs '.number_format((float) ($summary->taxable_total ?? 0), 2)" meta="Base amount" />
       <x-admin.stat-card label="GST @ 18%" :value="'Rs '.number_format((float) ($summary->gst_total ?? 0), 2)" meta="Tax component" tone="warning" />
       <x-admin.stat-card label="Coins" :value="number_format((int) ($summary->coins_total ?? 0))" meta="Recharge credits" tone="brand" />
     </section>
-
-    <div class="mt-6 flex flex-wrap gap-2">
-      @forelse($monthTabs as $tab)
-        <a href="{{ route('admin.recharge-audit.index', ['month' => $tab->month_key]) }}" class="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition {{ $selectedMonthKey === $tab->month_key ? 'border-brand-500 bg-brand-500 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800' }}">
-          {{ \Carbon\Carbon::createFromFormat('Y-m', $tab->month_key)->format('M Y') }}
-          <span class="rounded-full bg-black/10 px-2 py-0.5 text-xs {{ $selectedMonthKey === $tab->month_key ? 'text-white' : 'text-gray-600 dark:text-gray-300' }}">{{ number_format((int) $tab->order_count) }}</span>
-        </a>
-      @empty
-        <div class="text-sm text-gray-500 dark:text-gray-400">No recharge history available yet.</div>
-      @endforelse
-    </div>
   </x-common.component-card>
 
   <div class="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-    <x-common.component-card title="Gateway Breakdown" desc="Gateway-level performance for the selected month." padding="compact">
+    <x-common.component-card title="Gateway Breakdown" desc="Gateway-level performance for the selected date range." padding="compact">
       <div class="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-800">
         <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
           <thead class="bg-gray-50 dark:bg-gray-950/60">
@@ -123,7 +116,7 @@
               </tr>
             @empty
               <tr class="bg-white dark:bg-gray-900">
-                <td colspan="4" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No recharge orders found for this month.</td>
+                <td colspan="4" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No recharge orders found for this date range.</td>
               </tr>
             @endforelse
           </tbody>
@@ -136,7 +129,7 @@
         <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h3 class="text-base font-semibold text-gray-900 dark:text-white">Recharge Orders</h3>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Showing {{ $orders->firstItem() ?? 0 }}-{{ $orders->lastItem() ?? 0 }} of {{ $orders->total() }} orders for {{ $selectedMonth->format('F Y') }}.</p>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Showing {{ $orders->firstItem() ?? 0 }}-{{ $orders->lastItem() ?? 0 }} of {{ $orders->total() }} orders for {{ $selectedRangeLabel }}.</p>
           </div>
         </div>
       </x-slot:header>
@@ -197,7 +190,7 @@
               </tr>
             @empty
               <tr class="bg-white dark:bg-gray-900">
-                <td colspan="9" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No recharge orders found for the selected month.</td>
+                <td colspan="9" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No recharge orders found for the selected date range.</td>
               </tr>
             @endforelse
           </tbody>
