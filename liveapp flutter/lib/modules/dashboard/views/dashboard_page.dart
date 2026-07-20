@@ -139,8 +139,8 @@ class _DashboardPageState extends State<DashboardPage>
             _DashboardControlDock(
               group: _group,
               period: _period,
-              label: _thisWeekLabel(),
-              countdown: _weeklyResetCountdownLabel(),
+              label: _periodWindowLabel(_period),
+              countdown: _periodStatusLabel(_period),
               onGroupChanged: (value) => setState(() => _group = value),
               onPeriodChanged: (value) => setState(() => _period = value),
             ),
@@ -164,14 +164,15 @@ class _DashboardPageState extends State<DashboardPage>
   ) {
     switch (_group) {
       case _BoardGroup.users:
-        final items =
-            _period == _BoardPeriod.weekly
-                ? data.usersWeekly
-                : data.usersAlltime;
+        final items = switch (_period) {
+          _BoardPeriod.weekly => data.usersWeekly,
+          _BoardPeriod.lastWeek => data.usersLastWeek,
+          _BoardPeriod.alltime => data.usersAlltime,
+        };
         return items
             .map((item) {
               final subtitle =
-                  _period == _BoardPeriod.weekly
+                  _period != _BoardPeriod.alltime
                       ? [
                         if (item.giftCoins > 0)
                           'Gift ${_compact(item.giftCoins)}',
@@ -189,21 +190,22 @@ class _DashboardPageState extends State<DashboardPage>
                 title: item.name,
                 subtitle: subtitle.isEmpty ? 'User' : subtitle,
                 value:
-                    _period == _BoardPeriod.weekly
+                    _period != _BoardPeriod.alltime
                         ? item.totalCoins
                         : item.lifetimeSpendCoins,
                 valueLabel:
-                    _period == _BoardPeriod.weekly
-                        ? 'weekly coins'
+                    _period != _BoardPeriod.alltime
+                        ? 'period coins'
                         : 'lifetime coins',
               );
             })
             .toList(growable: false);
       case _BoardGroup.hosts:
-        final items =
-            _period == _BoardPeriod.weekly
-                ? data.hostsWeekly
-                : data.hostsAlltime;
+        final items = switch (_period) {
+          _BoardPeriod.weekly => data.hostsWeekly,
+          _BoardPeriod.lastWeek => data.hostsLastWeek,
+          _BoardPeriod.alltime => data.hostsAlltime,
+        };
         return items
             .map(
               (item) => _SpotlightEntry(
@@ -218,10 +220,11 @@ class _DashboardPageState extends State<DashboardPage>
             )
             .toList(growable: false);
       case _BoardGroup.agencies:
-        final items =
-            _period == _BoardPeriod.weekly
-                ? data.agenciesWeekly
-                : data.agenciesAlltime;
+        final items = switch (_period) {
+          _BoardPeriod.weekly => data.agenciesWeekly,
+          _BoardPeriod.lastWeek => data.agenciesLastWeek,
+          _BoardPeriod.alltime => data.agenciesAlltime,
+        };
         return items
             .map(
               (item) => _SpotlightEntry(
@@ -247,6 +250,12 @@ class _DashboardPageState extends State<DashboardPage>
           icon: Icons.whatshot_rounded,
           accent: Color(0xFFFF8966),
         );
+      case (_BoardGroup.users, _BoardPeriod.lastWeek):
+        return const _BoardMeta(
+          title: 'Users',
+          icon: Icons.history_rounded,
+          accent: Color(0xFFFFB36B),
+        );
       case (_BoardGroup.users, _BoardPeriod.alltime):
         return const _BoardMeta(
           title: 'Users',
@@ -258,6 +267,12 @@ class _DashboardPageState extends State<DashboardPage>
           title: 'Hosts',
           icon: Icons.live_tv_rounded,
           accent: Color(0xFF73E0A9),
+        );
+      case (_BoardGroup.hosts, _BoardPeriod.lastWeek):
+        return const _BoardMeta(
+          title: 'Hosts',
+          icon: Icons.schedule_rounded,
+          accent: Color(0xFF8BE0D1),
         );
       case (_BoardGroup.hosts, _BoardPeriod.alltime):
         return const _BoardMeta(
@@ -271,6 +286,12 @@ class _DashboardPageState extends State<DashboardPage>
           icon: Icons.apartment_rounded,
           accent: Color(0xFFB794F4),
         );
+      case (_BoardGroup.agencies, _BoardPeriod.lastWeek):
+        return const _BoardMeta(
+          title: 'Agencies',
+          icon: Icons.business_center_rounded,
+          accent: Color(0xFFC7A7FF),
+        );
       case (_BoardGroup.agencies, _BoardPeriod.alltime):
         return const _BoardMeta(
           title: 'Agencies',
@@ -283,7 +304,7 @@ class _DashboardPageState extends State<DashboardPage>
 
 enum _BoardGroup { users, hosts, agencies }
 
-enum _BoardPeriod { weekly, alltime }
+enum _BoardPeriod { weekly, lastWeek, alltime }
 
 class _BoardMeta {
   const _BoardMeta({
@@ -327,8 +348,7 @@ class _DashboardOverviewCard extends StatelessWidget {
       _BoardGroup.hosts => 'Hosts',
       _BoardGroup.agencies => 'Agencies',
     };
-    final periodLabel =
-        period == _BoardPeriod.weekly ? 'This Week' : 'All Time';
+    final periodLabel = _periodLabel(period);
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: .94, end: 1),
@@ -613,6 +633,7 @@ class _DashboardControlDock extends StatelessWidget {
                   value: period,
                   options: const [
                     _ModeOption(_BoardPeriod.weekly, 'This Week'),
+                    _ModeOption(_BoardPeriod.lastWeek, 'Last Week'),
                     _ModeOption(_BoardPeriod.alltime, 'All Time'),
                   ],
                   onChanged: onPeriodChanged,
@@ -2761,19 +2782,41 @@ String _initialFromFallback(IconData fallbackIcon) {
 DateTime _istNow() =>
     DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
 
-String _thisWeekLabel() {
+String _periodLabel(_BoardPeriod period) {
+  return switch (period) {
+    _BoardPeriod.weekly => 'This Week',
+    _BoardPeriod.lastWeek => 'Last Week',
+    _BoardPeriod.alltime => 'All Time',
+  };
+}
+
+String _periodWindowLabel(_BoardPeriod period) {
+  if (period == _BoardPeriod.alltime) {
+    return 'Since launch';
+  }
+
   final nowIst = _istNow();
-  final weekStart = DateTime(
+  var weekStart = DateTime(
     nowIst.year,
     nowIst.month,
     nowIst.day,
   ).subtract(Duration(days: nowIst.weekday - DateTime.monday));
+  if (period == _BoardPeriod.lastWeek) {
+    weekStart = weekStart.subtract(const Duration(days: 7));
+  }
   final weekEnd = weekStart.add(const Duration(days: 6));
 
   return '${DateFormat('dd MMM').format(weekStart)} - ${DateFormat('dd MMM').format(weekEnd)} IST';
 }
 
-String _weeklyResetCountdownLabel() {
+String _periodStatusLabel(_BoardPeriod period) {
+  if (period == _BoardPeriod.alltime) {
+    return 'Lifetime board';
+  }
+  if (period == _BoardPeriod.lastWeek) {
+    return 'Closed window';
+  }
+
   final nowIst = _istNow();
   final nextWeekStart = DateTime(
     nowIst.year,

@@ -124,71 +124,115 @@ class LeaderboardService
             return [
                 'users_alltime' => $usersAllTime,
                 'users_weekly' => [],
+                'users_last_week' => [],
                 'hosts_alltime' => [],
                 'hosts_weekly' => [],
+                'hosts_last_week' => [],
                 'agencies_alltime' => [],
                 'agencies_weekly' => [],
+                'agencies_last_week' => [],
                 'hosts' => [],
                 'agencies' => [],
                 'top_users_weekly' => [],
+                'top_users_last_week' => [],
                 'top_hosts_weekly' => [],
+                'top_hosts_last_week' => [],
                 'top_agencies_weekly' => [],
+                'top_agencies_last_week' => [],
             ];
         }
 
         $usersWeekly = $this->topUsersWeekly($limit);
+        $usersLastWeek = $this->topUsers('last_week', $limit);
         $hostsWeekly = $this->topHosts('weekly', $limit);
+        $hostsLastWeek = $this->topHosts('last_week', $limit);
         $hostsAllTime = $this->topHosts('alltime', $limit);
         $agenciesWeekly = $this->topAgencies('weekly', $limit);
+        $agenciesLastWeek = $this->topAgencies('last_week', $limit);
         $agenciesAllTime = $this->topAgencies('alltime', $limit);
-        $hosts = $period === 'alltime' ? $hostsAllTime : $hostsWeekly;
-        $agencies = $period === 'alltime' ? $agenciesAllTime : $agenciesWeekly;
+        $users = match ($period) {
+            'alltime' => $usersAllTime,
+            'last_week' => $usersLastWeek,
+            default => $usersWeekly,
+        };
+        $hosts = match ($period) {
+            'alltime' => $hostsAllTime,
+            'last_week' => $hostsLastWeek,
+            default => $hostsWeekly,
+        };
+        $agencies = match ($period) {
+            'alltime' => $agenciesAllTime,
+            'last_week' => $agenciesLastWeek,
+            default => $agenciesWeekly,
+        };
 
         if ($type === 'all') {
             return [
                 'users_alltime' => $usersAllTime,
                 'users_weekly' => $usersWeekly,
+                'users_last_week' => $usersLastWeek,
                 'hosts_alltime' => $hostsAllTime,
                 'hosts_weekly' => $hostsWeekly,
+                'hosts_last_week' => $hostsLastWeek,
                 'agencies_alltime' => $agenciesAllTime,
                 'agencies_weekly' => $agenciesWeekly,
-                'hosts' => $hostsWeekly,
-                'agencies' => $agenciesWeekly,
+                'agencies_last_week' => $agenciesLastWeek,
+                'users' => $users,
+                'hosts' => $hosts,
+                'agencies' => $agencies,
                 'top_users_weekly' => $usersWeekly,
+                'top_users_last_week' => $usersLastWeek,
                 'top_hosts_weekly' => $hostsWeekly,
+                'top_hosts_last_week' => $hostsLastWeek,
                 'top_agencies_weekly' => $agenciesWeekly,
+                'top_agencies_last_week' => $agenciesLastWeek,
             ];
         }
 
         return match ($type) {
             'users' => [
-                'users' => $period === 'alltime' ? $usersAllTime : $usersWeekly,
+                'users' => $users,
+                'users_alltime' => $usersAllTime,
+                'users_weekly' => $usersWeekly,
+                'users_last_week' => $usersLastWeek,
                 'top_users_weekly' => $period === 'weekly' ? $usersWeekly : [],
+                'top_users_last_week' => $period === 'last_week' ? $usersLastWeek : [],
             ],
             'hosts' => [
                 'hosts' => $hosts,
                 'hosts_alltime' => $hostsAllTime,
                 'hosts_weekly' => $hostsWeekly,
+                'hosts_last_week' => $hostsLastWeek,
                 'top_hosts_weekly' => $hostsWeekly,
+                'top_hosts_last_week' => $hostsLastWeek,
             ],
             'agencies' => [
                 'agencies' => $agencies,
                 'agencies_alltime' => $agenciesAllTime,
                 'agencies_weekly' => $agenciesWeekly,
+                'agencies_last_week' => $agenciesLastWeek,
                 'top_agencies_weekly' => $agenciesWeekly,
+                'top_agencies_last_week' => $agenciesLastWeek,
             ],
             default => [
                 'users_alltime' => $usersAllTime,
                 'users_weekly' => $usersWeekly,
+                'users_last_week' => $usersLastWeek,
                 'hosts_alltime' => $hostsAllTime,
                 'hosts_weekly' => $hostsWeekly,
+                'hosts_last_week' => $hostsLastWeek,
                 'agencies_alltime' => $agenciesAllTime,
                 'agencies_weekly' => $agenciesWeekly,
-                'hosts' => $hostsWeekly,
-                'agencies' => $agenciesWeekly,
+                'agencies_last_week' => $agenciesLastWeek,
+                'users' => $users,
+                'hosts' => $hosts,
+                'agencies' => $agencies,
                 'top_users_weekly' => $usersWeekly,
+                'top_users_last_week' => $usersLastWeek,
                 'top_hosts_weekly' => $hostsWeekly,
+                'top_hosts_last_week' => $hostsLastWeek,
                 'top_agencies_weekly' => $agenciesWeekly,
+                'top_agencies_last_week' => $agenciesLastWeek,
             ],
         };
     }
@@ -381,20 +425,31 @@ class LeaderboardService
 
     public function topUsersWeekly(int $limit = 10): array
     {
-        return Cache::remember(
-            $this->cacheKey('users', 'weekly', $limit),
-            now()->addSeconds(self::CACHE_TTL_SECONDS),
-            function () use ($limit): array {
-                [$weekStart, $weekEnd] = $this->weeklyRange();
+        return $this->topUsers('weekly', $limit);
+    }
 
-                $rows = LeaderboardDailyStat::query()
+    public function topUsers(string $period = 'weekly', int $limit = 10): array
+    {
+        $period = $this->normalizePeriodAlias($period);
+
+        return Cache::remember(
+            $this->cacheKey('users', $period, $limit),
+            now()->addSeconds(self::CACHE_TTL_SECONDS),
+            function () use ($period, $limit): array {
+                $query = LeaderboardDailyStat::query()
                     ->join('users', 'users.id', '=', 'leaderboard_daily_stats.subject_id')
                     ->leftJoin('user_levels', 'user_levels.id', '=', 'users.level_id')
-                    ->where('leaderboard_daily_stats.subject_type', 'user')
-                    ->whereBetween('leaderboard_daily_stats.stat_date', [
-                        $weekStart->toDateString(),
-                        $weekEnd->toDateString(),
-                    ])
+                    ->where('leaderboard_daily_stats.subject_type', 'user');
+
+                if ($period !== 'alltime') {
+                    [$rangeStart, $rangeEnd] = $this->rangeForPeriod($period);
+                    $query->whereBetween('leaderboard_daily_stats.stat_date', [
+                        $rangeStart->toDateString(),
+                        $rangeEnd->toDateString(),
+                    ]);
+                }
+
+                $rows = $query
                     ->groupBy('users.id', 'users.name', 'users.avatar_url', 'user_levels.level', 'users.lifetime_spend_coins')
                     ->selectRaw('
                         users.id as id,
@@ -445,8 +500,8 @@ class LeaderboardService
                     ->join('users', 'users.id', '=', 'hosts.user_id')
                     ->where('leaderboard_daily_stats.subject_type', 'host');
 
-                if ($period === 'weekly') {
-                    [$weekStart, $weekEnd] = $this->weeklyRange();
+                if ($period !== 'alltime') {
+                    [$weekStart, $weekEnd] = $this->rangeForPeriod($period);
                     $query->whereBetween('leaderboard_daily_stats.stat_date', [
                         $weekStart->toDateString(),
                         $weekEnd->toDateString(),
@@ -499,8 +554,8 @@ class LeaderboardService
                     ->join('agencies', 'agencies.id', '=', 'leaderboard_daily_stats.subject_id')
                     ->where('leaderboard_daily_stats.subject_type', 'agency');
 
-                if ($period === 'weekly') {
-                    [$weekStart, $weekEnd] = $this->weeklyRange();
+                if ($period !== 'alltime') {
+                    [$weekStart, $weekEnd] = $this->rangeForPeriod($period);
                     $query->whereBetween('leaderboard_daily_stats.stat_date', [
                         $weekStart->toDateString(),
                         $weekEnd->toDateString(),
@@ -634,9 +689,31 @@ class LeaderboardService
         return [$weekStart, $weekEnd];
     }
 
+    private function lastWeekRange(): array
+    {
+        $lastWeekStart = now(self::BUSINESS_TIMEZONE)
+            ->subWeek()
+            ->startOfWeek(Carbon::MONDAY);
+        $lastWeekEnd = $lastWeekStart->copy()->endOfWeek(Carbon::SUNDAY);
+
+        return [$lastWeekStart, $lastWeekEnd];
+    }
+
+    private function rangeForPeriod(string $period): array
+    {
+        return match ($this->normalizePeriodAlias($period)) {
+            'last_week' => $this->lastWeekRange(),
+            default => $this->weeklyRange(),
+        };
+    }
+
     private function normalizePeriodAlias(string $period): string
     {
-        return strtolower(trim($period)) === 'alltime' ? 'alltime' : 'weekly';
+        return match (strtolower(trim($period))) {
+            'alltime' => 'alltime',
+            'last_week', 'lastweek', 'previous_week', 'previousweek' => 'last_week',
+            default => 'weekly',
+        };
     }
 
     private function normalizeAvatarUrl(?string $value): ?string

@@ -16,7 +16,7 @@ class DashboardLeaderboardController extends Controller
     {
         $data = $request->validate([
             'type' => 'nullable|in:users,hosts,agencies,all',
-            'period' => 'nullable|in:alltime,weekly',
+            'period' => 'nullable|in:alltime,weekly,last_week',
             'limit' => 'nullable|integer|min:1|max:100',
         ]);
 
