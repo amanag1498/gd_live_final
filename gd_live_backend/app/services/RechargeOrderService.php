@@ -646,6 +646,92 @@ class RechargeOrderService
         return $report;
     }
 
+    public function reconcileOrder(string $identifier): array
+    {
+        if (!$this->paymentOrdersAvailable() || !$this->paymentOrderGatewayColumnsAvailable()) {
+            throw new InvalidArgumentException('Recharge setup is incomplete. Run the latest migrations.');
+        }
+
+        $identifier = trim($identifier);
+        if ($identifier === '') {
+            throw new InvalidArgumentException('Recharge identifier is required.');
+        }
+
+        return DB::transaction(function () use ($identifier) {
+            $order = PaymentOrder::query()
+                ->where(function ($query) use ($identifier) {
+                    $query->where('order_id', $identifier)
+                        ->orWhere('gateway_order_id', $identifier)
+                        ->orWhere('gateway_payment_id', $identifier);
+                })
+                ->lockForUpdate()
+                ->first();
+
+            if (!$order) {
+                throw new InvalidArgumentException('Recharge order not found.');
+            }
+
+            WalletService::getOrCreate($order->user);
+            $wallet = Wallet::query()
+                ->where('user_id', $order->user_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $existingTx = WalletTransaction::query()
+                ->where('wallet_id', $wallet->id)
+                ->where('reference_type', 'payment_order')
+                ->where('reference_id', $order->id)
+                ->where('category', 'recharge')
+                ->first();
+
+            if ($order->status === 'success' && $existingTx) {
+                return $this->existingProcessedResult($order, $wallet, $existingTx) + [
+                    'reconciled' => true,
+                    'reason' => 'already_success',
+                ];
+            }
+
+            $paymentId = trim((string) $order->gateway_payment_id);
+            if ($paymentId === '') {
+                throw new InvalidArgumentException('Recharge order does not have a gateway payment id yet.');
+            }
+
+            $payment = $this->razorpay->fetchPayment($paymentId);
+            $gatewayOrder = $this->resolveGatewayOrderData($order->gateway_order_id);
+            if ($this->gatewayOrderAppMatches($order, $gatewayOrder) === false) {
+                return $this->persistRazorpayFailure(
+                    $order,
+                    $wallet,
+                    $paymentId,
+                    'failed',
+                    [
+                        'reconciled' => true,
+                        'payment' => $payment,
+                        'order' => $gatewayOrder,
+                        'error' => 'gateway_app_mismatch',
+                    ],
+                ) + [
+                    'reconciled' => true,
+                    'reason' => 'gateway_app_mismatch',
+                ];
+            }
+
+            return $this->syncRazorpayGatewayState(
+                $order,
+                $wallet,
+                $payment,
+                [
+                    'reconciled' => true,
+                    'order' => $gatewayOrder,
+                    'manual_reconcile' => true,
+                ],
+            ) + [
+                'reconciled' => true,
+                'reason' => 'synced',
+            ];
+        });
+    }
+
     private function verifyRazorpayOrder(
         PaymentOrder $order,
         Wallet $wallet,
@@ -1034,55 +1120,73 @@ class RechargeOrderService
 
     private function gatewayOrderAppMatches(PaymentOrder $order, array $gatewayOrder): ?bool
     {
-        $explicitChecks = [];
-
         $receipt = strtolower(trim((string) ($gatewayOrder['receipt'] ?? '')));
         if ($receipt !== '') {
-            $explicitChecks[] = str_starts_with($receipt, self::GD_LIVE_RECEIPT_PREFIX);
+            if (!str_starts_with($receipt, self::GD_LIVE_RECEIPT_PREFIX)) {
+                return false;
+            }
         }
 
         $notes = is_array($gatewayOrder['notes'] ?? null) ? $gatewayOrder['notes'] : [];
         $appCode = strtolower(trim((string) ($notes['app_code'] ?? '')));
         if ($appCode !== '') {
-            $explicitChecks[] = $appCode === self::GD_LIVE_APP_CODE;
+            if ($appCode !== self::GD_LIVE_APP_CODE) {
+                return false;
+            }
         }
 
         $appSlug = strtolower(trim((string) ($notes['app_slug'] ?? '')));
         if ($appSlug !== '') {
-            $explicitChecks[] = in_array($appSlug, [self::GD_LIVE_APP_SLUG, self::GD_LIVE_APP_CODE], true);
+            if (!in_array($appSlug, [self::GD_LIVE_APP_SLUG, self::GD_LIVE_APP_CODE], true)) {
+                return false;
+            }
         }
 
         $appName = strtolower(trim((string) ($notes['app_name'] ?? '')));
-        if ($appName !== '') {
-            $explicitChecks[] = str_contains($appName, 'gd live');
+        if ($appName !== '' && str_contains($appName, 'talk')) {
+            return false;
         }
 
-        if ($explicitChecks !== []) {
-            return !in_array(false, $explicitChecks, true);
+        if ($receipt !== '' || $appCode !== '' || $appSlug !== '' || ($appName !== '' && str_contains($appName, 'gd live'))) {
+            return true;
         }
 
         $localCreateOrder = data_get($order->gateway_response, 'create_order');
         if (is_array($localCreateOrder)) {
-            $localChecks = [];
-
             $localReceipt = strtolower(trim((string) ($localCreateOrder['receipt'] ?? '')));
             if ($localReceipt !== '') {
-                $localChecks[] = str_starts_with($localReceipt, self::GD_LIVE_RECEIPT_PREFIX);
+                if (!str_starts_with($localReceipt, self::GD_LIVE_RECEIPT_PREFIX)) {
+                    return false;
+                }
             }
 
             $localNotes = is_array($localCreateOrder['notes'] ?? null) ? $localCreateOrder['notes'] : [];
             $localAppCode = strtolower(trim((string) ($localNotes['app_code'] ?? '')));
             if ($localAppCode !== '') {
-                $localChecks[] = $localAppCode === self::GD_LIVE_APP_CODE;
+                if ($localAppCode !== self::GD_LIVE_APP_CODE) {
+                    return false;
+                }
             }
 
             $localAppSlug = strtolower(trim((string) ($localNotes['app_slug'] ?? '')));
             if ($localAppSlug !== '') {
-                $localChecks[] = in_array($localAppSlug, [self::GD_LIVE_APP_SLUG, self::GD_LIVE_APP_CODE], true);
+                if (!in_array($localAppSlug, [self::GD_LIVE_APP_SLUG, self::GD_LIVE_APP_CODE], true)) {
+                    return false;
+                }
             }
 
-            if ($localChecks !== []) {
-                return !in_array(false, $localChecks, true);
+            $localAppName = strtolower(trim((string) ($localNotes['app_name'] ?? '')));
+            if ($localAppName !== '' && str_contains($localAppName, 'talk')) {
+                return false;
+            }
+
+            if (
+                $localReceipt !== ''
+                || $localAppCode !== ''
+                || $localAppSlug !== ''
+                || ($localAppName !== '' && str_contains($localAppName, 'gd live'))
+            ) {
+                return true;
             }
         }
 

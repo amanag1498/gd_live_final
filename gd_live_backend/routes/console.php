@@ -230,6 +230,27 @@ Artisan::command('recharge:reconcile {--sync-pending} {--limit=100}', function (
     }
 })->purpose('Detect inconsistent recharge orders and wallet credits');
 
+Artisan::command('recharge:reconcile-order {identifier}', function (RechargeOrderService $service, string $identifier) {
+    $result = $service->reconcileOrder($identifier);
+
+    $order = $result['order'] ?? null;
+    $transaction = $result['transaction'] ?? null;
+
+    $this->table(
+        ['Field', 'Value'],
+        [
+            ['reason', $result['reason'] ?? 'synced'],
+            ['status', $order?->status ?? 'unknown'],
+            ['order_id', $order?->order_id ?? '—'],
+            ['gateway_order_id', $order?->gateway_order_id ?? '—'],
+            ['gateway_payment_id', $order?->gateway_payment_id ?? '—'],
+            ['wallet_balance', $result['wallet']?->balance ?? '—'],
+            ['transaction_id', $transaction?->transaction_id ?? '—'],
+            ['already_processed', !empty($result['already_processed']) ? 'yes' : 'no'],
+        ]
+    );
+})->purpose('Reconcile one recharge order by app order id, gateway order id, or gateway payment id');
+
 Artisan::command('teen-patti:tick {--round_id=}', function (TeenPattiService $service) {
     $round = $this->option('round_id')
         ? TeenPattiRound::query()->findOrFail((int) $this->option('round_id'))
