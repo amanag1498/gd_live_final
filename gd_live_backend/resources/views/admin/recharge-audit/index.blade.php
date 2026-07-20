@@ -7,7 +7,7 @@
 @endphp
 
 @section('page_actions')
-  <x-ui.button size="sm" href="{{ route('admin.recharge-audit.pdf', ['month' => $selectedMonthKey] + request()->only(['status', 'gateway', 'q'])) }}">
+  <x-ui.button size="sm" href="{{ route('admin.recharge-audit.pdf', ['month' => $selectedMonthKey] + request()->only(['status', 'gateway', 'q', 'payment_method', 'vpa', 'rrn', 'contact', 'email', 'signature_verified'])) }}">
     Download PDF
   </x-ui.button>
 @endsection
@@ -22,7 +22,7 @@
           <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Track recharge outcomes, gateway reliability, and month-wise order trends for finance reviews and reconciliation.</p>
         </div>
 
-        <form method="get" action="{{ route('admin.recharge-audit.index') }}" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-[150px_160px_160px_220px_auto]">
+        <form method="get" action="{{ route('admin.recharge-audit.index') }}" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div>
             <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Month</label>
             <input type="month" name="month" value="{{ request('month', $selectedMonthKey) }}" class="{{ $inputClass }}">
@@ -43,6 +43,34 @@
           <div>
             <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Search</label>
             <input type="text" name="q" value="{{ request('q') }}" class="{{ $inputClass }}" placeholder="user, email, order ID">
+          </div>
+          <div>
+            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Method</label>
+            <input type="text" name="payment_method" value="{{ request('payment_method') }}" class="{{ $inputClass }}" placeholder="upi / card / netbanking">
+          </div>
+          <div>
+            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">VPA</label>
+            <input type="text" name="vpa" value="{{ request('vpa') }}" class="{{ $inputClass }}" placeholder="user@bank">
+          </div>
+          <div>
+            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">RRN</label>
+            <input type="text" name="rrn" value="{{ request('rrn') }}" class="{{ $inputClass }}" placeholder="Bank RRN">
+          </div>
+          <div>
+            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Gateway Contact</label>
+            <input type="text" name="contact" value="{{ request('contact') }}" class="{{ $inputClass }}" placeholder="+91...">
+          </div>
+          <div>
+            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Gateway Email</label>
+            <input type="text" name="email" value="{{ request('email') }}" class="{{ $inputClass }}" placeholder="payer email">
+          </div>
+          <div>
+            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Signature</label>
+            <select name="signature_verified" class="{{ $inputClass }}">
+              <option value="">Any</option>
+              <option value="1" @selected(request('signature_verified') === '1')>Verified</option>
+              <option value="0" @selected(request('signature_verified') === '0')>Not Verified</option>
+            </select>
           </div>
           <div class="flex items-end gap-3">
             <x-ui.button type="submit" size="sm">Apply</x-ui.button>
@@ -122,6 +150,7 @@
               <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Plan</th>
               <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Status</th>
               <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Gateway</th>
+              <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Payment Meta</th>
               <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Value</th>
               <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Coins</th>
               <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Created</th>
@@ -145,13 +174,30 @@
                   </x-ui.badge>
                 </td>
                 <td class="px-4 py-4 text-gray-600 capitalize dark:text-gray-300">{{ $order->gateway ?: 'manual' }}</td>
+                <td class="px-4 py-4 text-xs text-gray-600 dark:text-gray-300">
+                  @php($meta = $order->audit_meta ?? [])
+                  <div><span class="font-semibold text-gray-900 dark:text-white">Method:</span> {{ $meta['method'] ?? '—' }}</div>
+                  <div><span class="font-semibold text-gray-900 dark:text-white">RRN:</span> {{ $meta['rrn'] ?? '—' }}</div>
+                  <div><span class="font-semibold text-gray-900 dark:text-white">VPA:</span> {{ $meta['vpa'] ?? '—' }}</div>
+                  <div><span class="font-semibold text-gray-900 dark:text-white">Flow:</span> {{ $meta['upi_flow'] ?? '—' }}</div>
+                  <div><span class="font-semibold text-gray-900 dark:text-white">Payer Type:</span> {{ $meta['payer_account_type'] ?? '—' }}</div>
+                  <div><span class="font-semibold text-gray-900 dark:text-white">Contact:</span> {{ $meta['contact'] ?? '—' }}</div>
+                  <div><span class="font-semibold text-gray-900 dark:text-white">Gateway Email:</span> {{ $meta['email'] ?? '—' }}</div>
+                  <div><span class="font-semibold text-gray-900 dark:text-white">Gateway Status:</span> {{ $meta['payment_status'] ?? '—' }}</div>
+                  <div><span class="font-semibold text-gray-900 dark:text-white">Signature:</span> {{ array_key_exists('signature_verified', $meta) ? (($meta['signature_verified'] ?? false) ? 'Verified' : 'No') : '—' }}</div>
+                  <div><span class="font-semibold text-gray-900 dark:text-white">Fee:</span> {{ $meta['gateway_fee'] !== null ? 'Rs '.number_format(((float) $meta['gateway_fee']) / 100, 2) : '—' }}</div>
+                  <div><span class="font-semibold text-gray-900 dark:text-white">Tax:</span> {{ $meta['gateway_tax'] !== null ? 'Rs '.number_format(((float) $meta['gateway_tax']) / 100, 2) : '—' }}</div>
+                  @if(!empty($meta['error_code']) || !empty($meta['error_description']))
+                    <div><span class="font-semibold text-gray-900 dark:text-white">Gateway Error:</span> {{ $meta['error_code'] ?? '—' }}{{ !empty($meta['error_description']) ? ' · '.$meta['error_description'] : '' }}</div>
+                  @endif
+                </td>
                 <td class="px-4 py-4 text-gray-600 dark:text-gray-300">Rs {{ number_format((float) $order->amount_rupees, 2) }}</td>
                 <td class="px-4 py-4 text-gray-600 dark:text-gray-300">{{ number_format((int) $order->total_coins) }}</td>
                 <td class="px-4 py-4 text-gray-600 dark:text-gray-300">{{ $order->created_at?->format('d M Y, h:i A') }}</td>
               </tr>
             @empty
               <tr class="bg-white dark:bg-gray-900">
-                <td colspan="8" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No recharge orders found for the selected month.</td>
+                <td colspan="9" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No recharge orders found for the selected month.</td>
               </tr>
             @endforelse
           </tbody>
