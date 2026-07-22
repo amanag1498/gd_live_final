@@ -35,22 +35,184 @@
     <x-ui.alert variant="danger">{{ session('error') }}</x-ui.alert>
   @endif
 
-  <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-    <x-admin.stat-card label="Active" :value="number_format($summary['active'] ?? 0)" tone="success" />
-    <x-admin.stat-card label="Expired" :value="number_format($summary['expired'] ?? 0)" tone="dark" />
-    <x-admin.stat-card label="Cancelled" :value="number_format($summary['cancelled'] ?? 0)" tone="warning" />
-    <x-admin.stat-card label="Gifted" :value="number_format($summary['gifted'] ?? 0)" tone="brand" />
-    <x-admin.stat-card label="Expiring Soon" :value="number_format($summary['expiring_soon'] ?? 0)" :meta="number_format($summary['renewal_rate'] ?? 0, 1).'% renewal rate'" tone="dark" />
+  <section>
+    <div class="mb-3">
+      <h2 class="text-base font-semibold text-gray-900 dark:text-white">Paid sales</h2>
+      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Every wallet debit is counted as one sale, including renewals of an existing entitlement.</p>
+    </div>
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <x-admin.stat-card label="Subscriptions Sold" :value="number_format($salesSummary['sold'] ?? 0)" tone="success" />
+      <x-admin.stat-card label="Coins Collected" :value="number_format($salesSummary['coins'] ?? 0)" tone="brand" />
+      <x-admin.stat-card label="Unique Buyers" :value="number_format($salesSummary['buyers'] ?? 0)" tone="dark" />
+      <x-admin.stat-card label="Renewals" :value="number_format($salesSummary['renewals'] ?? 0)" tone="warning" />
+      <x-admin.stat-card label="Renewal Rate" :value="number_format($salesSummary['renewal_rate'] ?? 0, 1).'%'" tone="dark" />
+    </div>
   </section>
 
   <x-common.component-card>
     <x-slot:header>
       <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div class="max-w-2xl">
-          <h3 class="text-base font-semibold text-gray-900 dark:text-white">User Subscriptions</h3>
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Track plan ownership, grant source, expiry windows, and account-level subscription access from one filtered admin view.</p>
+          <h3 class="text-base font-semibold text-gray-900 dark:text-white">Subscription Sales Audit</h3>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Immutable paid purchase history from the wallet ledger. Renewing the same subscription creates another row here.</p>
         </div>
-        <x-ui.badge color="dark">{{ number_format($subs->total()) }} matching records</x-ui.badge>
+        <x-ui.badge color="dark">{{ number_format($sales->total()) }} matching sales</x-ui.badge>
+      </div>
+    </x-slot:header>
+
+    <form method="get" class="grid gap-3 border-b border-gray-200 pb-5 dark:border-gray-800 sm:grid-cols-2 xl:grid-cols-6">
+      <div class="sm:col-span-2">
+        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Buyer or Transaction</label>
+        <input name="sale_q" value="{{ request('sale_q') }}" class="{{ $inputClass }}" placeholder="Transaction ID, user ID, name, email, or plan">
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Plan</label>
+        <select name="sale_plan_id" class="{{ $inputClass }}">
+          <option value="">Any plan</option>
+          @foreach($plans as $plan)
+            <option value="{{ $plan->id }}" @selected((string) request('sale_plan_id') === (string) $plan->id)>{{ $plan->name }}</option>
+          @endforeach
+        </select>
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Sale Type</label>
+        <select name="sale_kind" class="{{ $inputClass }}">
+          <option value="">Purchase + renewal</option>
+          <option value="purchase" @selected(request('sale_kind') === 'purchase')>First purchase</option>
+          <option value="renewal" @selected(request('sale_kind') === 'renewal')>Renewal</option>
+        </select>
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Sold From</label>
+        <input type="date" name="sale_from" value="{{ request('sale_from') }}" class="{{ $inputClass }}">
+      </div>
+      <div>
+        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Sold To</label>
+        <input type="date" name="sale_to" value="{{ request('sale_to') }}" class="{{ $inputClass }}">
+      </div>
+      <div class="flex items-end gap-3 sm:col-span-2 xl:col-span-6">
+        <x-ui.button type="submit" size="sm">Apply Sales Filters</x-ui.button>
+        <x-ui.button variant="outline" size="sm" href="{{ route('admin.user-subscriptions.index') }}">Reset</x-ui.button>
+      </div>
+    </form>
+
+    @if($salesByPlan->isNotEmpty())
+      <div class="grid gap-3 border-b border-gray-200 py-5 dark:border-gray-800 md:grid-cols-2 xl:grid-cols-4">
+        @foreach($salesByPlan as $planSales)
+          <div class="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950/60">
+            <div class="font-semibold text-gray-900 dark:text-white">{{ $planSales['name'] }}</div>
+            <div class="mt-3 grid grid-cols-3 gap-3 text-xs text-gray-500 dark:text-gray-400">
+              <div><span class="block text-base font-bold text-gray-900 dark:text-white">{{ number_format($planSales['sold']) }}</span>sold</div>
+              <div><span class="block text-base font-bold text-gray-900 dark:text-white">{{ number_format($planSales['coins']) }}</span>coins</div>
+              <div><span class="block text-base font-bold text-gray-900 dark:text-white">{{ number_format($planSales['buyers']) }}</span>buyers</div>
+            </div>
+          </div>
+        @endforeach
+      </div>
+    @endif
+
+    <div class="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-800">
+      <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
+        <thead class="bg-gray-50 dark:bg-gray-950/60">
+          <tr>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Sale</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Buyer</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Plan</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Type</th>
+            <th class="px-4 py-3 text-right font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Coins</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Wallet</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Audit</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
+          @forelse($sales as $sale)
+            @php
+              $saleMeta = is_array($sale->meta ?? null) ? $sale->meta : [];
+              $buyer = $sale->wallet?->user;
+              $salePlanName = $saleMeta['plan_name'] ?? $sale->reference ?? 'Unknown plan';
+              $saleEvent = $saleMeta['event'] ?? 'SUBSCRIPTION_PURCHASE';
+              $saleSource = $saleMeta['source'] ?? (str_starts_with($saleEvent, 'ADMIN_') ? 'admin' : 'app');
+            @endphp
+            <tr class="bg-white align-top dark:bg-gray-900">
+              <td class="px-4 py-4">
+                <div class="font-semibold text-gray-900 dark:text-white">Txn #{{ $sale->id }}</div>
+                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $sale->created_at?->format('d M Y, h:i A') ?? '—' }}</div>
+                @if(!empty($saleMeta['subscription_id']))
+                  <div class="mt-2"><x-ui.badge color="dark">Sub #{{ $saleMeta['subscription_id'] }}</x-ui.badge></div>
+                @endif
+              </td>
+              <td class="px-4 py-4">
+                <div class="font-semibold text-gray-900 dark:text-white">{{ $buyer?->name ?? 'Unknown user' }}</div>
+                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $buyer?->email ?? 'No email' }}</div>
+                @if($buyer)
+                  <a class="mt-2 inline-block text-xs font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400" href="{{ route('admin.users.show', $buyer) }}">User #{{ $buyer->id }}</a>
+                @endif
+              </td>
+              <td class="px-4 py-4">
+                <div class="font-semibold text-gray-900 dark:text-white">{{ $salePlanName }}</div>
+                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $sale->reference ?? 'No reference' }}</div>
+                @if(isset($saleMeta['period_starts_at'], $saleMeta['period_ends_at']))
+                  <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ \Carbon\Carbon::parse($saleMeta['period_starts_at'])->format('d M Y') }} to {{ \Carbon\Carbon::parse($saleMeta['period_ends_at'])->format('d M Y') }}</div>
+                @endif
+              </td>
+              <td class="px-4 py-4">
+                <x-ui.badge :color="$sale->audit_kind === 'renewal' ? 'warning' : 'success'">{{ ucfirst($sale->audit_kind) }}</x-ui.badge>
+                <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ ucfirst($saleSource) }}</div>
+              </td>
+              <td class="px-4 py-4 text-right">
+                <div class="text-base font-bold text-gray-900 dark:text-white">{{ number_format((int) $sale->coins) }}</div>
+                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">debited</div>
+              </td>
+              <td class="px-4 py-4 text-gray-600 dark:text-gray-300">
+                <div>{{ number_format((int) ($sale->balance_before ?? 0)) }} → {{ number_format((int) ($sale->balance_after ?? 0)) }}</div>
+                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">Wallet #{{ $sale->wallet_id }}</div>
+              </td>
+              <td class="px-4 py-4">
+                <div class="text-xs font-semibold text-gray-700 dark:text-gray-200">{{ $saleEvent }}</div>
+                @if(!empty($saleMeta))
+                  <details class="mt-2">
+                    <summary class="cursor-pointer text-xs font-medium text-brand-600 dark:text-brand-400">View metadata</summary>
+                    <pre class="mt-2 max-w-[320px] overflow-x-auto whitespace-pre-wrap rounded-xl bg-gray-50 p-3 text-[11px] leading-5 text-gray-600 dark:bg-gray-950 dark:text-gray-300">{{ json_encode($saleMeta, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                  </details>
+                @endif
+              </td>
+            </tr>
+          @empty
+            <tr class="bg-white dark:bg-gray-900">
+              <td colspan="7" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No paid subscription sales matched these filters.</td>
+            </tr>
+          @endforelse
+        </tbody>
+      </table>
+    </div>
+
+    <x-slot:footer>
+      <div class="flex justify-end">{{ $sales->links() }}</div>
+    </x-slot:footer>
+  </x-common.component-card>
+
+  <section>
+    <div class="mb-3">
+      <h2 class="text-base font-semibold text-gray-900 dark:text-white">Current entitlement state</h2>
+      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">These rows represent access windows, not the number of sales.</p>
+    </div>
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <x-admin.stat-card label="Active Access" :value="number_format($summary['active'] ?? 0)" tone="success" />
+      <x-admin.stat-card label="Expired Access" :value="number_format($summary['expired'] ?? 0)" tone="dark" />
+      <x-admin.stat-card label="Cancelled" :value="number_format($summary['cancelled'] ?? 0)" tone="warning" />
+      <x-admin.stat-card label="Complimentary Active" :value="number_format($summary['complimentary_active'] ?? 0)" tone="brand" />
+      <x-admin.stat-card label="Expiring Soon" :value="number_format($summary['expiring_soon'] ?? 0)" tone="dark" />
+    </div>
+  </section>
+
+  <x-common.component-card>
+    <x-slot:header>
+      <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div class="max-w-2xl">
+          <h3 class="text-base font-semibold text-gray-900 dark:text-white">Subscription Entitlements</h3>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Current access periods. A renewal extends one of these rows and is recorded separately in the sales audit above.</p>
+        </div>
+        <x-ui.badge color="dark">{{ number_format($subs->total()) }} matching entitlements</x-ui.badge>
       </div>
     </x-slot:header>
 
