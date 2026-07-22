@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Log;
 
 class HostAvailabilityService
 {
+    private const HEARTBEAT_WRITE_INTERVAL_SECONDS = 15;
+
     public function __construct(
         private HostNotificationService $notifications,
     ) {
@@ -24,35 +26,54 @@ class HostAvailabilityService
 
     public function updateSocketStatus(int $userId, string $socketStatus): HostAvailability
     {
-        return DB::transaction(function () use ($userId, $socketStatus) {
-            $user = User::query()->findOrFail($userId);
+        $user = User::query()->findOrFail($userId);
+        $shouldDisconnect = false;
+
+        [$before, $fresh, $changed] = DB::transaction(function () use ($user, $socketStatus, &$shouldDisconnect) {
             $availability = $this->ensureForUser($user);
             $before = $availability->replicate();
+            $now = now();
+            $sameSocketStatus = $availability->socket_status === $socketStatus;
+            $heartbeatIsFresh = $availability->last_seen_at
+                && $availability->last_seen_at->gte($now->copy()->subSeconds(self::HEARTBEAT_WRITE_INTERVAL_SECONDS));
+
+            if ($sameSocketStatus && $heartbeatIsFresh) {
+                return [$before, $availability->fresh(), false];
+            }
+
+            $shouldDisconnect = $socketStatus === 'offline'
+                && $availability->socket_status !== 'offline';
 
             $availability->update([
                 'socket_status' => $socketStatus,
                 'call_status' => $socketStatus === 'offline' && $availability->call_status !== 'busy'
                     ? 'available'
                     : $availability->call_status,
-                'last_seen_at' => now(),
+                'last_seen_at' => $now,
             ]);
 
             Log::info('HOST_AVAILABILITY_SOCKET_STATUS', [
-                'user_id' => $userId,
+                'user_id' => $user->id,
                 'socket_status' => $socketStatus,
                 'current_call_session_id' => $availability->current_call_session_id,
             ]);
 
-            if ($socketStatus === 'offline') {
-                app(CallSessionService::class)->handleDisconnect($userId);
-                $availability->refresh();
-            }
-
-            $fresh = $availability->fresh();
-            $this->publishAvailability($fresh);
-            $this->notifications->handleAvailabilityTransition($user, $before, $fresh);
-            return $fresh;
+            return [$before, $availability->fresh(), true];
         });
+
+        if (!$changed) {
+            return $fresh;
+        }
+
+        if ($shouldDisconnect) {
+            app(CallSessionService::class)->handleDisconnect($userId);
+            $fresh = $fresh->fresh();
+        }
+
+        $this->publishAvailability($fresh);
+        $this->notifications->handleAvailabilityTransition($user, $before, $fresh);
+
+        return $fresh;
     }
 
     public function setCallStatus(int $userId, string $callStatus, ?int $callSessionId = null): HostAvailability
