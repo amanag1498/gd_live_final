@@ -21,7 +21,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:livekit_client/livekit_client.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart'
-    show Helper, RTCVideoRenderer, RTCVideoView, RTCVideoViewObjectFit;
+    show RTCVideoRenderer, RTCVideoView, RTCVideoViewObjectFit;
 import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
 
 import '../../banners/models/banner_item.dart';
@@ -37,6 +37,7 @@ import '../../../app/widgets/app_avatar.dart';
 import '../../../app/widgets/keep_awake_scope.dart';
 import '../../../services/app_settings_service.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/call_audio_route.dart';
 import '../../../services/live_rooms_ws_service.dart';
 import '../../../services/livekit_video_quality.dart';
 import '../../games/teen_patti/widgets/teen_patti_game_panel.dart';
@@ -594,11 +595,8 @@ class _VideoCallPageState extends State<VideoCallPage>
     if (_audioRouteSyncInFlight) return;
     _audioRouteSyncInFlight = true;
     try {
-      await Helper.setSpeakerphoneOnButPreferBluetooth();
+      await CallAudioRoute.preferBluetoothOrSpeaker();
     } catch (_) {
-      try {
-        await Helper.setSpeakerphoneOn(true);
-      } catch (_) {}
     } finally {
       _audioRouteSyncInFlight = false;
     }
@@ -618,6 +616,7 @@ class _VideoCallPageState extends State<VideoCallPage>
     });
 
     try {
+      await CallAudioRoute.prepare();
       final room = Room(
         roomOptions: LiveKitVideoQuality.roomOptions,
         connectOptions: const ConnectOptions(autoSubscribe: true),

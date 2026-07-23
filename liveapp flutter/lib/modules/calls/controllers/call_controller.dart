@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart' show Helper;
 import 'package:get/get.dart';
 import 'package:livekit_client/livekit_client.dart';
 
@@ -12,6 +11,7 @@ import '../../../app/brand/brand.dart';
 import '../../../app/widgets/coin_lottie.dart';
 import '../../../app/widgets/haptics.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/call_audio_route.dart';
 import '../../../services/call_service.dart';
 import '../../../services/call_socket_service.dart';
 import '../../../services/livekit_video_quality.dart';
@@ -50,6 +50,7 @@ class AppCallController extends GetxController with WidgetsBindingObserver {
   bool _isExitingCall = false;
   bool _terminalStateHandled = false;
   bool _roomBusy = false;
+  bool _audioRouteSyncInFlight = false;
   String? _callOriginRoute;
   LiveRoomModel? _returnLiveRoom;
   bool _returnLiveRoomViewerOnly = false;
@@ -516,6 +517,7 @@ class AppCallController extends GetxController with WidgetsBindingObserver {
     roomConnecting.value = true;
     roomError.value = '';
     try {
+      await CallAudioRoute.prepare();
       final room = Room(roomOptions: LiveKitVideoQuality.callOptions);
       final listener = room.createListener();
       _bindRoomEvents(room, listener);
@@ -531,7 +533,7 @@ class AppCallController extends GetxController with WidgetsBindingObserver {
       speakerOn.value = true;
       await room.localParticipant?.setMicrophoneEnabled(micOn.value);
       await room.localParticipant?.setCameraEnabled(shouldUseCamera);
-      await Helper.setSpeakerphoneOn(speakerOn.value);
+      await _applyPreferredAudioRoute();
 
       _room = room;
       _roomListener = listener;
@@ -559,10 +561,11 @@ class AppCallController extends GetxController with WidgetsBindingObserver {
         reconnecting.value = true;
         roomRevision.value++;
       })
-      ..on<RoomReconnectedEvent>((_) {
+      ..on<RoomReconnectedEvent>((_) async {
         reconnecting.value = false;
         roomError.value = '';
         roomRevision.value++;
+        await _applyPreferredAudioRoute();
       })
       ..on<ParticipantConnectedEvent>((_) => roomRevision.value++)
       ..on<ParticipantDisconnectedEvent>((_) => roomRevision.value++)
@@ -594,9 +597,23 @@ class AppCallController extends GetxController with WidgetsBindingObserver {
 
   Future<void> toggleSpeaker() async {
     final next = !speakerOn.value;
-    await Helper.setSpeakerphoneOn(next);
     speakerOn.value = next;
+    if (next) {
+      await _applyPreferredAudioRoute();
+    } else {
+      await CallAudioRoute.useEarpiece();
+    }
     await Haptics.selection();
+  }
+
+  Future<void> _applyPreferredAudioRoute() async {
+    if (_audioRouteSyncInFlight || !speakerOn.value) return;
+    _audioRouteSyncInFlight = true;
+    try {
+      await CallAudioRoute.preferBluetoothOrSpeaker();
+    } finally {
+      _audioRouteSyncInFlight = false;
+    }
   }
 
   Future<void> minimizeCall() async {
@@ -1495,7 +1512,10 @@ class AppCallController extends GetxController with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       restartSocket();
       if (hasActiveCall && callToken.value != null) {
-        ensureRoomConnected();
+        unawaited(() async {
+          await ensureRoomConnected();
+          await _applyPreferredAudioRoute();
+        }());
       }
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
