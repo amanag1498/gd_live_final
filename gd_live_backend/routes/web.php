@@ -61,6 +61,9 @@ Route::get('/media/gift/{path}', [MediaController::class, 'gift'])
 Route::get('/media/entry-pack/{path}', [MediaController::class, 'entryPack'])
     ->where('path', '.*')
     ->name('media.entry-pack');
+Route::get('/media/banner/{path}', [MediaController::class, 'banner'])
+    ->where('path', '.*')
+    ->name('media.banner');
 Route::post('/auth/firebase/login', [FirebaseAuthController::class, 'login'])->name('auth.firebase.login');
 Route::post('/logout', [FirebaseAuthController::class, 'logout'])->middleware('auth')->name('logout');
 
