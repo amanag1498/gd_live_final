@@ -184,7 +184,7 @@ class BannerAdminController extends Controller
     private function validateData(Request $request, bool $isUpdate): array
     {
         $data = $request->validate([
-            'title' => 'required|string|max:120',
+            'title' => 'nullable|string|max:120',
             'image_file' => [$isUpdate ? 'nullable' : 'required_without:image_url', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
             'image_url' => [$isUpdate ? 'nullable' : 'required_without:image_file', 'nullable', 'string', 'max:2048'],
             'target_url' => 'nullable|string|max:2048',

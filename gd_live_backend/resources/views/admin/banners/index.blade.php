@@ -99,13 +99,13 @@
                 <div class="flex items-start gap-4">
                   <div class="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950">
                     @if($previewUrl !== '')
-                      <img src="{{ $previewUrl }}" alt="{{ $banner->title }}" class="h-full w-full object-cover">
+                      <img src="{{ $previewUrl }}" alt="{{ $banner->title ?: 'Banner image' }}" class="h-full w-full object-cover">
                     @else
                       <span class="text-xs text-gray-400 dark:text-gray-500">No image</span>
                     @endif
                   </div>
                   <div class="min-w-0 space-y-1">
-                    <div class="font-semibold text-gray-900 dark:text-white">{{ $banner->title }}</div>
+                    <div class="font-semibold text-gray-900 dark:text-white">{{ $banner->title ?: 'Untitled banner' }}</div>
                     <div class="text-xs text-gray-500 dark:text-gray-400">Banner #{{ $banner->id }}</div>
                     @if($banner->button_text)
                       <x-ui.badge color="dark">{{ $banner->button_text }}</x-ui.badge>

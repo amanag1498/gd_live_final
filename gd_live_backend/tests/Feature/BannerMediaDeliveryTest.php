@@ -51,4 +51,30 @@ class BannerMediaDeliveryTest extends TestCase
             ->assertOk()
             ->assertHeader('Content-Type', 'image/png');
     }
+
+    public function test_banner_title_can_be_omitted(): void
+    {
+        $banner = Banner::query()->create([
+            'title' => null,
+            'image_url' => 'https://cdn.example/banner.webp',
+            'placement' => 'home',
+            'action_type' => 'none',
+            'platforms' => [],
+            'target_roles' => [],
+            'is_active' => true,
+        ]);
+
+        $this->assertDatabaseHas('banners', [
+            'id' => $banner->id,
+            'title' => null,
+        ]);
+
+        $this->getJson('/api/banners?placement=home')
+            ->assertOk()
+            ->assertJsonFragment([
+                'id' => $banner->id,
+                'title' => null,
+                'image_url' => 'https://cdn.example/banner.webp',
+            ]);
+    }
 }

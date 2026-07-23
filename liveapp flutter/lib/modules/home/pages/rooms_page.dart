@@ -400,13 +400,11 @@ class _VideoBannerStrip extends StatefulWidget {
   State<_VideoBannerStrip> createState() => _VideoBannerStripState();
 }
 
-class _VideoBannerStripState extends State<_VideoBannerStrip>
-    with SingleTickerProviderStateMixin {
+class _VideoBannerStripState extends State<_VideoBannerStrip> {
   static const EdgeInsets _outerPadding = EdgeInsets.fromLTRB(6, 8, 6, 4);
   static const double _bannerHeight = 208;
 
   late final PageController _pc = PageController(viewportFraction: 1);
-  late final AnimationController _flow;
   Timer? _ticker;
   int _index = 0;
   bool _loading = true;
@@ -422,10 +420,6 @@ class _VideoBannerStripState extends State<_VideoBannerStrip>
   @override
   void initState() {
     super.initState();
-    _flow = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 7),
-    )..repeat();
     _loadBanners();
     _startTicker();
   }
@@ -433,7 +427,6 @@ class _VideoBannerStripState extends State<_VideoBannerStrip>
   @override
   void dispose() {
     _ticker?.cancel();
-    _flow.dispose();
     _pc.dispose();
     super.dispose();
   }
@@ -564,129 +557,89 @@ class _VideoBannerStripState extends State<_VideoBannerStrip>
                               ),
                             ),
                           ),
-                        Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(18),
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors:
-                                  banners[i].hasImage
-                                      ? const [
-                                        Color(0x2B06040C),
-                                        Color(0x8A151020),
-                                        Color(0xCC1E1731),
-                                      ]
-                                      : [
-                                        tokens.cardGradient.first,
-                                        tokens.cardGradient.last,
-                                        tokens.primaryButtonGradient.last
-                                            .withOpacity(.78),
-                                      ],
-                            ),
-                            border: Border.all(
-                              color: tokens.borderColor.withOpacity(.46),
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(.28),
-                                blurRadius: 14,
-                                offset: const Offset(0, 6),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Positioned.fill(
-                          child: IgnorePointer(
-                            child: AnimatedBuilder(
-                              animation: _flow,
-                              builder: (_, __) {
-                                final x = (_flow.value * 2) - 1;
-                                return Transform.translate(
-                                  offset: Offset(x * 26, 0),
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          Colors.transparent,
-                                          Colors.white.withOpacity(.04),
-                                          Colors.transparent,
-                                        ],
-                                        stops: const [0.3, 0.5, 0.7],
-                                      ),
-                                    ),
+                        if (banners[i].hasImage &&
+                            banners[i].title.trim().isNotEmpty)
+                          Positioned(
+                            top: 12,
+                            left: 14,
+                            right: 14,
+                            child: Text(
+                              _shortTitle(banners[i].title),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 18,
+                                shadows: [
+                                  Shadow(
+                                    color: Color(0xD9000000),
+                                    blurRadius: 8,
+                                    offset: Offset(0, 2),
                                   ),
-                                );
-                              },
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 12,
+                        if (!banners[i].hasImage) ...[
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(18),
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  tokens.cardGradient.first,
+                                  tokens.cardGradient.last,
+                                  tokens.primaryButtonGradient.last.withOpacity(
+                                    .78,
+                                  ),
+                                ],
+                              ),
+                              border: Border.all(
+                                color: tokens.borderColor.withOpacity(.46),
+                              ),
+                            ),
                           ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _shortTitle(banners[i].title),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _shortTitle(banners[i].title),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                                if (banners[i].buttonText?.trim().isNotEmpty ??
+                                    false)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      banners[i].buttonText!,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 18,
+                                      style: TextStyle(
+                                        color: tokens.textSecondary.withOpacity(
+                                          .84,
+                                        ),
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 11.5,
                                       ),
                                     ),
-                                    if (banners[i].buttonText
-                                            ?.trim()
-                                            .isNotEmpty ??
-                                        false)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 2),
-                                        child: Text(
-                                          banners[i].buttonText!,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            color: tokens.textSecondary
-                                                .withOpacity(.84),
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 11.5,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              if ((banners[i].actionType.toLowerCase() !=
-                                      'none') &&
-                                  (banners[i].actionValue?.trim().isNotEmpty ??
-                                      false))
-                                Container(
-                                  width: 30,
-                                  height: 30,
-                                  decoration: BoxDecoration(
-                                    color: tokens.glassColor.withOpacity(.18),
-                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: const Icon(
-                                    Icons.arrow_outward_rounded,
-                                    color: Colors.white,
-                                    size: 15,
-                                  ),
-                                ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),

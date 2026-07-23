@@ -65,8 +65,8 @@
 
       <div class="grid gap-4 lg:grid-cols-12">
         <div class="lg:col-span-6">
-          <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Title</label>
-          <input name="title" class="{{ $inputClass }}" value="{{ old('title', $banner->title) }}" required maxlength="120">
+          <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Title <span class="font-normal text-gray-400">(optional)</span></label>
+          <input name="title" class="{{ $inputClass }}" value="{{ old('title', $banner->title) }}" maxlength="120">
         </div>
         <div class="lg:col-span-6">
           <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Upload New Image</label>

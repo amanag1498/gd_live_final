@@ -998,12 +998,7 @@ class _VideoCallPageState extends State<VideoCallPage>
 
   Future<void> _endSession() async {
     if (_exiting) return;
-    final ok = await _showActionSheet(
-      title: 'End Live',
-      message: 'This will end the live room for everyone.',
-      primaryLabel: 'End Live',
-      destructive: true,
-    );
+    final ok = await _showEndLiveDialog();
     if (ok != true) return;
 
     _exiting = true;
@@ -2264,6 +2259,104 @@ class _VideoCallPageState extends State<VideoCallPage>
       message: trimmed,
     );
     return null;
+  }
+
+  Future<bool?> _showEndLiveDialog() {
+    return showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(.72),
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: GdModalSurface(
+            tokens: _tokens,
+            maxWidth: 380,
+            maxHeightFactor: .72,
+            radius: 28,
+            showHandle: false,
+            padding: const EdgeInsets.fromLTRB(22, 24, 22, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 62,
+                  height: 62,
+                  decoration: BoxDecoration(
+                    color: _tokens.dangerColor.withOpacity(.12),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _tokens.dangerColor.withOpacity(.22),
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.stop_circle_outlined,
+                    color: _tokens.dangerColor,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'End Live?',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _tokens.textPrimary,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 22,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'This will end the live room for everyone.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _tokens.textSecondary.withOpacity(.9),
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed:
+                            () => Navigator.of(dialogContext).pop(false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _tokens.textPrimary,
+                          side: BorderSide(color: _tokens.borderColor),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(true),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _tokens.dangerColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text('End Live'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<bool?> _showActionSheet({
@@ -5119,6 +5212,7 @@ class _VideoCallPageState extends State<VideoCallPage>
     final pad = media.padding;
     final isCompactDevice =
         media.size.width < 360 || media.size.height < 760;
+    final isNarrowScreen = media.size.width < 360;
     final stageTiles = widget.devMode && _room == null ? _devStageTiles() : _stageTiles();
     final inlineError =
         _seatError ?? _giftError ?? _pkOverlaySubtitle ?? _error;
@@ -5248,9 +5342,12 @@ class _VideoCallPageState extends State<VideoCallPage>
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: isNarrowScreen ? 5 : 8),
                         _TopRightExitPill(
-                          label: _isHost ? 'End Live' : 'Leave',
+                          label:
+                              _isHost
+                                  ? (isNarrowScreen ? 'End' : 'End Live')
+                                  : 'Leave',
                           accent: _isHost ? Colors.redAccent : null,
                           onTap: () async {
                             if (_isHost) {
@@ -6012,8 +6109,14 @@ class _FooterCircleAction extends StatelessWidget {
         accent ??
         (active
             ? tokens.primaryButtonGradient.first
-            : tokens.chipColor.withOpacity(.92));
+            : const Color(0xFF183047));
     final canTap = onTap != null && !disabled && !busy;
+    final surface =
+        Color.lerp(
+          const Color(0xFF0B1B2B),
+          tint,
+          active || accent != null ? .28 : .10,
+        )!;
 
     return Stack(
       clipBehavior: Clip.none,
@@ -6027,9 +6130,16 @@ class _FooterCircleAction extends StatelessWidget {
               width: 46,
               height: 46,
               decoration: BoxDecoration(
-                color: tint.withOpacity(active || accent != null ? .18 : .12),
+                color: surface,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: tint.withOpacity(.34)),
+                border: Border.all(color: tint.withOpacity(.88), width: 1.2),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x70000000),
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
               ),
               child: Center(
                 child:
@@ -6039,8 +6149,8 @@ class _FooterCircleAction extends StatelessWidget {
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              tokens.textPrimary,
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              Colors.white,
                             ),
                           ),
                         )
@@ -6049,7 +6159,7 @@ class _FooterCircleAction extends StatelessWidget {
                           child: Icon(
                             icon,
                             size: 20,
-                            color: tokens.textPrimary,
+                            color: Colors.white,
                           ),
                         ),
               ),
@@ -6198,16 +6308,18 @@ class _ResponsiveChatInputAction extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    const Color(0xFF112134).withOpacity(.82),
-                    Color.lerp(const Color(0xFF1F3550), tint, .22)!.withOpacity(.72),
+                    const Color(0xFF0B1B2B),
+                    Color.lerp(const Color(0xFF1F3550), tint, .30)!,
                   ],
                 ),
-                color: const Color(0xFF0C1524).withOpacity(.78),
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: Colors.white.withOpacity(.24)),
+                border: Border.all(
+                  color: Color.lerp(Colors.white, tint, .45)!,
+                  width: 1.2,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF050A12).withOpacity(.20),
+                    color: const Color(0xFF050A12).withOpacity(.72),
                     blurRadius: 14,
                     offset: const Offset(0, 4),
                   ),
@@ -6360,11 +6472,18 @@ class _ExpandableFooterClusterState extends State<_ExpandableFooterCluster> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: tokens.glassColor.withOpacity(.14),
+                      color: const Color(0xFF081725),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: tokens.borderColor.withOpacity(.22),
+                        color: Colors.white.withOpacity(.72),
                       ),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x80000000),
+                          blurRadius: 16,
+                          offset: Offset(0, 6),
+                        ),
+                      ],
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -7204,6 +7323,7 @@ class _LiveRoomInfoPill extends StatelessWidget {
     );
     final width = MediaQuery.sizeOf(context).width;
     final compact = width < 390;
+    final narrow = width < 360;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -7219,10 +7339,10 @@ class _LiveRoomInfoPill extends StatelessWidget {
                   filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                   child: Container(
                     padding: EdgeInsets.fromLTRB(
-                      compact ? 10 : 11,
-                      compact ? 8 : 9,
-                      compact ? 12 : 13,
-                      compact ? 8 : 9,
+                      narrow ? 7 : (compact ? 9 : 11),
+                      narrow ? 6 : (compact ? 8 : 9),
+                      narrow ? 8 : (compact ? 10 : 13),
+                      narrow ? 6 : (compact ? 8 : 9),
                     ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(24),
@@ -7282,24 +7402,26 @@ class _LiveRoomInfoPill extends StatelessWidget {
                             ),
                           ],
                         ),
-                        SizedBox(width: compact ? 10 : 12),
+                        SizedBox(width: narrow ? 6 : (compact ? 9 : 12)),
                         Flexible(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                hostName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(.97),
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: compact ? 11.6 : 12.3,
-                                  letterSpacing: .05,
+                              if (!narrow) ...[
+                                Text(
+                                  hostName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(.97),
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: compact ? 11.6 : 12.3,
+                                    letterSpacing: .05,
+                                  ),
                                 ),
-                              ),
-                              SizedBox(height: compact ? 4 : 5),
+                                SizedBox(height: compact ? 4 : 5),
+                              ],
                               _LiveHudSubPill(
                                 icon: Icons.schedule_rounded,
                                 label: liveLabel,
@@ -7317,7 +7439,7 @@ class _LiveRoomInfoPill extends StatelessWidget {
             ),
           ),
         ),
-        SizedBox(width: compact ? 7 : 8),
+        SizedBox(width: narrow ? 4 : (compact ? 6 : 8)),
         _LiveHudMetricPill(
           icon: Icons.visibility_rounded,
           label: '$participantCount',
@@ -7345,7 +7467,7 @@ class _LiveRoomPillAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = compact ? 38.0 : 42.0;
+    final size = compact ? 34.0 : 42.0;
     final initial = name.trim().isNotEmpty
         ? name.trim().characters.first.toUpperCase()
         : 'H';
@@ -7416,7 +7538,7 @@ class _LiveHudSubPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 8 : 9,
+        horizontal: compact ? 6 : 9,
         vertical: compact ? 4 : 4.5,
       ),
       decoration: BoxDecoration(
@@ -7474,10 +7596,10 @@ class _LiveHudMetricPill extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(22),
         child: ConstrainedBox(
-          constraints: BoxConstraints(minWidth: compact ? 70 : 78),
+          constraints: BoxConstraints(minWidth: compact ? 56 : 78),
           child: Ink(
             padding: EdgeInsets.symmetric(
-              horizontal: compact ? 10 : 11,
+              horizontal: compact ? 7 : 11,
               vertical: compact ? 8 : 9,
             ),
             decoration: BoxDecoration(
@@ -9051,131 +9173,125 @@ class _LiveInRoomBannerState extends State<_LiveInRoomBanner> {
     String? imageUrl, {
     required bool hasAction,
   }) {
+    final hasImage = imageUrl != null;
     return ClipRRect(
       borderRadius: BorderRadius.circular(22),
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (imageUrl != null)
+          if (hasImage)
             Image.network(
               imageUrl,
-              fit: BoxFit.cover,
+              fit: BoxFit.contain,
               errorBuilder: (_, __, ___) => const SizedBox.shrink(),
             ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors:
-                    imageUrl == null
-                        ? const [
-                          Color(0xE2191231),
-                          Color(0xE4362058),
-                          Color(0xE2502F85),
-                        ]
-                        : const [
-                          Color(0x6E12091F),
-                          Color(0xAF1F1336),
-                          Color(0xD2281850),
-                        ],
-              ),
-              border: Border.all(color: Colors.white.withOpacity(.20)),
-              borderRadius: BorderRadius.circular(22),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(.4), blurRadius: 18),
-              ],
-            ),
-          ),
-          Positioned(
-            right: -18,
-            top: -20,
-            child: Container(
-              width: 88,
-              height: 88,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(.09),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(.14),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.campaign_rounded,
-                    color: Colors.white,
-                    size: 18,
-                  ),
+          if (hasImage && title.trim().isNotEmpty)
+            Positioned(
+              top: 10,
+              left: 12,
+              right: 40,
+              child: Text(
+                title.trim(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                  shadows: [
+                    Shadow(
+                      color: Color(0xD9000000),
+                      blurRadius: 7,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'LIVE UPDATE',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(.72),
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1,
-                          fontSize: 9.5,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 14,
-                        ),
-                      ),
-                      if (sub != null && sub.isNotEmpty)
+              ),
+            ),
+          if (!hasImage) ...[
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xE2191231),
+                    Color(0xE4362058),
+                    Color(0xE2502F85),
+                  ],
+                ),
+                border: Border.all(color: Colors.white.withOpacity(.20)),
+                borderRadius: BorderRadius.circular(22),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(.14),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.campaign_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
                         Text(
-                          sub,
+                          title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 10.8,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 14,
                           ),
                         ),
-                    ],
-                  ),
-                ),
-                if (hasAction)
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(.12),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: Colors.white.withOpacity(.24)),
-                    ),
-                    child: const Icon(
-                      Icons.chevron_right_rounded,
-                      color: Colors.white,
-                      size: 16,
+                        if (sub != null && sub.isNotEmpty)
+                          Text(
+                            sub,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 10.8,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-              ],
+                  if (hasAction)
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(.12),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(.24),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.chevron_right_rounded,
+                          color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
