@@ -2122,6 +2122,7 @@ class _GreedyResultDialogState extends State<_GreedyResultDialog>
           radius: 28,
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           scrollable: true,
+          transparentSurface: true,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -2206,12 +2207,20 @@ class _GreedyResultDialogState extends State<_GreedyResultDialog>
                       gradient: LinearGradient(
                         colors: [
                           accent.withValues(alpha: .16),
-                          const Color(0xFFF7FCF8),
+                          accent.withValues(alpha: .05),
+                          Colors.transparent,
                         ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                       ),
                       border: Border.all(color: accent.withValues(alpha: .34)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: accent.withValues(alpha: .10),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
                     ),
                     child: Stack(
                       alignment: Alignment.center,

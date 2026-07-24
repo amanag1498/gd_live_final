@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -121,7 +122,13 @@ class _GdLoginView extends GetView<AuthController> {
                                   tokens: tokens,
                                   loading: loading,
                                   error: error,
-                                  onPressed: controller.loginWithGoogle,
+                                  onGooglePressed: controller.loginWithGoogle,
+                                  onApplePressed:
+                                      !kIsWeb &&
+                                              defaultTargetPlatform ==
+                                                  TargetPlatform.iOS
+                                          ? controller.loginWithApple
+                                          : null,
                                 ),
                               ],
                             );
@@ -145,13 +152,15 @@ class _SignInDock extends StatelessWidget {
     required this.tokens,
     required this.loading,
     required this.error,
-    required this.onPressed,
+    required this.onGooglePressed,
+    this.onApplePressed,
   });
 
   final BrandTokens tokens;
   final bool loading;
   final String error;
-  final VoidCallback onPressed;
+  final VoidCallback onGooglePressed;
+  final VoidCallback? onApplePressed;
 
   @override
   Widget build(BuildContext context) {
@@ -167,78 +176,113 @@ class _SignInDock extends StatelessWidget {
           ),
           const SizedBox(height: 16),
         ],
-        Container(
-          height: 58,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(.86),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: tokens.borderColor.withOpacity(.34)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(.03),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-              ),
-            ],
+        _AuthButton(
+          label: 'Sign in with Google',
+          loading: loading,
+          onPressed: onGooglePressed,
+          tokens: tokens,
+          leading: Image.asset('assets/logos/google-icon.png'),
+        ),
+        if (onApplePressed != null) ...[
+          const SizedBox(height: 12),
+          _AuthButton(
+            label: 'Sign in with Apple',
+            loading: loading,
+            onPressed: onApplePressed!,
+            tokens: tokens,
+            dark: true,
+            leading: const Icon(Icons.apple, color: Colors.white, size: 25),
           ),
-          child: TextButton(
-            onPressed: loading ? null : onPressed,
-            style: TextButton.styleFrom(
-              backgroundColor: Colors.transparent,
-              foregroundColor: tokens.textPrimary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-            ),
-            child:
-                loading
-                    ? SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.4,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          tokens.primaryButtonGradient.first,
+        ],
+      ],
+    );
+  }
+}
+
+class _AuthButton extends StatelessWidget {
+  const _AuthButton({
+    required this.label,
+    required this.loading,
+    required this.onPressed,
+    required this.tokens,
+    required this.leading,
+    this.dark = false,
+  });
+
+  final String label;
+  final bool loading;
+  final VoidCallback onPressed;
+  final BrandTokens tokens;
+  final Widget leading;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 58,
+      decoration: BoxDecoration(
+        color: dark ? Colors.black : Colors.white.withOpacity(.86),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: tokens.borderColor.withOpacity(.34)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(.03),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: TextButton(
+        onPressed: loading ? null : onPressed,
+        style: TextButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          foregroundColor: dark ? Colors.white : tokens.textPrimary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+        ),
+        child:
+            loading
+                ? SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.4,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      tokens.primaryButtonGradient.first,
+                    ),
+                  ),
+                )
+                : Row(
+                  children: [
+                    SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: Center(child: leading),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          color: dark ? Colors.white : tokens.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    )
-                    : Row(
-                      children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: tokens.borderColor.withOpacity(.24),
-                            ),
-                          ),
-                          child: Image.asset('assets/logos/google-icon.png'),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Text(
-                            'Sign in with Google',
-                            style: TextStyle(
-                              color: tokens.textPrimary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          size: 20,
-                          color: tokens.textSecondary,
-                        ),
-                      ],
                     ),
-          ),
-        ),
-      ],
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color:
+                          dark
+                              ? Colors.white.withOpacity(.7)
+                              : tokens.textSecondary,
+                    ),
+                  ],
+                ),
+      ),
     );
   }
 }

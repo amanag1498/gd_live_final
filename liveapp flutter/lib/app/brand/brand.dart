@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 const kGdLivePrimary = Color(0xFF06B430);
 const kGdLiveBg = Color(0xFFF2FBF4);
@@ -130,9 +129,7 @@ ThemeData gdLiveDarkTheme([String? brandKey]) {
     scheme,
     tokens,
     isDark: true,
-  ).copyWith(
-    scaffoldBackgroundColor: tokens.backgroundGradient.first,
-  );
+  ).copyWith(scaffoldBackgroundColor: tokens.backgroundGradient.first);
 }
 
 ThemeData _baseTheme(
@@ -142,23 +139,45 @@ ThemeData _baseTheme(
 }) {
   final baseText =
       isDark ? Typography.whiteMountainView : Typography.blackMountainView;
-  final baseTypography = GoogleFonts.plusJakartaSansTextTheme(baseText);
+  final baseTypography = baseText;
   final textTheme = baseTypography.copyWith(
-    displayLarge: baseTypography.displayLarge?.copyWith(fontWeight: FontWeight.w800),
-    displayMedium: baseTypography.displayMedium?.copyWith(fontWeight: FontWeight.w800),
-    displaySmall: baseTypography.displaySmall?.copyWith(fontWeight: FontWeight.w800),
-    headlineLarge: baseTypography.headlineLarge?.copyWith(fontWeight: FontWeight.w800),
-    headlineMedium: baseTypography.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
-    headlineSmall: baseTypography.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
-    titleLarge: baseTypography.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-    titleMedium: baseTypography.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-    titleSmall: baseTypography.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+    displayLarge: baseTypography.displayLarge?.copyWith(
+      fontWeight: FontWeight.w800,
+    ),
+    displayMedium: baseTypography.displayMedium?.copyWith(
+      fontWeight: FontWeight.w800,
+    ),
+    displaySmall: baseTypography.displaySmall?.copyWith(
+      fontWeight: FontWeight.w800,
+    ),
+    headlineLarge: baseTypography.headlineLarge?.copyWith(
+      fontWeight: FontWeight.w800,
+    ),
+    headlineMedium: baseTypography.headlineMedium?.copyWith(
+      fontWeight: FontWeight.w800,
+    ),
+    headlineSmall: baseTypography.headlineSmall?.copyWith(
+      fontWeight: FontWeight.w800,
+    ),
+    titleLarge: baseTypography.titleLarge?.copyWith(
+      fontWeight: FontWeight.w700,
+    ),
+    titleMedium: baseTypography.titleMedium?.copyWith(
+      fontWeight: FontWeight.w700,
+    ),
+    titleSmall: baseTypography.titleSmall?.copyWith(
+      fontWeight: FontWeight.w700,
+    ),
     labelLarge: baseTypography.labelLarge?.copyWith(
       fontWeight: FontWeight.w700,
       letterSpacing: .2,
     ),
-    labelMedium: baseTypography.labelMedium?.copyWith(fontWeight: FontWeight.w700),
-    labelSmall: baseTypography.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+    labelMedium: baseTypography.labelMedium?.copyWith(
+      fontWeight: FontWeight.w700,
+    ),
+    labelSmall: baseTypography.labelSmall?.copyWith(
+      fontWeight: FontWeight.w700,
+    ),
     bodyLarge: baseTypography.bodyLarge?.copyWith(height: 1.25),
     bodyMedium: baseTypography.bodyMedium?.copyWith(height: 1.25),
     bodySmall: baseTypography.bodySmall?.copyWith(height: 1.25),
@@ -168,7 +187,6 @@ ThemeData _baseTheme(
     useMaterial3: true,
     colorScheme: colorScheme,
     visualDensity: VisualDensity.adaptivePlatformDensity,
-    fontFamily: GoogleFonts.plusJakartaSans().fontFamily,
     textTheme: textTheme,
     appBarTheme: AppBarTheme(
       backgroundColor: Colors.transparent,
@@ -246,8 +264,7 @@ ThemeData _baseTheme(
       ),
     ),
     chipTheme: ChipThemeData(
-      backgroundColor:
-          isDark ? tokens.chipColor : const Color(0xFFEDE5FA),
+      backgroundColor: isDark ? tokens.chipColor : const Color(0xFFEDE5FA),
       labelStyle: textTheme.labelLarge!.copyWith(
         color: isDark ? Colors.white : const Color(0xFF3E256D),
       ),
@@ -257,8 +274,7 @@ ThemeData _baseTheme(
         color: isDark ? Colors.white12 : const Color(0xFFE3D9F6),
       ),
       iconTheme: IconThemeData(
-        color:
-            isDark ? Colors.white : tokens.primaryButtonGradient.first,
+        color: isDark ? Colors.white : tokens.primaryButtonGradient.first,
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
@@ -285,9 +301,10 @@ ThemeData _baseTheme(
       height: 68,
     ),
     bottomSheetTheme: BottomSheetThemeData(
-      backgroundColor: (isDark ? colorScheme.surface : Colors.white).withOpacity(.92),
-      modalBackgroundColor:
-          (isDark ? colorScheme.surface : Colors.white).withOpacity(.96),
+      backgroundColor: (isDark ? colorScheme.surface : Colors.white)
+          .withOpacity(.92),
+      modalBackgroundColor: (isDark ? colorScheme.surface : Colors.white)
+          .withOpacity(.96),
       elevation: 0,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(_rXl)),

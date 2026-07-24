@@ -2,12 +2,18 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import 'storage_service.dart';
 import '../services/device_id_service.dart';
 import 'app_settings_service.dart';
 
 class ApiClient {
+  static const bool _verboseApiLogs = bool.fromEnvironment(
+    'VERBOSE_API_LOGS',
+    defaultValue: false,
+  );
+
   final Dio dio;
   final StorageService storage;
 
@@ -42,7 +48,7 @@ class ApiClient {
           }
 
           options.headers['X-Client-Platform'] =
-              AppSettingsService.androidPlatform;
+              AppSettingsService.clientPlatform;
           options.headers['X-App-Version'] = AppSettingsService.appVersionName;
           options.headers['X-App-Version-Code'] =
               AppSettingsService.appVersionCode.toString();
@@ -56,6 +62,11 @@ class ApiClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (o, h) {
+          if (!(kDebugMode && _verboseApiLogs)) {
+            h.next(o);
+            return;
+          }
+
           String pretty(dynamic v) {
             try {
               return const JsonEncoder.withIndent('  ').convert(v);
@@ -82,6 +93,11 @@ class ApiClient {
           h.next(o);
         },
         onResponse: (r, h) {
+          if (!(kDebugMode && _verboseApiLogs)) {
+            h.next(r);
+            return;
+          }
+
           String pretty(dynamic v) {
             try {
               return const JsonEncoder.withIndent('  ').convert(v);
@@ -99,6 +115,11 @@ class ApiClient {
           h.next(r);
         },
         onError: (e, h) {
+          if (!kDebugMode) {
+            h.next(e);
+            return;
+          }
+
           String pretty(dynamic v) {
             try {
               return const JsonEncoder.withIndent('  ').convert(v);
@@ -228,7 +249,7 @@ class ApiClient {
 
   Future<String> _getDeviceId() async {
     if (_cachedDeviceId != null) return _cachedDeviceId!;
-    _fetchInFlight ??= DeviceIdService.getAndroidId();
+    _fetchInFlight ??= DeviceIdService.getDeviceId();
     final id = await _fetchInFlight!;
     _cachedDeviceId = id;
     _fetchInFlight = null;

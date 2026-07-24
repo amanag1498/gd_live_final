@@ -79,6 +79,9 @@ function defaultAppConfig() {
     android_min_version_code: 1,
     android_min_version_name: '1.0.0',
     android_update_message: 'Please update GD Live to continue using the app.',
+    ios_min_version_code: 1,
+    ios_min_version_name: '1.0.0',
+    ios_update_message: 'Please update GD Live from the App Store to continue.',
     features: {
       video_rooms_enabled: true,
       pk_battles_enabled: true,
@@ -91,6 +94,42 @@ function defaultAppConfig() {
       greedy_enabled: false,
       video_room_games_enabled: false,
     },
+    platforms: {
+      android: {
+        minimum_version_code: 1,
+        minimum_version_name: '1.0.0',
+        update_message: 'Please update GD Live to continue using the app.',
+        features: {
+          video_rooms_enabled: true,
+          pk_battles_enabled: true,
+          gifts_enabled: true,
+          subscriptions_enabled: true,
+          entry_effects_enabled: true,
+          wallet_recharge_enabled: true,
+          host_calling_enabled: true,
+          teen_patti_enabled: false,
+          greedy_enabled: false,
+          video_room_games_enabled: false,
+        },
+      },
+      ios: {
+        minimum_version_code: 1,
+        minimum_version_name: '1.0.0',
+        update_message: 'Please update GD Live from the App Store to continue.',
+        features: {
+          video_rooms_enabled: true,
+          pk_battles_enabled: true,
+          gifts_enabled: true,
+          subscriptions_enabled: true,
+          entry_effects_enabled: true,
+          wallet_recharge_enabled: true,
+          host_calling_enabled: true,
+          teen_patti_enabled: false,
+          greedy_enabled: false,
+          video_room_games_enabled: false,
+        },
+      },
+    },
   };
 }
 
@@ -98,6 +137,37 @@ function normalizeAppConfig(payload) {
   const input = payload && typeof payload === 'object' ? payload : {};
   const features = input.features && typeof input.features === 'object' ? input.features : {};
   const defaults = defaultAppConfig();
+  const inputPlatforms = input.platforms && typeof input.platforms === 'object'
+    ? input.platforms
+    : {};
+  const platforms = {};
+  for (const platform of ['android', 'ios']) {
+    const platformInput = inputPlatforms[platform] && typeof inputPlatforms[platform] === 'object'
+      ? inputPlatforms[platform]
+      : {};
+    const legacyFeatures = platform === 'android' ? features : {};
+    platforms[platform] = {
+      ...defaults.platforms[platform],
+      minimum_version_code: platform === 'ios'
+        ? input.ios_min_version_code ?? defaults.platforms.ios.minimum_version_code
+        : input.android_min_version_code ?? defaults.platforms.android.minimum_version_code,
+      minimum_version_name: platform === 'ios'
+        ? input.ios_min_version_name ?? defaults.platforms.ios.minimum_version_name
+        : input.android_min_version_name ?? defaults.platforms.android.minimum_version_name,
+      update_message: platform === 'ios'
+        ? input.ios_update_message ?? defaults.platforms.ios.update_message
+        : input.android_update_message ?? defaults.platforms.android.update_message,
+      ...platformInput,
+      features: {
+        ...defaults.platforms[platform].features,
+        ...legacyFeatures,
+        ...(platformInput.features && typeof platformInput.features === 'object'
+          ? platformInput.features
+          : {}),
+      },
+    };
+  }
+
   return {
     ...defaults,
     ...input,
@@ -105,6 +175,7 @@ function normalizeAppConfig(payload) {
       ...defaults.features,
       ...features,
     },
+    platforms,
   };
 }
 
@@ -147,22 +218,53 @@ async function getAppConfig(force = false) {
   return appConfigCache.data;
 }
 
-function featureEnabled(flagKey) {
-  return !!appConfigCache.data?.features?.[flagKey];
+function normalizeClientPlatform(platform) {
+  const normalized = String(platform || '').trim().toLowerCase();
+  return normalized === 'ios' ? 'ios' : 'android';
 }
 
-function roomTypeFeatureEnabled(roomType) {
-  return featureEnabled('video_rooms_enabled');
+function platformConfig(platform) {
+  const normalized = normalizeClientPlatform(platform);
+  return appConfigCache.data?.platforms?.[normalized] || {
+    minimum_version_code: normalized === 'ios'
+      ? appConfigCache.data?.ios_min_version_code
+      : appConfigCache.data?.android_min_version_code,
+    update_message: normalized === 'ios'
+      ? appConfigCache.data?.ios_update_message
+      : appConfigCache.data?.android_update_message,
+    features: appConfigCache.data?.features || {},
+  };
 }
 
-function isAndroidClientSupported(platform, versionCode) {
-  if (String(platform || '').trim().toLowerCase() !== 'android') {
+function featureEnabled(flagKey, platform = 'android') {
+  return !!platformConfig(platform)?.features?.[flagKey];
+}
+
+function featureEnabledForAnyPlatform(flagKey) {
+  return ['android', 'ios'].some((platform) => featureEnabled(flagKey, platform));
+}
+
+function roomTypeFeatureEnabled(roomType, platform = 'android') {
+  return featureEnabled('video_rooms_enabled', platform);
+}
+
+function roomTypeFeatureEnabledForAnyPlatform(roomType) {
+  return ['android', 'ios'].some(
+    (platform) => roomTypeFeatureEnabled(roomType, platform),
+  );
+}
+
+function isClientSupported(platform, versionCode) {
+  const normalized = String(platform || '').trim().toLowerCase();
+  if (!['android', 'ios'].includes(normalized)) {
     return false;
   }
   if (!appConfigCache.data.force_app_upgrade_enabled) {
     return true;
   }
-  return Number(versionCode || 0) >= Number(appConfigCache.data.android_min_version_code || 1);
+  return Number(versionCode || 0) >= Number(
+    platformConfig(normalized).minimum_version_code || 1,
+  );
 }
 
 function featureErrorPayload(code, message, extra = {}) {
@@ -282,7 +384,33 @@ console.log('[common]  ', nowISO(), `Moderation cache poll interval: ${MODERATIO
 async function verifyUserFromLaravel(token, socket = null) {
   if (!token) return null;
   const publicOrigin = publicApiOriginForSocket(socket);
-  const cacheKey = `${token}|${publicOrigin}`;
+  const clientPlatform = String(
+    socket?.handshake?.auth?.platform
+    || socket?.handshake?.headers?.['x-client-platform']
+    || 'android',
+  ).trim().toLowerCase();
+  const clientVersion = String(
+    socket?.handshake?.auth?.app_version
+    || socket?.handshake?.headers?.['x-app-version']
+    || '',
+  ).trim();
+  const clientVersionCode = String(
+    socket?.handshake?.auth?.app_version_code
+    || socket?.handshake?.headers?.['x-app-version-code']
+    || '',
+  ).trim();
+  const deviceId = String(
+    socket?.handshake?.auth?.device_id
+    || socket?.handshake?.headers?.['x-device-id']
+    || '',
+  ).trim();
+  const cacheKey = [
+    token,
+    publicOrigin,
+    clientPlatform,
+    clientVersionCode,
+    deviceId,
+  ].join('|');
   const cached = verifiedUserCache.get(cacheKey);
   const now = Date.now();
   if (cached && cached.expiresAt > now) {
@@ -296,6 +424,10 @@ async function verifyUserFromLaravel(token, socket = null) {
       headers: {
         Authorization: `Bearer ${token}`,
         ...(publicOrigin ? { 'X-Public-Origin': publicOrigin } : {}),
+        ...(clientPlatform ? { 'X-Client-Platform': clientPlatform } : {}),
+        ...(clientVersion ? { 'X-App-Version': clientVersion } : {}),
+        ...(clientVersionCode ? { 'X-App-Version-Code': clientVersionCode } : {}),
+        ...(deviceId ? { 'X-Device-Id': deviceId } : {}),
       },
     });
     if (!data || !data.id) return null;
@@ -343,7 +475,10 @@ async function moderationJoinCheck(token, roomId) {
     const { data } = await api.post('/ws/rooms/join-check', {
       room_id: String(roomId),
     }, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...internalApiHeaders(),
+      },
     });
     return data || { ok: true, allow: true };
   } catch (e) {
@@ -366,7 +501,10 @@ async function moderationChatCheck(token, roomId, message) {
       room_id: String(roomId),
       message: String(message || ''),
     }, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...internalApiHeaders(),
+      },
     });
     return data || { ok: true, allow: true, message };
   } catch (e) {
@@ -402,7 +540,7 @@ function makeAuthMiddleware(_namespaceName) {
       const clientPlatform = String(
         socket.handshake?.auth?.platform ||
         socket.handshake?.headers?.['x-client-platform'] ||
-        ''
+        'android'
       ).trim().toLowerCase();
       const clientVersionCode = Number(
         socket.handshake?.auth?.app_version_code ||
@@ -431,8 +569,8 @@ function makeAuthMiddleware(_namespaceName) {
         return next(new Error('maintenance_mode'));
       }
 
-      if (!isAndroidClientSupported(clientPlatform, clientVersionCode)) {
-        if (clientPlatform !== 'android') {
+      if (!isClientSupported(clientPlatform, clientVersionCode)) {
+        if (!['android', 'ios'].includes(clientPlatform)) {
           return next(new Error('unsupported_client_platform'));
         }
         return next(new Error('force_upgrade'));
@@ -440,23 +578,25 @@ function makeAuthMiddleware(_namespaceName) {
       if (!user) return next(new Error('unauthorized')); // keep same unauthorized text
       if (user.blocked) return next(new Error('blocked'));
 
-      if (_namespaceName === '/calls' && !featureEnabled('host_calling_enabled')) {
+      if (_namespaceName === '/calls'
+        && !featureEnabled('host_calling_enabled', clientPlatform)) {
         return next(new Error('host_calling_disabled'));
       }
 
       if (_namespaceName === '/rooms'
-        && !featureEnabled('video_rooms_enabled')) {
+        && !featureEnabled('video_rooms_enabled', clientPlatform)) {
         return next(new Error('live_rooms_disabled'));
       }
 
       if (_namespaceName === '/games'
-        && !featureEnabled('teen_patti_enabled')
-        && !featureEnabled('greedy_enabled')) {
+        && !featureEnabled('teen_patti_enabled', clientPlatform)
+        && !featureEnabled('greedy_enabled', clientPlatform)) {
         return next(new Error('games_disabled'));
       }
 
       socket.user = user;
       socket.authToken = token;
+      socket.clientPlatform = clientPlatform;
       return next();
     } catch {
       return next(new Error('unauthorized'));
@@ -483,7 +623,7 @@ function addSocketMap(socket) {
   const platform = String(
     socket.handshake?.auth?.platform ||
     socket.handshake?.headers?.['x-client-platform'] ||
-    ''
+    'android'
   ).trim().toLowerCase();
   const appVersion = String(
     socket.handshake?.auth?.app_version ||
@@ -584,7 +724,10 @@ async function syncSocketPresenceWithLaravel(token, status) {
   if (!VERIFY_WITH_LARAVEL || !token) return;
   try {
     await api.post('/ws/presence', { socket_status: status }, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...internalApiHeaders(),
+      },
     });
   } catch (e) {
     console.error('[presence][ERR]', nowISO(), `sync socket_status=${status} failed:`, e.message);
@@ -802,7 +945,7 @@ function hashTeenPattiSnapshot(payload) {
 
 async function fetchTeenPattiSnapshotInternal(force = false) {
   await getAppConfig();
-  if (!featureEnabled('teen_patti_enabled')) {
+  if (!featureEnabledForAnyPlatform('teen_patti_enabled')) {
     teenPattiSnapshotCache = null;
     teenPattiSnapshotHash = '';
     return null;
@@ -842,7 +985,7 @@ function hashGreedySnapshot(payload) {
 
 async function fetchGreedySnapshotInternal(force = false) {
   await getAppConfig();
-  if (!featureEnabled('greedy_enabled')) {
+  if (!featureEnabledForAnyPlatform('greedy_enabled')) {
     greedySnapshotCache = null;
     greedySnapshotHash = '';
     return null;
@@ -1339,7 +1482,7 @@ async function roomsSnapshot(limit = ROOMS_SNAPSHOT_LIMIT) {
     .map(({ doc }) => doc)
     .filter(Boolean)
     .filter((doc) => doc.status === 'live' && !doc.ended_at)
-    .filter((doc) => roomTypeFeatureEnabled(doc.room_type));
+    .filter((doc) => roomTypeFeatureEnabledForAnyPlatform(doc.room_type));
   console.log('[rooms][DBG]', nowISO(), `snapshot: returning ${list.length} docs`);
   return list;
 }
@@ -1348,7 +1491,7 @@ async function roomsSnapshot(limit = ROOMS_SNAPSHOT_LIMIT) {
 function fanoutRoomEvent(payload) {
   const type = payload?.type;
   const rid  = payload?.room?.id;
-  if (!roomTypeFeatureEnabled(payload?.room?.room_type)) {
+  if (!roomTypeFeatureEnabledForAnyPlatform(payload?.room?.room_type)) {
     return;
   }
   const totalSockets = roomsNs.sockets.size;
@@ -1439,7 +1582,7 @@ sub.on('message', async (channel, message) => {
         console.log('[rooms][SUB]', nowISO(), 'skip: missing type/room');
         return;
       }
-      if (!roomTypeFeatureEnabled(room.room_type)) {
+      if (!roomTypeFeatureEnabledForAnyPlatform(room.room_type)) {
         return;
       }
 
@@ -1471,7 +1614,7 @@ sub.on('message', async (channel, message) => {
     }
   } else if (channel === 'users:availability') {
     try {
-      if (!featureEnabled('host_calling_enabled')) {
+      if (!featureEnabledForAnyPlatform('host_calling_enabled')) {
         return;
       }
       const payload = JSON.parse(message || '{}');
@@ -1486,7 +1629,7 @@ sub.on('message', async (channel, message) => {
     }
   } else if (channel === 'calls:events') {
     try {
-      if (!featureEnabled('host_calling_enabled')) {
+      if (!featureEnabledForAnyPlatform('host_calling_enabled')) {
         return;
       }
       const payload = JSON.parse(message || '{}');
@@ -1529,7 +1672,7 @@ sub.on('message', async (channel, message) => {
   } else if (channel === 'rooms:seat-events') {
     try {
       const payload = JSON.parse(message || '{}');
-      if (!roomTypeFeatureEnabled(payload.room_type)) {
+      if (!roomTypeFeatureEnabledForAnyPlatform(payload.room_type)) {
         return;
       }
       const roomId = String(payload.room_id || '');
@@ -1550,11 +1693,13 @@ sub.on('message', async (channel, message) => {
     }
   } else if (channel === 'rooms:gift-events') {
     try {
-      if (!featureEnabled('gifts_enabled')) {
+      if (!featureEnabledForAnyPlatform('gifts_enabled')) {
         return;
       }
       const payload = JSON.parse(message || '{}');
-      if (!roomTypeFeatureEnabled(payload.room_type)) {
+      if (!['android', 'ios'].some(
+        (platform) => roomTypeFeatureEnabled(payload.room_type, platform),
+      )) {
         return;
       }
       const roomId = String(payload.room_id || '');
@@ -1609,7 +1754,7 @@ sub.on('message', async (channel, message) => {
     }
   } else if (channel === 'rooms:entry-effects') {
     try {
-      if (!featureEnabled('entry_effects_enabled')) {
+      if (!featureEnabledForAnyPlatform('entry_effects_enabled')) {
         return;
       }
       const payload = JSON.parse(message || '{}');
@@ -1631,7 +1776,7 @@ sub.on('message', async (channel, message) => {
     }
   } else if (channel === 'rooms:pk-events') {
     try {
-      if (!featureEnabled('pk_battles_enabled')) {
+      if (!featureEnabledForAnyPlatform('pk_battles_enabled')) {
         return;
       }
       const payload = JSON.parse(message || '{}');
@@ -1707,7 +1852,7 @@ roomsNs.on('connection', (socket) => {
 
   socket.on('rooms:subscribe', async () => {
     await getAppConfig();
-    if (!featureEnabled('video_rooms_enabled')) {
+    if (!featureEnabled('video_rooms_enabled', socket.clientPlatform)) {
       socket.emit('feature:error', featureErrorPayload(
         'LIVE_ROOMS_DISABLED',
         'Live rooms are currently unavailable.',
@@ -1731,7 +1876,10 @@ roomsNs.on('connection', (socket) => {
       const raw = await redis.get(roomKey(room_id));
       roomDoc = raw ? JSON.parse(raw) : null;
     } catch {}
-    if (roomDoc && !roomTypeFeatureEnabled(roomDoc.room_type)) {
+    if (
+      roomDoc
+      && !roomTypeFeatureEnabled(roomDoc.room_type, socket.clientPlatform)
+    ) {
       socket.emit('feature:error', featureErrorPayload(
         'VIDEO_ROOMS_DISABLED',
         'Video rooms are currently unavailable.',
@@ -1823,7 +1971,7 @@ roomsNs.on('connection', (socket) => {
 
   socket.on('room:message:send', async (payload = {}) => {
     await getAppConfig();
-    if (!featureEnabled('video_rooms_enabled')) {
+    if (!featureEnabled('video_rooms_enabled', socket.clientPlatform)) {
       socket.emit(
         'room:message:error',
         roomMessageErrorPayload(
@@ -1856,7 +2004,7 @@ roomsNs.on('connection', (socket) => {
       );
       return;
     }
-    if (!roomTypeFeatureEnabled(roomType)) {
+    if (!roomTypeFeatureEnabled(roomType, socket.clientPlatform)) {
       socket.emit(
         'room:message:error',
         roomMessageErrorPayload(
@@ -1993,7 +2141,7 @@ gamesNs.on('connection', (socket) => {
 
   socket.on('games:teen_patti:subscribe', async () => {
     await getAppConfig();
-    if (!featureEnabled('teen_patti_enabled')) {
+    if (!featureEnabled('teen_patti_enabled', socket.clientPlatform)) {
       socket.emit('feature:error', featureErrorPayload(
         'TEEN_PATTI_DISABLED',
         'Teen Patti is currently unavailable.',
@@ -2014,7 +2162,7 @@ gamesNs.on('connection', (socket) => {
 
   socket.on('games:greedy:subscribe', async () => {
     await getAppConfig();
-    if (!featureEnabled('greedy_enabled')) {
+    if (!featureEnabled('greedy_enabled', socket.clientPlatform)) {
       socket.emit('feature:error', featureErrorPayload(
         'GREEDY_DISABLED',
         'Greedy is currently unavailable.',
@@ -2088,31 +2236,68 @@ setInterval(async () => {
   }
 
   if (latest.force_app_upgrade_enabled) {
+    for (const platform of ['android', 'ios']) {
+      const config = platformConfig(platform);
+      disconnectUnsupportedSockets(
+        'force_upgrade',
+        (info) => info.platform === platform
+          && Number(info.appVersionCode || 0) < Number(config.minimum_version_code || 1),
+        () => featureErrorPayload(
+          'APP_UPGRADE_REQUIRED',
+          config.update_message,
+          {
+            platform,
+            minimum_version_code: Number(config.minimum_version_code || 1),
+            ...(platform === 'android'
+              ? {
+                minimum_android_version_code: Number(
+                  config.minimum_version_code || 1,
+                ),
+              }
+              : {}),
+            ...(platform === 'ios'
+              ? {
+                minimum_ios_version_code: Number(
+                  config.minimum_version_code || 1,
+                ),
+              }
+              : {}),
+          },
+        ),
+      );
+    }
+  }
+
+  for (const platform of ['android', 'ios']) {
+    if (featureEnabled('host_calling_enabled', platform)) {
+      continue;
+    }
     disconnectUnsupportedSockets(
-      'force_upgrade',
-      (info) => info.platform === 'android'
-        && Number(info.appVersionCode || 0) < Number(latest.android_min_version_code || 1),
+      'host_calling_disabled',
+      (info) => info.ns === '/calls' && info.platform === platform,
       () => featureErrorPayload(
-        'APP_UPGRADE_REQUIRED',
-        latest.android_update_message,
-        { minimum_android_version_code: Number(latest.android_min_version_code || 1) },
+        'HOST_CALLING_DISABLED',
+        'Host calling is currently unavailable.',
+        { platform },
       ),
     );
   }
 
-  if (!latest.features.host_calling_enabled) {
-    disconnectNamespace(
-      callsNs,
-      'host_calling_disabled',
-      featureErrorPayload('HOST_CALLING_DISABLED', 'Host calling is currently unavailable.'),
-    );
-  }
-
-  if (!latest.features.teen_patti_enabled && !latest.features.greedy_enabled) {
-    disconnectNamespace(
-      gamesNs,
+  for (const platform of ['android', 'ios']) {
+    if (
+      featureEnabled('teen_patti_enabled', platform)
+      || featureEnabled('greedy_enabled', platform)
+    ) {
+      continue;
+    }
+    disconnectUnsupportedSockets(
       'games_disabled',
-      featureErrorPayload('GAMES_DISABLED', 'Room games are currently unavailable.'),
+      (info) => info.ns === '/games' && info.platform === platform,
+      () => featureErrorPayload(
+        'GAMES_DISABLED',
+        'Room games are currently unavailable.',
+        { platform },
+      ),
     );
   }
 }, APP_CONFIG_POLL_MS);

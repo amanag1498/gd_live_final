@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
@@ -12,7 +13,14 @@ import 'storage_service.dart';
 class AppSettingsService extends GetxService with WidgetsBindingObserver {
   AppSettingsService(this._api);
 
-  static const String androidPlatform = 'android';
+  static String get clientPlatform {
+    if (kIsWeb) return 'web';
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.iOS => 'ios',
+      _ => 'android',
+    };
+  }
+
   static const String brandStorageKey = 'app_brand_key';
   static String appVersionName = String.fromEnvironment(
     'APP_VERSION_NAME',
@@ -87,9 +95,8 @@ class AppSettingsService extends GetxService with WidgetsBindingObserver {
 
   Future<void> syncDailyActivity() async {
     if (_activitySyncInFlight) return;
-    final storage = Get.isRegistered<StorageService>()
-        ? Get.find<StorageService>()
-        : null;
+    final storage =
+        Get.isRegistered<StorageService>() ? Get.find<StorageService>() : null;
     final token = storage?.token;
     if (token == null || token.isEmpty) {
       return;
@@ -126,11 +133,11 @@ class AppSettingsService extends GetxService with WidgetsBindingObserver {
       return false;
     }
 
-    return appVersionCode < config.androidMinVersionCode;
+    return appVersionCode < config.minimumVersionCode;
   }
 
   String get forceUpgradeMessage =>
-      payload.value?.androidUpdateMessage ??
+      payload.value?.updateMessage ??
       'Please update GD Live to continue using the app.';
 
   String get brandKey => currentBrandKey.value;
@@ -155,8 +162,7 @@ class AppSettingsService extends GetxService with WidgetsBindingObserver {
       payload.value?.features.hostCallingEnabled ?? true;
   bool get teenPattiEnabled =>
       payload.value?.features.teenPattiEnabled ?? false;
-  bool get greedyEnabled =>
-      payload.value?.features.greedyEnabled ?? false;
+  bool get greedyEnabled => payload.value?.features.greedyEnabled ?? false;
   bool get videoRoomGamesEnabled =>
       payload.value?.features.videoRoomGamesEnabled ?? false;
   bool get anyLiveCreationEnabled => videoRoomsEnabled;
@@ -173,33 +179,47 @@ class AppSettingsPayload {
   const AppSettingsPayload({
     required this.maintenanceModeEnabled,
     required this.forceAppUpgradeEnabled,
-    required this.androidMinVersionCode,
-    required this.androidMinVersionName,
-    required this.androidUpdateMessage,
+    required this.minimumVersionCode,
+    required this.minimumVersionName,
+    required this.updateMessage,
     required this.features,
   });
 
   final bool maintenanceModeEnabled;
   final bool forceAppUpgradeEnabled;
-  final int androidMinVersionCode;
-  final String androidMinVersionName;
-  final String androidUpdateMessage;
+  final int minimumVersionCode;
+  final String minimumVersionName;
+  final String updateMessage;
   final AppPlatformFeatureFlags features;
 
   factory AppSettingsPayload.fromJson(Map<String, dynamic> json) {
     return AppSettingsPayload(
       maintenanceModeEnabled: _toBool(json['maintenance_mode_enabled']),
       forceAppUpgradeEnabled: _toBool(json['force_app_upgrade_enabled']),
-      androidMinVersionCode: _toInt(json['android_min_version_code'], 1),
-      androidMinVersionName:
-          (json['android_min_version_name']?.toString().trim().isNotEmpty ??
+      minimumVersionCode: _toInt(
+        json['minimum_version_code'] ?? json['android_min_version_code'],
+        1,
+      ),
+      minimumVersionName:
+          ((json['minimum_version_name'] ?? json['android_min_version_name'])
+                      ?.toString()
+                      .trim()
+                      .isNotEmpty ??
                   false)
-              ? json['android_min_version_name'].toString().trim()
+              ? (json['minimum_version_name'] ??
+                      json['android_min_version_name'])
+                  .toString()
+                  .trim()
               : '1.0.0',
-      androidUpdateMessage:
-          (json['android_update_message']?.toString().trim().isNotEmpty ??
+      updateMessage:
+          ((json['update_message'] ?? json['android_update_message'])
+                      ?.toString()
+                      .trim()
+                      .isNotEmpty ??
                   false)
-              ? json['android_update_message'].toString().trim()
+              ? (json['update_message'] ?? json['android_update_message'])
+                  .toString()
+                  .trim()
               : 'Please update GD Live to continue using the app.',
       features: AppPlatformFeatureFlags.fromJson(
         Map<String, dynamic>.from(json['features'] as Map? ?? const {}),
@@ -265,10 +285,7 @@ class AppPlatformFeatureFlags {
     }
 
     return AppPlatformFeatureFlags(
-      videoRoomsEnabled: toBool(
-        json['video_rooms_enabled'],
-        fallback: true,
-      ),
+      videoRoomsEnabled: toBool(json['video_rooms_enabled'], fallback: true),
       pkBattlesEnabled: toBool(json['pk_battles_enabled'], fallback: true),
       giftsEnabled: toBool(json['gifts_enabled'], fallback: true),
       subscriptionsEnabled: toBool(
@@ -283,10 +300,7 @@ class AppPlatformFeatureFlags {
         json['wallet_recharge_enabled'],
         fallback: true,
       ),
-      hostCallingEnabled: toBool(
-        json['host_calling_enabled'],
-        fallback: true,
-      ),
+      hostCallingEnabled: toBool(json['host_calling_enabled'], fallback: true),
       teenPattiEnabled: toBool(json['teen_patti_enabled'], fallback: false),
       greedyEnabled: toBool(json['greedy_enabled'], fallback: false),
       videoRoomGamesEnabled: toBool(

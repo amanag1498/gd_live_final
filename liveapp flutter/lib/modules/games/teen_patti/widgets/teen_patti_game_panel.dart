@@ -8,7 +8,6 @@ import 'package:get/get.dart';
 
 import '../../../../app/routes/app_urls.dart';
 import '../../../../app/brand/brand.dart';
-import '../../../../app/widgets/gd_live_logo.dart';
 import '../../../../app/widgets/gd_modal_surface.dart';
 import '../../../../app/widgets/coin_lottie.dart';
 import '../../../../app/widgets/haptics.dart';
@@ -33,184 +32,36 @@ class _TeenPattiGamesSheetState extends State<TeenPattiGamesSheet> {
   @override
   Widget build(BuildContext context) {
     final tokens = getBrandTokens('midnight');
-    final title = switch (_selectedGame) {
-      'teen_patti' => 'Teen Patti',
-      'greedy' => 'Greedy',
-      _ => 'Games',
-    };
-    final subtitle = switch (_selectedGame) {
-      'teen_patti' => 'High-tempo card betting inside the live room',
-      'greedy' => 'Weighted spinner pots with premium reveal pacing',
-      _ => 'Choose a room game without leaving the current live session',
-    };
 
     return SafeArea(
       top: false,
       child: FractionallySizedBox(
-        heightFactor: 0.94,
+        heightFactor: 0.98,
         child: GdModalSurface(
           tokens: tokens,
           radius: 34,
-          padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
-          scrollable: true,
+          padding: EdgeInsets.zero,
+          expandChild: true,
+          transparentSurface: true,
           child: Column(
             children: [
-              const GdLiveLogo(size: 44, showWordmark: false),
               Padding(
-                padding: const EdgeInsets.fromLTRB(18, 14, 18, 12),
-                child: Stack(
+                padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
+                child: Row(
                   children: [
-                    Positioned(
-                      left: 18,
-                      top: 10,
-                      child: Container(
-                        width: 86,
-                        height: 86,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFFFFD966).withValues(alpha: .10),
-                        ),
-                      ),
+                    _SheetActionButton(
+                      icon: Icons.arrow_back_rounded,
+                      onTap:
+                          _selectedGame == null
+                              ? null
+                              : () => setState(() => _selectedGame = null),
+                      tokens: tokens,
                     ),
-                    Positioned(
-                      right: -6,
-                      top: -8,
-                      child: Container(
-                        width: 92,
-                        height: 92,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFF67A5FF).withValues(alpha: .10),
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(28),
-                        color: Colors.white,
-                        border: Border.all(color: tokens.borderColor.withOpacity(.18)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: tokens.primaryButtonGradient.first.withOpacity(.06),
-                            blurRadius: 20,
-                            offset: const Offset(0, 14),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              SizedBox(
-                                width: 42,
-                                child:
-                                    _selectedGame != null
-                                        ? IconButton(
-                                          onPressed:
-                                              () => setState(
-                                                () => _selectedGame = null,
-                                              ),
-                                          icon: const Icon(
-                                            Icons.arrow_back_rounded,
-                                          ),
-                                          color: tokens.textPrimary,
-                                          splashRadius: 20,
-                                        )
-                                        : const SizedBox.shrink(),
-                              ),
-                              Expanded(
-                                child: Column(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(
-                                          999,
-                                        ),
-                                        color: const Color(
-                                          0xFFFFD966,
-                                        ).withValues(alpha: .12),
-                                        border: Border.all(
-                                          color: const Color(
-                                            0xFFFFD966,
-                                          ).withValues(alpha: .24),
-                                        ),
-                                      ),
-                                      child: const Text(
-                                        'ROOM GAMES',
-                                        style: TextStyle(
-                                          color: Color(0xFF2D8B4A),
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 1.1,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      title,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: tokens.textPrimary,
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: .2,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      subtitle,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: tokens.textSecondary,
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w600,
-                                        height: 1.35,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              SizedBox(
-                                width: 42,
-                                child: IconButton(
-                                  onPressed:
-                                      () => Navigator.of(context).maybePop(),
-                                  icon: const Icon(Icons.close_rounded),
-                                  color: tokens.textSecondary,
-                                  splashRadius: 20,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (_selectedGame == null) ...[
-                            const SizedBox(height: 14),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _SheetFactPill(
-                                    icon: Icons.flash_on_rounded,
-                                    label: 'Instant room play',
-                                    accent: const Color(0xFFFFD966),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: _SheetFactPill(
-                                    icon: Icons.stacked_line_chart_rounded,
-                                    label: 'Live pot motion',
-                                    accent: const Color(0xFF67A5FF),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
+                    const Spacer(),
+                    _SheetActionButton(
+                      icon: Icons.close_rounded,
+                      onTap: () => Navigator.of(context).maybePop(),
+                      tokens: tokens,
                     ),
                   ],
                 ),
@@ -238,6 +89,56 @@ class _TeenPattiGamesSheetState extends State<TeenPattiGamesSheet> {
   }
 }
 
+class _SheetActionButton extends StatelessWidget {
+  const _SheetActionButton({
+    required this.icon,
+    required this.onTap,
+    required this.tokens,
+  });
+
+  final IconData icon;
+  final VoidCallback? onTap;
+  final BrandTokens tokens;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: onTap == null ? .36 : 1,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Ink(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.black.withValues(alpha: .34),
+                  Colors.black.withValues(alpha: .18),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: .14)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: .18),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Icon(icon, color: Colors.white, size: 22),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _GamesList extends StatelessWidget {
   const _GamesList({required this.onOpenTeenPatti, required this.onOpenGreedy});
 
@@ -251,7 +152,7 @@ class _GamesList extends StatelessWidget {
     final showGreedy = settings.greedyEnabled;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 4, 18, 28),
+      padding: const EdgeInsets.fromLTRB(14, 6, 14, 26),
       children: [
         if (showTeenPatti)
           _GameEntryCard(
@@ -339,46 +240,6 @@ class _GamesList extends StatelessWidget {
   }
 }
 
-class _SheetFactPill extends StatelessWidget {
-  const _SheetFactPill({
-    required this.icon,
-    required this.label,
-    required this.accent,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color accent;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        color: Colors.white.withValues(alpha: .05),
-        border: Border.all(color: Colors.white.withValues(alpha: .08)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: accent, size: 16),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _GameEntryCard extends StatelessWidget {
   const _GameEntryCard({
     required this.title,
@@ -406,13 +267,14 @@ class _GameEntryCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(26),
           gradient: LinearGradient(
             colors: [
-              Colors.white.withValues(alpha: .08),
-              Colors.white.withValues(alpha: .04),
+              accent.withValues(alpha: .22),
+              accent.withValues(alpha: .08),
+              Colors.black.withValues(alpha: .22),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          border: Border.all(color: Colors.white.withValues(alpha: .10)),
+          border: Border.all(color: accent.withValues(alpha: .34)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: .20),
@@ -477,18 +339,18 @@ class _GameEntryCard extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Container(
-                width: 38,
-                height: 38,
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: .06),
+                  color: accent.withValues(alpha: .18),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: .10),
+                    color: accent.withValues(alpha: .34),
                   ),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.arrow_forward_rounded,
-                  color: Colors.white70,
+                  color: accent,
                   size: 20,
                 ),
               ),
@@ -2824,6 +2686,7 @@ class _TeenPattiResultDialogState extends State<_TeenPattiResultDialog> {
         radius: 24,
         padding: const EdgeInsets.all(20),
         scrollable: true,
+        transparentSurface: true,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -2843,7 +2706,9 @@ class _TeenPattiResultDialogState extends State<_TeenPattiResultDialog> {
                     gradient: LinearGradient(
                       colors: [
                         accent.withValues(alpha: .18),
-                        tokens.primaryButtonGradient.last.withValues(alpha: .12),
+                        tokens.primaryButtonGradient.last.withValues(
+                          alpha: .12,
+                        ),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(18),
@@ -2882,12 +2747,20 @@ class _TeenPattiResultDialogState extends State<_TeenPattiResultDialog> {
                     gradient: LinearGradient(
                       colors: [
                         accent.withValues(alpha: .14),
-                        const Color(0xFFF7FCF8),
+                        accent.withValues(alpha: .04),
+                        Colors.transparent,
                       ],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                     ),
                     border: Border.all(color: accent.withValues(alpha: .36)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: accent.withValues(alpha: .10),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
                   ),
                   child: Stack(
                     alignment: Alignment.center,

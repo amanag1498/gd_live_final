@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Schema;
 class AppSettingsService
 {
     private const SETTINGS_CACHE_KEY = 'app_settings:all:v1';
-    private const PUBLIC_APP_CONFIG_CACHE_KEY = 'app_config:public:v2';
+    private const PUBLIC_APP_CONFIG_CACHE_KEY = 'app_config:public:v3';
 
     public const APP_DEFINITIONS = [
         'app_features.maintenance_mode_enabled' => [
@@ -48,6 +48,28 @@ class AppSettingsService
             'group' => 'general',
             'default' => 'Please update GD Live to continue using the app.',
             'hint' => 'Blocking message shown to Android users during a mandatory upgrade.',
+        ],
+        'app_features.ios_min_version_code' => [
+            'label' => 'iOS Min Build Number',
+            'type' => 'integer',
+            'group' => 'general',
+            'default' => 1,
+            'min' => 1,
+            'hint' => 'Minimum iOS CFBundleVersion allowed when force upgrade is enabled.',
+        ],
+        'app_features.ios_min_version_name' => [
+            'label' => 'iOS Min Version Name',
+            'type' => 'string',
+            'group' => 'general',
+            'default' => '1.0.0',
+            'hint' => 'Human-readable iOS version label shown in admin and app payloads.',
+        ],
+        'app_features.ios_update_message' => [
+            'label' => 'iOS Update Message',
+            'type' => 'string',
+            'group' => 'general',
+            'default' => 'Please update GD Live from the App Store to continue.',
+            'hint' => 'Blocking message shown to iOS users during a mandatory upgrade.',
         ],
         'app_features.platform.android.video_rooms_enabled' => [
             'label' => 'Video Rooms',
@@ -107,6 +129,67 @@ class AppSettingsService
             'label' => 'Video Room Games Strip',
             'type' => 'boolean',
             'group' => 'android',
+            'default' => false,
+        ],
+        'app_features.platform.ios.video_rooms_enabled' => [
+            'label' => 'Video Rooms',
+            'type' => 'boolean',
+            'group' => 'ios',
+            'default' => true,
+        ],
+        'app_features.platform.ios.pk_battles_enabled' => [
+            'label' => 'PK Battles',
+            'type' => 'boolean',
+            'group' => 'ios',
+            'default' => true,
+        ],
+        'app_features.platform.ios.gifts_enabled' => [
+            'label' => 'Gifts',
+            'type' => 'boolean',
+            'group' => 'ios',
+            'default' => true,
+        ],
+        'app_features.platform.ios.subscriptions_enabled' => [
+            'label' => 'Subscriptions',
+            'type' => 'boolean',
+            'group' => 'ios',
+            'default' => true,
+        ],
+        'app_features.platform.ios.entry_effects_enabled' => [
+            'label' => 'Entry Effects',
+            'type' => 'boolean',
+            'group' => 'ios',
+            'default' => true,
+        ],
+        'app_features.platform.ios.wallet_recharge_enabled' => [
+            'label' => 'Wallet Recharge',
+            'type' => 'boolean',
+            'group' => 'ios',
+            'default' => true,
+            'hint' => 'Enables Razorpay wallet recharge in the iOS app.',
+        ],
+        'app_features.platform.ios.host_calling_enabled' => [
+            'label' => 'Host Calling',
+            'type' => 'boolean',
+            'group' => 'ios',
+            'default' => true,
+        ],
+        'app_features.platform.ios.teen_patti_enabled' => [
+            'label' => 'Teen Patti',
+            'type' => 'boolean',
+            'group' => 'ios',
+            'default' => false,
+        ],
+        'app_features.platform.ios.greedy_enabled' => [
+            'label' => 'Greedy',
+            'type' => 'boolean',
+            'group' => 'ios',
+            'default' => false,
+        ],
+        'app_features.platform.ios.video_room_games_enabled' => [
+            'label' => 'Video Room Games Strip',
+            'type' => 'boolean',
+            'group' => 'ios',
             'default' => false,
         ],
     ];
@@ -456,7 +539,11 @@ class AppSettingsService
         $this->updateSettings($validated, self::APP_DEFINITIONS, 'app_features');
     }
 
-    public function publicAppPayload(?User $user = null, ?int $appVersionCode = null): array
+    public function publicAppPayload(
+        ?User $user = null,
+        ?int $appVersionCode = null,
+        ?string $platform = null,
+    ): array
     {
         $base = Cache::rememberForever(self::PUBLIC_APP_CONFIG_CACHE_KEY, function (): array {
             return [
@@ -465,38 +552,110 @@ class AppSettingsService
                 'android_min_version_code' => $this->minimumAndroidVersionCode(),
                 'android_min_version_name' => $this->minimumAndroidVersionName(),
                 'android_update_message' => $this->androidUpdateMessage(),
-                'features' => $this->androidFeatureFlags(),
+                'ios_min_version_code' => $this->minimumIosVersionCode(),
+                'ios_min_version_name' => $this->minimumIosVersionName(),
+                'ios_update_message' => $this->iosUpdateMessage(),
             ];
         });
 
+        $selectedPlatform = $this->normalizeClientPlatform($platform);
+        $selected = $this->platformPayload($selectedPlatform, $user);
+
         return array_merge($base, [
-            'features' => $this->androidFeatureFlags($user),
+            'platform' => $selectedPlatform,
+            'minimum_version_code' => $selected['minimum_version_code'],
+            'minimum_version_name' => $selected['minimum_version_name'],
+            'update_message' => $selected['update_message'],
+            'features' => $selected['features'],
+            'platforms' => [
+                'android' => $this->platformPayload('android', $user),
+                'ios' => $this->platformPayload('ios', $user),
+            ],
         ]);
     }
 
     public function androidFeatureFlags(?User $user = null): array
     {
+        return $this->platformFeatureFlags('android', $user);
+    }
+
+    public function platformFeatureFlags(string $platform, ?User $user = null): array
+    {
+        $platform = $this->normalizeClientPlatform($platform);
         $games = app(GameAccessService::class);
         $access = $games->userAccessMap($user);
-        $teenPattiEnabled = (bool) config('app_features.platform.android.teen_patti_enabled', false)
+        $prefix = "app_features.platform.{$platform}";
+        $teenPattiEnabled = (bool) config("{$prefix}.teen_patti_enabled", false)
             && (bool) ($access[GameAccessService::GAME_TEEN_PATTI] ?? false);
-        $greedyEnabled = (bool) config('app_features.platform.android.greedy_enabled', false)
+        $greedyEnabled = (bool) config("{$prefix}.greedy_enabled", false)
             && (bool) ($access[GameAccessService::GAME_GREEDY] ?? false);
-        $videoRoomGamesEnabled = (bool) config('app_features.platform.android.video_room_games_enabled', false)
+        $videoRoomGamesEnabled = (bool) config("{$prefix}.video_room_games_enabled", false)
             && ($teenPattiEnabled || $greedyEnabled);
 
         return [
-            'video_rooms_enabled' => (bool) config('app_features.platform.android.video_rooms_enabled', true),
-            'pk_battles_enabled' => (bool) config('app_features.platform.android.pk_battles_enabled', true),
-            'gifts_enabled' => (bool) config('app_features.platform.android.gifts_enabled', true),
-            'subscriptions_enabled' => (bool) config('app_features.platform.android.subscriptions_enabled', true),
-            'entry_effects_enabled' => (bool) config('app_features.platform.android.entry_effects_enabled', true),
-            'wallet_recharge_enabled' => (bool) config('app_features.platform.android.wallet_recharge_enabled', true),
-            'host_calling_enabled' => (bool) config('app_features.platform.android.host_calling_enabled', true),
+            'video_rooms_enabled' => (bool) config("{$prefix}.video_rooms_enabled", true),
+            'pk_battles_enabled' => (bool) config("{$prefix}.pk_battles_enabled", true),
+            'gifts_enabled' => (bool) config("{$prefix}.gifts_enabled", true),
+            'subscriptions_enabled' => (bool) config("{$prefix}.subscriptions_enabled", true),
+            'entry_effects_enabled' => (bool) config("{$prefix}.entry_effects_enabled", true),
+            'wallet_recharge_enabled' => (bool) config(
+                "{$prefix}.wallet_recharge_enabled",
+                true,
+            ),
+            'host_calling_enabled' => (bool) config("{$prefix}.host_calling_enabled", true),
             'teen_patti_enabled' => $teenPattiEnabled,
             'greedy_enabled' => $greedyEnabled,
             'video_room_games_enabled' => $videoRoomGamesEnabled,
         ];
+    }
+
+    public function platformPayload(string $platform, ?User $user = null): array
+    {
+        $platform = $this->normalizeClientPlatform($platform);
+
+        return [
+            'minimum_version_code' => $this->minimumVersionCode($platform),
+            'minimum_version_name' => $this->minimumVersionName($platform),
+            'update_message' => $this->updateMessage($platform),
+            'features' => $this->platformFeatureFlags($platform, $user),
+        ];
+    }
+
+    public function normalizeClientPlatform(?string $platform): string
+    {
+        return strtolower(trim((string) $platform)) === 'ios' ? 'ios' : 'android';
+    }
+
+    public function isSupportedClientPlatform(?string $platform): bool
+    {
+        return in_array(strtolower(trim((string) $platform)), ['android', 'ios'], true);
+    }
+
+    public function featureEnabled(string $featureKey, ?string $platform): bool
+    {
+        $platform = $this->normalizeClientPlatform($platform);
+        return (bool) config("app_features.platform.{$platform}.{$featureKey}", true);
+    }
+
+    public function minimumVersionCode(string $platform): int
+    {
+        return $this->normalizeClientPlatform($platform) === 'ios'
+            ? $this->minimumIosVersionCode()
+            : $this->minimumAndroidVersionCode();
+    }
+
+    public function minimumVersionName(string $platform): string
+    {
+        return $this->normalizeClientPlatform($platform) === 'ios'
+            ? $this->minimumIosVersionName()
+            : $this->minimumAndroidVersionName();
+    }
+
+    public function updateMessage(string $platform): string
+    {
+        return $this->normalizeClientPlatform($platform) === 'ios'
+            ? $this->iosUpdateMessage()
+            : $this->androidUpdateMessage();
     }
 
     public function minimumAndroidVersionCode(): int
@@ -512,6 +671,24 @@ class AppSettingsService
     public function androidUpdateMessage(): string
     {
         return (string) config('app_features.android_update_message', env('ANDROID_UPDATE_MESSAGE', 'Please update GD Live to continue using the app.'));
+    }
+
+    public function minimumIosVersionCode(): int
+    {
+        return max(1, (int) config('app_features.ios_min_version_code', env('IOS_MIN_VERSION_CODE', 1)));
+    }
+
+    public function minimumIosVersionName(): string
+    {
+        return (string) config('app_features.ios_min_version_name', env('IOS_MIN_VERSION_NAME', '1.0.0'));
+    }
+
+    public function iosUpdateMessage(): string
+    {
+        return (string) config(
+            'app_features.ios_update_message',
+            env('IOS_UPDATE_MESSAGE', 'Please update GD Live from the App Store to continue.'),
+        );
     }
 
     private function castValue(mixed $value, string $type): mixed

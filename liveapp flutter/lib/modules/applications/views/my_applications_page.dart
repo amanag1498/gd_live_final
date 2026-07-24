@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -54,57 +55,71 @@ class _MyApplicationsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = _applicationsTokens();
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     return SafeArea(
       top: false,
-      child: GdModalSurface(
-        tokens: tokens,
-        radius: 30,
-        padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * .92,
-          ),
-          child: Column(
-            children: [
-              Text(
-                'My Applications',
-                style: TextStyle(
-                  color: tokens.textPrimary,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
+      child: AnimatedPadding(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.only(bottom: bottomInset),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final availableHeight =
+                constraints.maxHeight.isFinite
+                    ? constraints.maxHeight
+                    : MediaQuery.sizeOf(context).height * .86;
+            final bodyHeight = math.max(260.0, availableHeight - 120);
+
+            return GdModalSurface(
+              tokens: tokens,
+              radius: 30,
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+              child: SizedBox(
+                height: bodyHeight,
+                child: Column(
+                  children: [
+                    Text(
+                      'My Applications',
+                      style: TextStyle(
+                        color: tokens.textPrimary,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Track your host and agency requests in one place.',
+                      style: TextStyle(
+                        color: tokens.textSecondary.withOpacity(.82),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: IconButton(
+                        onPressed: () {
+                          Haptics.selection();
+                          Get.back<void>();
+                        },
+                        icon: Icon(
+                          Icons.close_rounded,
+                          color: tokens.textPrimary,
+                        ),
+                      ),
+                    ),
+                    const Expanded(
+                      child: _ApplicationsBody(
+                        paddedTop: 0,
+                        surface: _ApplicationsSurface.sheet,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Track your host and agency requests in one place.',
-                style: TextStyle(
-                  color: tokens.textSecondary.withOpacity(.82),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: IconButton(
-                  onPressed: () {
-                    Haptics.selection();
-                    Get.back<void>();
-                  },
-                  icon: Icon(
-                    Icons.close_rounded,
-                    color: tokens.textPrimary,
-                  ),
-                ),
-              ),
-              const Expanded(
-                child: _ApplicationsBody(
-                  paddedTop: 0,
-                  surface: _ApplicationsSurface.sheet,
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -378,10 +393,7 @@ class _ApplicationCard extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            palette.panelStart,
-            palette.panelEnd,
-          ],
+          colors: [palette.panelStart, palette.panelEnd],
           begin: Alignment.topLeft,
           end: Alignment.bottomCenter,
         ),
@@ -416,11 +428,7 @@ class _ApplicationCard extends StatelessWidget {
                   ),
                   border: Border.all(color: palette.iconTint.withOpacity(.34)),
                 ),
-                child: Icon(
-                  palette.icon,
-                  color: palette.iconTint,
-                  size: 26,
-                ),
+                child: Icon(palette.icon, color: palette.iconTint, size: 26),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -503,11 +511,7 @@ class _ApplicationCard extends StatelessWidget {
           ),
           if (reviewedText != null) ...[
             const SizedBox(height: 14),
-            _MetaRow(
-              label: 'Reviewed',
-              value: reviewedText,
-              dark: dark,
-            ),
+            _MetaRow(label: 'Reviewed', value: reviewedText, dark: dark),
           ],
           if ((item.reviewNotes ?? '').trim().isNotEmpty)
             Container(

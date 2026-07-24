@@ -15,6 +15,7 @@ Route::get('/app-config', fn(Request $request, AppSettingsService $settings) => 
     'data' => $settings->publicAppPayload(
         $request->user('sanctum'),
         (($code = (int) $request->header('X-App-Version-Code', 0)) > 0 ? $code : null),
+        $request->header('X-Client-Platform'),
     ),
 ]));
 Route::get('/app/settings', fn(Request $request, AppSettingsService $settings) => response()->json([
@@ -22,6 +23,7 @@ Route::get('/app/settings', fn(Request $request, AppSettingsService $settings) =
     'data' => $settings->publicAppPayload(
         $request->user('sanctum'),
         (($code = (int) $request->header('X-App-Version-Code', 0)) > 0 ? $code : null),
+        $request->header('X-Client-Platform'),
     ),
 ]));
 Route::get('/banners', [BannerController::class, 'index']);

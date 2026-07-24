@@ -22,6 +22,7 @@
 **/*.swo
 **/*.symbols
 **/*.map.json
+**/gd-keystore.jks
 
 gd_live_backend/.env
 gd_live_backend/.env.*

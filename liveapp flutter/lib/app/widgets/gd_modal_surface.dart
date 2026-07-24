@@ -13,6 +13,8 @@ class GdModalSurface extends StatelessWidget {
     this.padding = const EdgeInsets.fromLTRB(20, 16, 20, 18),
     this.showHandle = true,
     this.scrollable = false,
+    this.expandChild = false,
+    this.transparentSurface = false,
   });
 
   final BrandTokens tokens;
@@ -23,10 +25,34 @@ class GdModalSurface extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   final bool showHandle;
   final bool scrollable;
+  final bool expandChild;
+  final bool transparentSurface;
 
   @override
   Widget build(BuildContext context) {
     final maxHeight = MediaQuery.sizeOf(context).height * maxHeightFactor;
+    final decoration =
+        transparentSurface
+            ? const BoxDecoration()
+            : BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.white.withOpacity(.98),
+                  const Color(0xFFF3FBF4).withOpacity(.98),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(radius),
+              border: Border.all(color: tokens.borderColor.withOpacity(.55)),
+              boxShadow: [
+                BoxShadow(
+                  color: tokens.primaryButtonGradient.first.withOpacity(.08),
+                  blurRadius: 28,
+                  offset: const Offset(0, 14),
+                ),
+              ],
+            );
     return ConstrainedBox(
       constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
       child:
@@ -34,24 +60,7 @@ class GdModalSurface extends StatelessWidget {
               ? ClipRRect(
                 borderRadius: BorderRadius.circular(radius),
                 child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.white.withOpacity(.98),
-                        const Color(0xFFF3FBF4).withOpacity(.98),
-                      ],
-                    ),
-                    border: Border.all(color: tokens.borderColor.withOpacity(.55)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: tokens.primaryButtonGradient.first.withOpacity(.08),
-                        blurRadius: 28,
-                        offset: const Offset(0, 14),
-                      ),
-                    ],
-                  ),
+                  decoration: decoration,
                   child: Padding(
                     padding: padding,
                     child: SingleChildScrollView(
@@ -78,29 +87,12 @@ class GdModalSurface extends StatelessWidget {
                 ),
               )
               : Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.white.withOpacity(.98),
-                      const Color(0xFFF3FBF4).withOpacity(.98),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(radius),
-                  border: Border.all(color: tokens.borderColor.withOpacity(.55)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: tokens.primaryButtonGradient.first.withOpacity(.08),
-                      blurRadius: 28,
-                      offset: const Offset(0, 14),
-                    ),
-                  ],
-                ),
+                decoration: decoration,
                 child: Padding(
                   padding: padding,
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisSize:
+                        expandChild ? MainAxisSize.max : MainAxisSize.min,
                     children: [
                       if (showHandle) ...[
                         Container(
@@ -113,7 +105,7 @@ class GdModalSurface extends StatelessWidget {
                         ),
                         const SizedBox(height: 14),
                       ],
-                      child,
+                      if (expandChild) Expanded(child: child) else child,
                     ],
                   ),
                 ),

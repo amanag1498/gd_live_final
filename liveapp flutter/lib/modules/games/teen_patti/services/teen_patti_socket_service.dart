@@ -20,14 +20,14 @@ class TeenPattiSocketService {
     required String bearerToken,
   }) async {
     await stop();
-    final deviceId = await DeviceIdService.getAndroidId();
+    final deviceId = await DeviceIdService.getDeviceId();
 
     _socket = io.io(wsGamesUrl, <String, dynamic>{
       'transports': ['websocket'],
       'auth': {
         'token': bearerToken,
         if (deviceId.isNotEmpty) 'device_id': deviceId,
-        'platform': AppSettingsService.androidPlatform,
+        'platform': AppSettingsService.clientPlatform,
         'app_version': AppSettingsService.appVersionName,
         'app_version_code': AppSettingsService.appVersionCode,
       },
@@ -44,10 +44,22 @@ class TeenPattiSocketService {
     _socket!.on('connect_error', (e) => _log('connect_error $e'));
     _socket!.on('feature:error', (data) => _emitEvent('feature:error', data));
     _socket!.on('games:event', (data) => _emitEvent('games:event', data));
-    _socket!.on('teen_patti:bet_placed', (data) => _emitEvent('teen_patti:bet_placed', data));
-    _socket!.on('teen_patti:round_locked', (data) => _emitEvent('teen_patti:round_locked', data));
-    _socket!.on('teen_patti:round_settled', (data) => _emitEvent('teen_patti:round_settled', data));
-    _socket!.on('teen_patti:round_started', (data) => _emitEvent('teen_patti:round_started', data));
+    _socket!.on(
+      'teen_patti:bet_placed',
+      (data) => _emitEvent('teen_patti:bet_placed', data),
+    );
+    _socket!.on(
+      'teen_patti:round_locked',
+      (data) => _emitEvent('teen_patti:round_locked', data),
+    );
+    _socket!.on(
+      'teen_patti:round_settled',
+      (data) => _emitEvent('teen_patti:round_settled', data),
+    );
+    _socket!.on(
+      'teen_patti:round_started',
+      (data) => _emitEvent('teen_patti:round_started', data),
+    );
     _socket!.on('teen_patti:snapshot', (data) {
       try {
         final payload = Map<String, dynamic>.from(data as Map);

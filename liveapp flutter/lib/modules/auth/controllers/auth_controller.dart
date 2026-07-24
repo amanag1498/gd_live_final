@@ -27,10 +27,18 @@ class AuthController extends GetxController {
   }
 
   Future<void> loginWithGoogle() async {
+    await _login(auth.signInWithGoogleAndBackend);
+  }
+
+  Future<void> loginWithApple() async {
+    await _login(auth.signInWithAppleAndBackend);
+  }
+
+  Future<void> _login(Future<UserModel> Function() signIn) async {
     loading.value = true;
     error.value = '';
     try {
-      final u = await auth.signInWithGoogleAndBackend();
+      final u = await signIn();
       user.value = u;
       if (Get.isRegistered<AppSettingsService>()) {
         await Get.find<AppSettingsService>().refresh();

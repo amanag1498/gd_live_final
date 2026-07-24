@@ -29,7 +29,7 @@ class AppRuntimeGate extends StatelessWidget {
           detailLabel:
               'Installed ${AppSettingsService.appVersionName} (${AppSettingsService.appVersionCode})',
           detailValue:
-              'Required ${settings.payload.value?.androidMinVersionName ?? 'latest'} (${settings.payload.value?.androidMinVersionCode ?? '-'})',
+              'Required ${settings.payload.value?.minimumVersionName ?? 'latest'} (${settings.payload.value?.minimumVersionCode ?? '-'})',
           primaryActionLabel: 'Update now',
           onPrimaryAction: _openAndroidStoreListing,
         );

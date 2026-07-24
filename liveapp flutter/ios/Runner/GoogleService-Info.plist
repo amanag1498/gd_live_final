@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CLIENT_ID</key>
+	<string>826349753111-d8dkhcmk8eo4c2jtov4pl92srn09uin2.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.826349753111-d8dkhcmk8eo4c2jtov4pl92srn09uin2</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>826349753111-kmmg99em2bi72h53cistod2mmhnce333.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
 	<string>AIzaSyD_qcodhD4FfSIUrLNNi-BcfG69DYSaeCc</string>
 	<key>GCM_SENDER_ID</key>
@@ -9,11 +15,11 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.techybugs.gdLive</string>
+	<string>com.techybugs.gdlive</string>
 	<key>PROJECT_ID</key>
 	<string>gdlive-da4e9</string>
 	<key>STORAGE_BUCKET</key>
-	<string>gdlive-da4e9.appspot.com</string>
+	<string>gdlive-da4e9.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -25,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:826349753111:ios:42df9532f6b8edd382dd52</string>
+	<string>1:826349753111:ios:df019ad6bef75ac482dd52</string>
 </dict>
 </plist>

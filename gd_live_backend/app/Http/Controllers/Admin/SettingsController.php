@@ -61,6 +61,7 @@ class SettingsController extends Controller
             'groups' => [
                 'general' => 'Global App Controls',
                 'android' => 'Android Feature Flags',
+                'ios' => 'iOS Feature Flags',
             ],
         ]);
     }

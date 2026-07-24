@@ -43,10 +43,12 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyD_qcodhD4FfSIUrLNNi-BcfG69DYSaeCc',
-    appId: '1:826349753111:ios:42df9532f6b8edd382dd52',
+    appId: '1:826349753111:ios:df019ad6bef75ac482dd52',
     messagingSenderId: '826349753111',
     projectId: 'gdlive-da4e9',
-    storageBucket: 'gdlive-da4e9.appspot.com',
-    iosBundleId: 'com.techybugs.gdLive',
+    storageBucket: 'gdlive-da4e9.firebasestorage.app',
+    iosClientId:
+        '826349753111-d8dkhcmk8eo4c2jtov4pl92srn09uin2.apps.googleusercontent.com',
+    iosBundleId: 'com.techybugs.gdlive',
   );
 }

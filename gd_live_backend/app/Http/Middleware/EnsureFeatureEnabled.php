@@ -3,15 +3,22 @@
 namespace App\Http\Middleware;
 
 use App\Services\GameAccessService;
+use App\Services\AppSettingsService;
 use Closure;
 use Illuminate\Http\Request;
 
 class EnsureFeatureEnabled
 {
+    public function __construct(private AppSettingsService $settings)
+    {
+    }
+
     public function handle(Request $request, Closure $next, string $featureKey)
     {
-        $configKey = "app_features.platform.android.{$featureKey}";
-        if (!(bool) config($configKey, true)) {
+        if (!$this->settings->featureEnabled(
+            $featureKey,
+            $request->header('X-Client-Platform'),
+        )) {
             return response()->json([
                 'ok' => false,
                 'error' => 'FEATURE_DISABLED',

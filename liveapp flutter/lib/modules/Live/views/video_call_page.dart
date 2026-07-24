@@ -20,9 +20,6 @@ import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:livekit_client/livekit_client.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart'
-    show RTCVideoRenderer, RTCVideoView, RTCVideoViewObjectFit;
-import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
 
 import '../../banners/models/banner_item.dart';
 import '../../banners/services/banner_service.dart';
@@ -83,12 +80,6 @@ class _VideoCallPageState extends State<VideoCallPage>
     with SingleTickerProviderStateMixin {
   Room? _room;
   EventsListener<RoomEvent>? _listener;
-
-  final RTCVideoRenderer _renderer = RTCVideoRenderer();
-  bool _rendererReady = false;
-  webrtc.MediaStream? _previewStream;
-  LocalVideoTrack? _boundTrack;
-  int _previewBindGeneration = 0;
 
   bool _connecting = false;
   String? _error;
@@ -189,9 +180,7 @@ class _VideoCallPageState extends State<VideoCallPage>
 
   final _emojiKey = GlobalKey<_EmojiBurstState>();
 
-  BrandTokens get _tokens => getBrandTokens(
-    'midnight',
-  );
+  BrandTokens get _tokens => getBrandTokens('midnight');
   @override
   void initState() {
     super.initState();
@@ -398,7 +387,8 @@ class _VideoCallPageState extends State<VideoCallPage>
           'host_b': battle.hostB,
           'updated_at': DateTime.now().toIso8601String(),
         });
-        _recentGiftMessage = '${payload['sender_name']} boosted ${left ? 'left' : 'right'} side';
+        _recentGiftMessage =
+            '${payload['sender_name']} boosted ${left ? 'left' : 'right'} side';
       });
       _recentGiftTimer?.cancel();
       _recentGiftTimer = Timer(const Duration(seconds: 4), () {
@@ -422,9 +412,9 @@ class _VideoCallPageState extends State<VideoCallPage>
       _pkOverlayWinnerSide = winnerSide;
       _pkOverlayWinnerName = winnerHost?['name']?.toString();
       _pkOverlayWinnerAvatarUrl =
-          winnerHost?['avatar_url']?.toString() ?? winnerHost?['avatar']?.toString();
-      _pkOverlayTopSupporters =
-          winnerSupporters
+          winnerHost?['avatar_url']?.toString() ??
+          winnerHost?['avatar']?.toString();
+      _pkOverlayTopSupporters = winnerSupporters
               .map(
                 (supporter) => PkWinnerSupporter(
                   userId: supporter.senderId,
@@ -454,8 +444,6 @@ class _VideoCallPageState extends State<VideoCallPage>
   }
 
   Future<void> _bootstrap() async {
-    await _renderer.initialize();
-    _rendererReady = true;
     if (widget.devMode) {
       setState(() {
         _availableGifts = LiveRoomDevFixtures.mockGiftCatalog();
@@ -520,7 +508,6 @@ class _VideoCallPageState extends State<VideoCallPage>
     _devPkTransitionTimer?.cancel();
     _pkExpiryWatcher?.cancel();
     _glow.dispose();
-    _detachPreview();
     _listener?.dispose();
     _opponentListener?.dispose();
     _seatEventsSub?.cancel();
@@ -547,9 +534,6 @@ class _VideoCallPageState extends State<VideoCallPage>
     } catch (_) {}
     _room?.dispose();
     _opponentRoom?.dispose();
-    if (_rendererReady) {
-      _renderer.dispose();
-    }
     super.dispose();
   }
 
@@ -789,38 +773,7 @@ class _VideoCallPageState extends State<VideoCallPage>
   }
 
   Future<void> _attachLocalPreview(Room room, {bool force = false}) async {
-    final t = _localCameraTrack(room);
-    if (t == null) return;
-    if (!force && _boundTrack == t && _renderer.srcObject != null) return;
-    final generation = ++_previewBindGeneration;
-
     try {
-      if (_boundTrack != t || force || _previewStream == null || _renderer.srcObject == null) {
-        final oldStream = _previewStream;
-        _previewStream = null;
-        _renderer.srcObject = null;
-        await oldStream?.dispose();
-        if (generation != _previewBindGeneration) return;
-
-        final nextStream = await webrtc.createLocalMediaStream('lk-preview');
-        if (generation != _previewBindGeneration) {
-          await nextStream.dispose();
-          return;
-        }
-
-        await nextStream.addTrack(t.mediaStreamTrack);
-        if (generation != _previewBindGeneration) {
-          await nextStream.dispose();
-          return;
-        }
-
-        _previewStream = nextStream;
-        _boundTrack = t;
-        _renderer.srcObject = nextStream;
-      } else if (_renderer.srcObject != _previewStream) {
-        _renderer.srcObject = _previewStream;
-      }
-
       if (mounted) setState(() {});
     } catch (e) {
       if (mounted) setState(() => _error = 'Preview bind failed: $e');
@@ -828,14 +781,9 @@ class _VideoCallPageState extends State<VideoCallPage>
   }
 
   Future<void> _detachPreview() async {
-    _previewBindGeneration += 1;
-    final oldStream = _previewStream;
-    _previewStream = null;
-    _boundTrack = null;
-    try {
-      _renderer.srcObject = null;
-      await oldStream?.dispose();
-    } catch (_) {}
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<LocalVideoTrack?> _waitForLocalTrack(
@@ -1088,7 +1036,9 @@ class _VideoCallPageState extends State<VideoCallPage>
     }
 
     final joinedIds =
-        animate ? currentIds.difference(_trackedParticipantIds).toList() : const <String>[];
+        animate
+            ? currentIds.difference(_trackedParticipantIds).toList()
+            : const <String>[];
     _trackedParticipantIds = currentIds;
 
     if (!animate || joinedIds.isEmpty || !mounted) {
@@ -1130,7 +1080,9 @@ class _VideoCallPageState extends State<VideoCallPage>
 
   void _showJoinAnimationRequest(RoomJoinAnimationRequest request) {
     final knownIdentity = _trackedParticipantIds.contains(request.userId);
-    final knownUserId = _trackedParticipantIds.contains('user-${request.userId}');
+    final knownUserId = _trackedParticipantIds.contains(
+      'user-${request.userId}',
+    );
     if (knownIdentity || knownUserId) return;
     _trackedParticipantIds = {
       ..._trackedParticipantIds,
@@ -1147,13 +1099,16 @@ class _VideoCallPageState extends State<VideoCallPage>
 
     final request = RoomJoinAnimationRequest(
       userId: userId.toString(),
-      name: currentUser.name.trim().isNotEmpty ? currentUser.name.trim() : 'You',
-      avatarUrl: currentUser.avatarUrl?.trim().isNotEmpty == true
+      name:
+          currentUser.name.trim().isNotEmpty ? currentUser.name.trim() : 'You',
+      avatarUrl:
+          currentUser.avatarUrl?.trim().isNotEmpty == true
           ? currentUser.avatarUrl!.trim()
           : null,
       isHost: _isHost,
       isVip: currentUser.roles.any(
-        (role) => role.toLowerCase() == 'vip' || role.toLowerCase() == 'premium',
+        (role) =>
+            role.toLowerCase() == 'vip' || role.toLowerCase() == 'premium',
       ),
       level: currentUser.level,
     );
@@ -1347,9 +1302,11 @@ class _VideoCallPageState extends State<VideoCallPage>
 
   bool get _hostIsVip {
     if (_isHost) {
-      final roles = Get.find<AuthService>().currentUser?.roles ?? const <String>[];
+      final roles =
+          Get.find<AuthService>().currentUser?.roles ?? const <String>[];
       return roles.any(
-        (role) => role.toLowerCase() == 'vip' || role.toLowerCase() == 'premium',
+        (role) =>
+            role.toLowerCase() == 'vip' || role.toLowerCase() == 'premium',
       );
     }
     final room = _room;
@@ -1526,7 +1483,8 @@ class _VideoCallPageState extends State<VideoCallPage>
                 icon: Icons.flag_rounded,
                 title: 'Report user',
                 subtitle: 'Send a private moderation report',
-                onTap: userId == _myUserId
+                onTap:
+                    userId == _myUserId
                     ? null
                     : () {
                         Navigator.of(context).pop();
@@ -1559,11 +1517,11 @@ class _VideoCallPageState extends State<VideoCallPage>
                 ),
               if (canModerate)
                 _videoParticipantActionTile(
-                  icon: isBlocked
-                      ? Icons.lock_open_rounded
-                      : Icons.block_rounded,
+                  icon:
+                      isBlocked ? Icons.lock_open_rounded : Icons.block_rounded,
                   title: isBlocked ? 'Unblock user' : 'Block permanently',
-                  subtitle: isBlocked
+                  subtitle:
+                      isBlocked
                       ? 'Allow this user to join your rooms again'
                       : 'Remove and block from all your rooms',
                   destructive: !isBlocked,
@@ -1710,7 +1668,8 @@ class _VideoCallPageState extends State<VideoCallPage>
         _ExpandableFooterCluster(
           primaryIcon: Icons.tune_rounded,
           primaryAccent: const Color(0xFF5D8BFF),
-          primaryBadgeCount: _pkCapable && _pkActive ? 0 : _pendingRequests.length,
+          primaryBadgeCount:
+              _pkCapable && _pkActive ? 0 : _pendingRequests.length,
           actions: [
             _FooterActionItem(
               icon: _micOn ? Icons.mic_rounded : Icons.mic_off_rounded,
@@ -1729,7 +1688,9 @@ class _VideoCallPageState extends State<VideoCallPage>
             ),
             _FooterActionItem(
               icon:
-                  _giftBusy ? Icons.hourglass_top_rounded : Icons.redeem_rounded,
+                  _giftBusy
+                      ? Icons.hourglass_top_rounded
+                      : Icons.redeem_rounded,
               onTap: _giftBusy ? null : _openGiftSheet,
               accent: const Color(0xFFFF8BC2),
             ),
@@ -1739,8 +1700,7 @@ class _VideoCallPageState extends State<VideoCallPage>
                     _pkActive
                         ? Icons.stop_circle_outlined
                         : Icons.sports_martial_arts_rounded,
-                onTap:
-                    _pkActive ? _endPkBattle : _showPkInviteSheet,
+                onTap: _pkActive ? _endPkBattle : _showPkInviteSheet,
                 accent: const Color(0xFF7B50C5),
               ),
           ],
@@ -1752,8 +1712,7 @@ class _VideoCallPageState extends State<VideoCallPage>
     if (_currentRole == 'speaker') {
       if (showGiftInChatFooter) {
         final giftAction = _FooterCircleAction(
-          icon:
-              _giftBusy ? Icons.hourglass_top_rounded : Icons.redeem_rounded,
+          icon: _giftBusy ? Icons.hourglass_top_rounded : Icons.redeem_rounded,
           onTap: _giftBusy ? null : _openGiftSheet,
           accent: const Color(0xFFFF8BC2),
           busy: _giftBusy,
@@ -1778,7 +1737,8 @@ class _VideoCallPageState extends State<VideoCallPage>
               active: _micOn,
             ),
             _FooterActionItem(
-              icon: _camOn ? Icons.videocam_rounded : Icons.videocam_off_rounded,
+              icon:
+                  _camOn ? Icons.videocam_rounded : Icons.videocam_off_rounded,
               onTap: _toggleCam,
               active: _camOn,
             ),
@@ -1801,8 +1761,7 @@ class _VideoCallPageState extends State<VideoCallPage>
     if (_pkActive && showGiftInChatFooter) {
       actions.add(
         _FooterCircleAction(
-          icon:
-              _giftBusy ? Icons.hourglass_top_rounded : Icons.redeem_rounded,
+          icon: _giftBusy ? Icons.hourglass_top_rounded : Icons.redeem_rounded,
           onTap: _giftBusy ? null : _openGiftSheet,
           accent: const Color(0xFFFF8BC2),
           busy: _giftBusy,
@@ -1908,8 +1867,8 @@ class _VideoCallPageState extends State<VideoCallPage>
   }) {
     final current = _chatMessages.value;
     var changed = false;
-    final next =
-        current.map((message) {
+    final next = current
+        .map((message) {
           if (message.isSystem || message.senderId != userId) {
             return message;
           }
@@ -1924,7 +1883,8 @@ class _VideoCallPageState extends State<VideoCallPage>
             senderIsVip: resolvedVip,
             senderLevel: resolvedLevel,
           );
-        }).toList(growable: false);
+        })
+        .toList(growable: false);
     if (changed) {
       _chatMessages.value = next;
     }
@@ -1988,10 +1948,7 @@ class _VideoCallPageState extends State<VideoCallPage>
     );
   }
 
-  Widget _gdSheetIntro({
-    required String title,
-    required String subtitle,
-  }) {
+  Widget _gdSheetIntro({required String title, required String subtitle}) {
     return Column(
       children: [
         const GdLiveLogo(size: 46, showWordmark: false),
@@ -2090,10 +2047,7 @@ class _VideoCallPageState extends State<VideoCallPage>
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            accent.withOpacity(.10),
-            _tokens.chipColor.withOpacity(.72),
-          ],
+          colors: [accent.withOpacity(.10), _tokens.chipColor.withOpacity(.72)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -2233,7 +2187,8 @@ class _VideoCallPageState extends State<VideoCallPage>
   }
 
   bool _currentUserLooksVip() {
-    final roles = Get.find<AuthService>().currentUser?.roles ?? const <String>[];
+    final roles =
+        Get.find<AuthService>().currentUser?.roles ?? const <String>[];
     return roles.any((role) {
       final normalized = role.toLowerCase();
       return normalized.contains('vip') ||
@@ -2382,10 +2337,12 @@ class _VideoCallPageState extends State<VideoCallPage>
               _gdSheetBanner(
                 title: title,
                 subtitle: message,
-                accent: destructive
+                accent:
+                    destructive
                     ? _tokens.dangerColor
                     : _tokens.primaryButtonGradient.first,
-                icon: destructive
+                icon:
+                    destructive
                     ? Icons.warning_amber_rounded
                     : Icons.info_outline_rounded,
               ),
@@ -2411,7 +2368,8 @@ class _VideoCallPageState extends State<VideoCallPage>
                     child: FilledButton(
                       onPressed: () => Navigator.of(context).pop(true),
                       style: FilledButton.styleFrom(
-                        backgroundColor: destructive
+                        backgroundColor:
+                            destructive
                             ? _tokens.dangerColor
                             : _tokens.primaryButtonGradient.first,
                         foregroundColor: Colors.white,
@@ -2601,7 +2559,8 @@ class _VideoCallPageState extends State<VideoCallPage>
                         _gdChoiceChip(
                           label: _reasonLabel(reason),
                           selected: selectedReason == reason,
-                          accent: selectedReason == reason
+                          accent:
+                              selectedReason == reason
                               ? _tokens.dangerColor
                               : _tokens.primaryButtonGradient.first,
                           onTap: () {
@@ -2639,7 +2598,12 @@ class _VideoCallPageState extends State<VideoCallPage>
                           color: _tokens.textSecondary.withOpacity(.68),
                         ),
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                        contentPadding: const EdgeInsets.fromLTRB(
+                          14,
+                          14,
+                          14,
+                          14,
+                        ),
                       ),
                     ),
                   ),
@@ -2730,7 +2694,9 @@ class _VideoCallPageState extends State<VideoCallPage>
                 decoration: BoxDecoration(
                   color: _tokens.chipColor.withOpacity(.68),
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: _tokens.borderColor.withOpacity(.22)),
+                  border: Border.all(
+                    color: _tokens.borderColor.withOpacity(.22),
+                  ),
                 ),
                 child: TextField(
                   controller: controller,
@@ -2758,7 +2724,8 @@ class _VideoCallPageState extends State<VideoCallPage>
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+                  onPressed:
+                      () => Navigator.of(context).pop(controller.text.trim()),
                   style: FilledButton.styleFrom(
                     backgroundColor: _tokens.primaryButtonGradient.first,
                     foregroundColor: Colors.white,
@@ -2875,7 +2842,8 @@ class _VideoCallPageState extends State<VideoCallPage>
       if (!seen.add(userId)) continue;
 
       final isHost =
-          participant.identity.startsWith('host-') || metadata['is_host'] == true;
+          participant.identity.startsWith('host-') ||
+          metadata['is_host'] == true;
       final isSpeaking = room.activeSpeakers.any(
         (speaker) => speaker.identity == participant.identity,
       );
@@ -2883,7 +2851,9 @@ class _VideoCallPageState extends State<VideoCallPage>
         _HostModerationParticipant(
           userId: userId,
           name:
-              participant.name.isNotEmpty ? participant.name : participant.identity,
+              participant.name.isNotEmpty
+                  ? participant.name
+                  : participant.identity,
           subtitle: isHost ? 'Host' : 'Participant',
           brandKey: _participantBrandKey(participant),
           isVip: _participantIsVip(participant),
@@ -2891,7 +2861,8 @@ class _VideoCallPageState extends State<VideoCallPage>
           speaking: isSpeaking,
           level: _safeInt(metadata['level']),
           avatarUrl:
-              metadata['avatar_url']?.toString() ?? metadata['avatar']?.toString(),
+              metadata['avatar_url']?.toString() ??
+              metadata['avatar']?.toString(),
         ),
       );
     }
@@ -2906,9 +2877,7 @@ class _VideoCallPageState extends State<VideoCallPage>
 
   Future<void> _showViewerListSheet() async {
     final participants = _hostModerationParticipants();
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -3123,7 +3092,8 @@ class _VideoCallPageState extends State<VideoCallPage>
       final expectedRoomType = _normalizeGiftRoomType(widget.room.roomType);
       final opponentRoomId = (event['opponent_room_id'] ?? '').toString();
       final touchesCurrentRoom =
-          eventRoomId == widget.room.roomId || opponentRoomId == widget.room.roomId;
+          eventRoomId == widget.room.roomId ||
+          opponentRoomId == widget.room.roomId;
       if (!touchesCurrentRoom) return;
       if (eventRoomType.isNotEmpty && eventRoomType != expectedRoomType) return;
       final senderId = _safeInt(event['sender_user_id']);
@@ -3135,14 +3105,10 @@ class _VideoCallPageState extends State<VideoCallPage>
               ? (_normalizePkGiftSide(event['pk_side'] ?? event['pkSide']) ??
                   _inferPkGiftSideFromRoomEvent(eventRoomId))
               : null;
-      _recordPkGiftFromEvent(
-        event,
-        fallbackSide: inferredPkSide,
-      );
+      _recordPkGiftFromEvent(event, fallbackSide: inferredPkSide);
       _giftAnimationOverlay.handleSocketGiftEvent(
         event,
-        currentBrandKey:
-            'midnight',
+        currentBrandKey: 'midnight',
         receiverFallbackId:
             _safeInt(widget.room.meta?['host_user_id']) ??
             _safeInt(widget.room.meta?['host_id']),
@@ -3573,8 +3539,7 @@ class _VideoCallPageState extends State<VideoCallPage>
               ? _safeInt(myRequest?['requested_by'])
               : null;
       final myPendingRequestedByUser =
-          myRequestStatus == 'pending' &&
-                  myRequest?['requested_by_user'] is Map
+          myRequestStatus == 'pending' && myRequest?['requested_by_user'] is Map
               ? Map<String, dynamic>.from(
                 myRequest?['requested_by_user'] as Map,
               )
@@ -3598,8 +3563,7 @@ class _VideoCallPageState extends State<VideoCallPage>
             requests
                 .where(
                   (row) =>
-                      (row['status'] ?? '') == 'pending' &&
-                      !_isSeatInvite(row),
+                      (row['status'] ?? '') == 'pending' && !_isSeatInvite(row),
                 )
                 .toList();
         _speakers = speakers;
@@ -3614,7 +3578,8 @@ class _VideoCallPageState extends State<VideoCallPage>
             myPendingRequestedByUser['name']?.toString();
         _requestStatus = myRequestStatus;
         _lastSeatRequestWasHostInvite =
-            myPendingRequestedById != null && myPendingRequestedById != _myUserId;
+            myPendingRequestedById != null &&
+            myPendingRequestedById != _myUserId;
         _seatError = null;
       });
       if (myPendingRequestId != null &&
@@ -3757,7 +3722,9 @@ class _VideoCallPageState extends State<VideoCallPage>
     }
   }
 
-  Future<void> _showIncomingSeatRequestDialog(Map<String, dynamic> request) async {
+  Future<void> _showIncomingSeatRequestDialog(
+    Map<String, dynamic> request,
+  ) async {
     final requestId = _safeInt(request['request_id'] ?? request['id']);
     if (requestId == null || requestId <= 0) return;
     if (_incomingSeatRequestDialogOpen ||
@@ -3890,7 +3857,9 @@ class _VideoCallPageState extends State<VideoCallPage>
                                     borderRadius: BorderRadius.circular(18),
                                   ),
                                 ),
-                                child: Text(isHostInvite ? 'Decline' : 'Cancel'),
+                                child: Text(
+                                  isHostInvite ? 'Decline' : 'Cancel',
+                                ),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -3906,7 +3875,9 @@ class _VideoCallPageState extends State<VideoCallPage>
                                     borderRadius: BorderRadius.circular(18),
                                   ),
                                 ),
-                                child: Text(isHostInvite ? 'Join now' : 'Accept'),
+                                child: Text(
+                                  isHostInvite ? 'Join now' : 'Accept',
+                                ),
                               ),
                             ),
                           ],
@@ -3946,10 +3917,7 @@ class _VideoCallPageState extends State<VideoCallPage>
         viewerOnly: widget.viewerOnly,
         devMode: widget.devMode,
       );
-      await callController.placeCallFromLiveRoom(
-        roomId: roomId,
-        type: 'video',
-      );
+      await callController.placeCallFromLiveRoom(roomId: roomId, type: 'video');
     } catch (e) {
       if (!mounted) return;
       Get.snackbar(
@@ -4244,19 +4212,23 @@ class _VideoCallPageState extends State<VideoCallPage>
     final battle = _pkBattle;
     if (battle == null || !battle.isActive) return;
     _primePkGiftLeadersForBattle(battle);
-    final side = _normalizePkGiftSide(event['pk_side'] ?? event['pkSide'] ?? fallbackSide);
+    final side = _normalizePkGiftSide(
+      event['pk_side'] ?? event['pkSide'] ?? fallbackSide,
+    );
     if (side == null) return;
     final senderId =
         _safeInt(event['sender_user_id'] ?? event['senderId']) ??
         _safeInt(event['user_id']);
     if (senderId == null) return;
-    final senderName = (event['sender_name'] ?? event['senderName'] ?? 'Someone')
+    final senderName =
+        (event['sender_name'] ?? event['senderName'] ?? 'Someone')
         .toString()
         .trim();
     final avatarUrl =
         (event['sender_avatar'] ?? event['senderAvatar'])?.toString().trim();
     final quantity = (_safeInt(event['quantity']) ?? 1).clamp(1, 9999);
-    final coinsPerUnit = _safeInt(event['coins_per_unit'] ?? event['coinsPerUnit']) ?? 0;
+    final coinsPerUnit =
+        _safeInt(event['coins_per_unit'] ?? event['coinsPerUnit']) ?? 0;
     final totalCoins =
         _safeInt(event['totalCoins'] ?? event['total_coins']) ??
         (coinsPerUnit * quantity);
@@ -4304,13 +4276,16 @@ class _VideoCallPageState extends State<VideoCallPage>
   }
 
   List<_PkSupporterStanding> _topPkSupportersFor(String side) {
-    final items = (_pkGiftLeadersBySide[side] ?? const <int, _PkSupporterStanding>{})
+    final items =
+        (_pkGiftLeadersBySide[side] ?? const <int, _PkSupporterStanding>{})
         .values
         .toList()
       ..sort((a, b) {
         final byCoins = b.totalCoins.compareTo(a.totalCoins);
         if (byCoins != 0) return byCoins;
-        return a.senderName.toLowerCase().compareTo(b.senderName.toLowerCase());
+            return a.senderName.toLowerCase().compareTo(
+              b.senderName.toLowerCase(),
+            );
       });
     return items.take(3).toList(growable: false);
   }
@@ -4330,9 +4305,9 @@ class _VideoCallPageState extends State<VideoCallPage>
       final winnerHost = battle.ownHostFor(widget.room.roomId);
       winnerName = winnerHost?['name']?.toString();
       winnerAvatarUrl =
-          winnerHost?['avatar_url']?.toString() ?? winnerHost?['avatar']?.toString();
-      topSupporters =
-          _topPkSupportersFor('left')
+          winnerHost?['avatar_url']?.toString() ??
+          winnerHost?['avatar']?.toString();
+      topSupporters = _topPkSupportersFor('left')
               .map(
                 (supporter) => PkWinnerSupporter(
                   userId: supporter.senderId,
@@ -4348,9 +4323,9 @@ class _VideoCallPageState extends State<VideoCallPage>
       final winnerHost = battle.opponentHostFor(widget.room.roomId);
       winnerName = winnerHost?['name']?.toString();
       winnerAvatarUrl =
-          winnerHost?['avatar_url']?.toString() ?? winnerHost?['avatar']?.toString();
-      topSupporters =
-          _topPkSupportersFor('right')
+          winnerHost?['avatar_url']?.toString() ??
+          winnerHost?['avatar']?.toString();
+      topSupporters = _topPkSupportersFor('right')
               .map(
                 (supporter) => PkWinnerSupporter(
                   userId: supporter.senderId,
@@ -4550,8 +4525,10 @@ class _VideoCallPageState extends State<VideoCallPage>
         final totalScore = math.max(1, ownScore + opponentScore);
         final ownFraction = ownScore / totalScore;
         final opponentFraction = opponentScore / totalScore;
-        final leadSide = ownScore == opponentScore ? 0 : (ownScore > opponentScore ? 1 : -1);
-        final pkDangerMode = battle.remainingSeconds > 0 && battle.remainingSeconds <= 10;
+        final leadSide =
+            ownScore == opponentScore ? 0 : (ownScore > opponentScore ? 1 : -1);
+        final pkDangerMode =
+            battle.remainingSeconds > 0 && battle.remainingSeconds <= 10;
         return Stack(
           children: [
             Positioned.fill(
@@ -4586,7 +4563,9 @@ class _VideoCallPageState extends State<VideoCallPage>
                         const Color(0xFF06080E),
                       ],
                     ),
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(22),
+                    ),
                   ),
                 ),
               ),
@@ -4628,19 +4607,18 @@ class _VideoCallPageState extends State<VideoCallPage>
                             ? _localSpeaking
                             : _room?.activeSpeakers.any(
                                   (speaker) =>
-                                      speaker.identity == ownParticipant.identity,
+                                      speaker.identity ==
+                                      ownParticipant.identity,
                                 ) ??
                                 false),
                     isPkWinner: battle.winnerRoomId == widget.room.roomId,
                     borderRadius: 0,
                     child:
                         _isHost
-                            ? (_renderer.srcObject != null
-                                ? RTCVideoView(
-                                  _renderer,
-                                  mirror: _frontFacing,
-                                  objectFit:
-                                      RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                            ? (ownTrack != null
+                                ? VideoTrackRenderer(
+                                  ownTrack,
+                                  fit: VideoViewFit.cover,
                                 )
                                 : _PkVideoFallback(
                                   name:
@@ -4681,7 +4659,8 @@ class _VideoCallPageState extends State<VideoCallPage>
                             )
                             : _PkVideoFallback(
                               name:
-                                  opponentHost?['name']?.toString() ?? 'Opponent',
+                                  opponentHost?['name']?.toString() ??
+                                  'Opponent',
                               subtitle:
                                   _opponentConnecting
                                       ? 'Connecting…'
@@ -4776,14 +4755,16 @@ class _VideoCallPageState extends State<VideoCallPage>
               children: [
                 _gdSheetIntro(
                   title: 'Start PK Battle',
-                  subtitle: candidates.isEmpty
+                  subtitle:
+                      candidates.isEmpty
                       ? 'No active host rooms are available right now.'
                       : 'Invite another live host into a PK battle.',
                 ),
                 const SizedBox(height: 14),
                 _gdSheetBanner(
                   title: 'PK Matchmaking',
-                  subtitle: candidates.isEmpty
+                  subtitle:
+                      candidates.isEmpty
                       ? 'Check back in a moment for more live hosts.'
                       : 'Pick a live room to send a PK challenge.',
                   accent: _tokens.primaryButtonGradient.first,
@@ -4851,7 +4832,8 @@ class _VideoCallPageState extends State<VideoCallPage>
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         hostName,
@@ -5012,6 +4994,7 @@ class _VideoCallPageState extends State<VideoCallPage>
 
     if (_canPublishMedia) {
       final localParticipant = room.localParticipant;
+      final localTrack = _localCameraTrack(room);
       final currentUser = Get.find<AuthService>().currentUser;
       final trimmedCurrentUserName = currentUser?.name.trim() ?? '';
       final localDisplayName =
@@ -5036,7 +5019,9 @@ class _VideoCallPageState extends State<VideoCallPage>
           brandKey: localBrandKey,
           isHost: _isHost,
           isVip:
-              localParticipant != null ? _participantIsVip(localParticipant) : false,
+              localParticipant != null
+                  ? _participantIsVip(localParticipant)
+                  : false,
           isSpeaking: _localSpeaking,
           userId: _myUserId ?? currentUser?.id,
           avatarUrl: currentUser?.avatarUrl,
@@ -5045,8 +5030,7 @@ class _VideoCallPageState extends State<VideoCallPage>
               (_myUserId ?? currentUser?.id) == null
                   ? null
                   : () => _showParticipantProfileCard(
-                    userId:
-                        _myUserId ?? currentUser!.id,
+                    userId: _myUserId ?? currentUser!.id,
                     name: localDisplayName,
                     subtitle: _isHost ? 'Host' : 'Participant',
                     brandKey: localBrandKey,
@@ -5060,12 +5044,8 @@ class _VideoCallPageState extends State<VideoCallPage>
                     avatarUrl: currentUser?.avatarUrl,
                   ),
           child:
-              _renderer.srcObject != null
-                  ? RTCVideoView(
-                    _renderer,
-                    mirror: _frontFacing,
-                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                  )
+              localTrack != null
+                  ? VideoTrackRenderer(localTrack, fit: VideoViewFit.cover)
                   : _PkVideoFallback(
                     name: localDisplayName,
                     subtitle: _camOn ? 'Camera starting…' : 'Camera off',
@@ -5082,7 +5062,8 @@ class _VideoCallPageState extends State<VideoCallPage>
       final userId = _safeInt(metadata['user_id']);
       final role = metadata['role']?.toString().toLowerCase().trim() ?? '';
       final isHost =
-          participant.identity.startsWith('host-') || metadata['is_host'] == true;
+          participant.identity.startsWith('host-') ||
+          metadata['is_host'] == true;
       final name =
           isHost
               ? _hostDisplayName
@@ -5156,7 +5137,9 @@ class _VideoCallPageState extends State<VideoCallPage>
         const <dynamic>[];
     if (rawTiles.isEmpty) return const <_StageTileData>[];
 
-    return rawTiles.whereType<Map>().map((entry) {
+    return rawTiles
+        .whereType<Map>()
+        .map((entry) {
       final data = Map<String, dynamic>.from(entry);
       final brandKey = normalizeBrandVariant(
         data['brand_key']?.toString() ?? 'midnight',
@@ -5174,7 +5157,8 @@ class _VideoCallPageState extends State<VideoCallPage>
         isVip: data['is_vip'] == true,
         isSpeaking: data['is_speaking'] == true,
         userId: _safeInt(data['user_id']),
-        avatarUrl: data['avatar_url']?.toString() ?? data['avatar']?.toString(),
+            avatarUrl:
+                data['avatar_url']?.toString() ?? data['avatar']?.toString(),
         level: _safeInt(data['level']),
         onProfileTap:
             _safeInt(data['user_id']) == null
@@ -5195,12 +5179,10 @@ class _VideoCallPageState extends State<VideoCallPage>
                       data['avatar_url']?.toString() ??
                       data['avatar']?.toString(),
                 ),
-        child: _DevVideoTilePlaceholder(
-          label: label,
-          brandKey: brandKey,
-        ),
+            child: _DevVideoTilePlaceholder(label: label, brandKey: brandKey),
       );
-    }).toList(growable: false);
+        })
+        .toList(growable: false);
   }
 
   /* ===================== UI ===================== */
@@ -5210,10 +5192,10 @@ class _VideoCallPageState extends State<VideoCallPage>
     final title = widget.room.title ?? 'GD Live';
     final media = MediaQuery.of(context);
     final pad = media.padding;
-    final isCompactDevice =
-        media.size.width < 360 || media.size.height < 760;
+    final isCompactDevice = media.size.width < 360 || media.size.height < 760;
     final isNarrowScreen = media.size.width < 360;
-    final stageTiles = widget.devMode && _room == null ? _devStageTiles() : _stageTiles();
+    final stageTiles =
+        widget.devMode && _room == null ? _devStageTiles() : _stageTiles();
     final inlineError =
         _seatError ?? _giftError ?? _pkOverlaySubtitle ?? _error;
     final hasTopTicker =
@@ -5221,11 +5203,15 @@ class _VideoCallPageState extends State<VideoCallPage>
         (_viewerStatusText != null && !_canModerate);
     final topRowHeight = isCompactDevice ? 42.0 : 46.0;
     final topRowGap = isCompactDevice ? 2.0 : 4.0;
-    final topTickerHeight = hasTopTicker ? (isCompactDevice ? 38.0 : 42.0) : 0.0;
+    final topTickerHeight =
+        hasTopTicker ? (isCompactDevice ? 38.0 : 42.0) : 0.0;
     final topTickerGap = hasTopTicker ? (isCompactDevice ? 8.0 : 10.0) : 0.0;
     final pkStageTopInset =
         pad.top + topRowGap + topRowHeight + topTickerGap + topTickerHeight;
-    final pkAvailableHeight = math.max(0.0, media.size.height - pkStageTopInset);
+    final pkAvailableHeight = math.max(
+      0.0,
+      media.size.height - pkStageTopInset,
+    );
     final pkStageHeight = pkAvailableHeight * 0.4;
     final pkRailHeight = math.min(52.0, pkAvailableHeight * 0.08);
     final pkLeadersHeight = pkAvailableHeight * 0.1;
@@ -5267,7 +5253,9 @@ class _VideoCallPageState extends State<VideoCallPage>
                 height: 180,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _tokens.primaryButtonGradient.first.withOpacity(.12),
+                      color: _tokens.primaryButtonGradient.first.withOpacity(
+                        .12,
+                      ),
                 ),
               ),
             ),
@@ -5297,7 +5285,9 @@ class _VideoCallPageState extends State<VideoCallPage>
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                       : KeyedSubtree(
-                        key: _giftAnchors.keyFor(GiftAnchorRegistry.stageCenter),
+                            key: _giftAnchors.keyFor(
+                              GiftAnchorRegistry.stageCenter,
+                            ),
                         child:
                             _pkCapable && _pkActive
                                 ? _buildPkVideoStage(
@@ -5367,7 +5357,8 @@ class _VideoCallPageState extends State<VideoCallPage>
                         onDismiss:
                             () => setState(() => _recentGiftMessage = null),
                       ),
-                    ] else if (_viewerStatusText != null && !_canModerate) ...[
+                        ] else if (_viewerStatusText != null &&
+                            !_canModerate) ...[
                       SizedBox(height: isCompactDevice ? 8 : 10),
                       _FloatingTickerBanner(
                         icon:
@@ -5382,7 +5373,8 @@ class _VideoCallPageState extends State<VideoCallPage>
                                     _requestStatus == 'removed'
                                 ? Colors.orangeAccent
                                 : const Color(0xFF7B50C5),
-                        onDismiss: () => setState(() => _requestStatus = null),
+                            onDismiss:
+                                () => setState(() => _requestStatus = null),
                       ),
                     ],
                   ],
@@ -5398,8 +5390,7 @@ class _VideoCallPageState extends State<VideoCallPage>
               ),
             Positioned.fill(
               child: Obx(() {
-                final viewerBrandKey =
-                    'midnight';
+                    final viewerBrandKey = 'midnight';
                 return LiveRoomChatOverlay(
                   key: ValueKey('video-room-chat-$viewerBrandKey'),
                   messagesListenable: _chatMessages,
@@ -5430,9 +5421,12 @@ class _VideoCallPageState extends State<VideoCallPage>
                     _showParticipantProfileCard(
                       userId: message.senderId,
                       name: message.senderName,
-                      subtitle: message.senderIsHost
+                          subtitle:
+                              message.senderIsHost
                           ? 'Host'
-                          : (message.senderIsVip ? 'VIP Participant' : 'Participant'),
+                                  : (message.senderIsVip
+                                      ? 'VIP Participant'
+                                      : 'Participant'),
                       brandKey: kGdLiveBrandKey,
                       isVip: message.senderIsVip,
                       isHost: message.senderIsHost,
@@ -5463,12 +5457,13 @@ class _VideoCallPageState extends State<VideoCallPage>
               child: GiftAnimationLayer(
                 manager: _giftAnimationOverlay,
                 anchors: _giftAnchors,
-                currentBrandKey:
-                    'midnight',
+                    currentBrandKey: 'midnight',
                 receiverAnchorName: GiftAnchorRegistry.videoHostTile,
                 stageCenterAnchorName: GiftAnchorRegistry.stageCenter,
                 pkLeftAnchorName:
-                    _pkCapable && _pkActive ? GiftAnchorRegistry.pkLeft : null,
+                        _pkCapable && _pkActive
+                            ? GiftAnchorRegistry.pkLeft
+                            : null,
                 pkRightAnchorName:
                     _pkCapable && _pkActive
                         ? GiftAnchorRegistry.pkRight
@@ -5587,10 +5582,7 @@ class _HostModerationParticipant {
 }
 
 class _DevVideoTilePlaceholder extends StatelessWidget {
-  const _DevVideoTilePlaceholder({
-    required this.label,
-    required this.brandKey,
-  });
+  const _DevVideoTilePlaceholder({required this.label, required this.brandKey});
 
   final String label;
   final String brandKey;
@@ -5633,7 +5625,9 @@ class _DevVideoTilePlaceholder extends StatelessWidget {
                   radius: 34,
                   backgroundColor: tokens.primaryButtonGradient.first,
                   child: Text(
-                    label.isNotEmpty ? label.characters.first.toUpperCase() : '?',
+                    label.isNotEmpty
+                        ? label.characters.first.toUpperCase()
+                        : '?',
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w900,
@@ -5683,9 +5677,7 @@ class _PkVideoFallback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     return DecoratedBox(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -5765,9 +5757,7 @@ class _VideoParticipantProfileFallbackSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     final frameTokens = getBrandTokens(brandKey);
     return SafeArea(
       top: false,
@@ -5805,7 +5795,9 @@ class _VideoParticipantProfileFallbackSheet extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(26),
-                  border: Border.all(color: tokens.borderColor.withOpacity(.22)),
+                  border: Border.all(
+                    color: tokens.borderColor.withOpacity(.22),
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -5823,7 +5815,8 @@ class _VideoParticipantProfileFallbackSheet extends StatelessWidget {
                             colors: frameTokens.primaryButtonGradient,
                           ),
                         ),
-                        child: avatarUrl?.trim().isNotEmpty == true
+                        child:
+                            avatarUrl?.trim().isNotEmpty == true
                             ? ClipRRect(
                                 borderRadius: BorderRadius.circular(26),
                                 child: Image.network(
@@ -5875,7 +5868,8 @@ class _VideoParticipantProfileFallbackSheet extends StatelessWidget {
                             children: [
                               if (isHost) _VideoProfileChip(label: 'Host'),
                               if (isVip) _VideoProfileChip(label: 'VIP'),
-                              if (speaking) _VideoProfileChip(label: 'Speaking'),
+                              if (speaking)
+                                _VideoProfileChip(label: 'Speaking'),
                               if (level != null)
                                 _VideoProfileChip(label: 'LV $level'),
                               if (userId != null)
@@ -5912,9 +5906,7 @@ class _VideoProfileChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -5948,9 +5940,7 @@ class _PkInvitePrompt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     final host = battle.hostA;
     final room = battle.roomA;
     return Container(
@@ -6033,9 +6023,7 @@ class _CircleGlassButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -6102,9 +6090,7 @@ class _FooterCircleAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     final tint =
         accent ??
         (active
@@ -6208,9 +6194,7 @@ class _FooterPillAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     final tint = accent ?? tokens.primaryButtonGradient.first;
     final enabled = onTap != null && !busy;
 
@@ -6273,11 +6257,10 @@ class _ResponsiveChatInputAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     final screenWidth = MediaQuery.of(context).size.width;
-    final iconOnly = iconOnlyBelowWidth > 0 && screenWidth <= iconOnlyBelowWidth;
+    final iconOnly =
+        iconOnlyBelowWidth > 0 && screenWidth <= iconOnlyBelowWidth;
     final resolvedLabel = label;
     final tint = accent ?? tokens.primaryButtonGradient.first;
     final enabled = onTap != null && !busy;
@@ -6340,7 +6323,11 @@ class _ResponsiveChatInputAction extends StatelessWidget {
                                     ),
                                   ),
                                 )
-                                : Icon(icon, size: 18, color: Colors.white.withOpacity(.94)),
+                                : Icon(
+                                  icon,
+                                  size: 18,
+                                  color: Colors.white.withOpacity(.94),
+                                ),
                       )
                       : Row(
                         mainAxisSize: MainAxisSize.min,
@@ -6357,7 +6344,11 @@ class _ResponsiveChatInputAction extends StatelessWidget {
                               ),
                             )
                           else
-                            Icon(icon, size: 15, color: Colors.white.withOpacity(.92)),
+                            Icon(
+                              icon,
+                              size: 15,
+                              color: Colors.white.withOpacity(.92),
+                            ),
                           const SizedBox(width: 6),
                           Text(
                             resolvedLabel,
@@ -6433,9 +6424,7 @@ class _ExpandableFooterClusterState extends State<_ExpandableFooterCluster> {
     final overlay = Overlay.of(context, rootOverlay: true);
     _entry = OverlayEntry(
       builder: (context) {
-        final tokens = getBrandTokens(
-          'midnight',
-        );
+        final tokens = getBrandTokens('midnight');
         return Stack(
           children: [
             Positioned.fill(
@@ -6549,19 +6538,14 @@ class _ExpandableFooterClusterState extends State<_ExpandableFooterCluster> {
 }
 
 class _PkGiftActionRow extends StatelessWidget {
-  const _PkGiftActionRow({
-    required this.busy,
-    required this.onTap,
-  });
+  const _PkGiftActionRow({required this.busy, required this.onTap});
 
   final bool busy;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: .97, end: 1),
       duration: const Duration(milliseconds: 900),
@@ -6729,9 +6713,7 @@ class _PkTopSupportersBand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     return DecoratedBox(
       decoration: BoxDecoration(
         color: const Color(0xFF0A0D14),
@@ -6872,7 +6854,10 @@ class _PkSupportersLane extends StatelessWidget {
                       textColor: textColor,
                       crowned: i == 0 && rankSupporters[i] != null,
                       emptyLabel: i == 0 ? emptyLabel : null,
-                      onTap: rankSupporters[i] == null ? null : () => onSupporterTap(rankSupporters[i]!),
+                      onTap:
+                          rankSupporters[i] == null
+                              ? null
+                              : () => onSupporterTap(rankSupporters[i]!),
                     ),
                   ),
                 ),
@@ -6986,7 +6971,9 @@ class _PkSupporterCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: textColor.withOpacity(supporter != null ? .88 : .50),
+                          color: textColor.withOpacity(
+                            supporter != null ? .88 : .50,
+                          ),
                           fontWeight: FontWeight.w800,
                           fontSize: 9.1,
                         ),
@@ -7000,7 +6987,9 @@ class _PkSupporterCard extends StatelessWidget {
                           color:
                               crowned
                                   ? accent.first.withOpacity(.84)
-                                  : textColor.withOpacity(supporter != null ? .58 : .36),
+                                  : textColor.withOpacity(
+                                    supporter != null ? .58 : .36,
+                                  ),
                           fontWeight: FontWeight.w800,
                           fontSize: 8.1,
                         ),
@@ -7091,10 +7080,7 @@ class _PkSupporterAvatar extends StatelessWidget {
               size: 14,
               color: const Color(0xFFFFD86B),
               shadows: [
-                Shadow(
-                  color: Colors.black.withOpacity(.35),
-                  blurRadius: 8,
-                ),
+                Shadow(color: Colors.black.withOpacity(.35), blurRadius: 8),
               ],
             ),
           ),
@@ -7105,7 +7091,9 @@ class _PkSupporterAvatar extends StatelessWidget {
 
 String _formatCompactPkCoins(int value) {
   if (value >= 1000000) {
-    final compact = (value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1);
+    final compact = (value / 1000000).toStringAsFixed(
+      value >= 10000000 ? 0 : 1,
+    );
     return '${compact.replaceAll(RegExp(r'\\.0$'), '')}M';
   }
   if (value >= 1000) {
@@ -7128,9 +7116,7 @@ class _TopRightExitPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     final tint = accent ?? tokens.chipColor.withOpacity(.92);
     final width = MediaQuery.sizeOf(context).width;
     final compact = width < 390;
@@ -7185,9 +7171,7 @@ class _DevPkControlPad extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     return DecoratedBox(
       decoration: BoxDecoration(
         color: const Color(0xD90A0D13),
@@ -7318,9 +7302,7 @@ class _LiveRoomInfoPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     final width = MediaQuery.sizeOf(context).width;
     final compact = width < 390;
     final narrow = width < 360;
@@ -7391,9 +7373,9 @@ class _LiveRoomInfoPill extends StatelessWidget {
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFFFF355D).withOpacity(
-                                        .34,
-                                      ),
+                                      color: const Color(
+                                        0xFFFF355D,
+                                      ).withOpacity(.34),
                                       blurRadius: 8,
                                     ),
                                   ],
@@ -7468,7 +7450,8 @@ class _LiveRoomPillAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = compact ? 34.0 : 42.0;
-    final initial = name.trim().isNotEmpty
+    final initial =
+        name.trim().isNotEmpty
         ? name.trim().characters.first.toUpperCase()
         : 'H';
     return SizedBox(
@@ -7501,10 +7484,7 @@ class _LiveRoomPillAvatarFallback extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            tint.withOpacity(.94),
-            tint.withOpacity(.54),
-          ],
+          colors: [tint.withOpacity(.94), tint.withOpacity(.54)],
         ),
       ),
       child: Center(
@@ -7549,11 +7529,7 @@ class _LiveHudSubPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: compact ? 11.5 : 12,
-            color: tint.withOpacity(.96),
-          ),
+          Icon(icon, size: compact ? 11.5 : 12, color: tint.withOpacity(.96)),
           SizedBox(width: compact ? 4 : 5),
           Flexible(
             child: Text(
@@ -7607,10 +7583,7 @@ class _LiveHudMetricPill extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  Colors.black.withOpacity(.24),
-                  tint.withOpacity(.16),
-                ],
+                colors: [Colors.black.withOpacity(.24), tint.withOpacity(.16)],
               ),
               border: Border.all(color: Colors.white.withOpacity(.10)),
               boxShadow: [
@@ -7660,11 +7633,7 @@ class _MiniInfoDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 12,
-      color: color,
-    );
+    return Container(width: 1, height: 12, color: color);
   }
 }
 
@@ -7675,9 +7644,7 @@ class _InlineMetaText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     final compact = MediaQuery.sizeOf(context).width < 390;
     return Text(
       label,
@@ -7698,9 +7665,7 @@ class _MetaPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -7735,9 +7700,7 @@ class _FloatingTickerBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -7858,19 +7821,14 @@ class _DynamicStageGrid extends StatelessWidget {
     }
 
     if (tiles.length == 2) {
-      final ordered = List<_StageTileData>.from(tiles)
-        ..sort((a, b) {
+      final ordered = List<_StageTileData>.from(tiles)..sort((a, b) {
           if (a.isHost == b.isHost) return 0;
           return a.isHost ? -1 : 1;
         });
       return Column(
         children: [
-          Expanded(
-            child: _StageTile(tile: ordered[0]),
-          ),
-          Expanded(
-            child: _StageTile(tile: ordered[1]),
-          ),
+          Expanded(child: _StageTile(tile: ordered[0])),
+          Expanded(child: _StageTile(tile: ordered[1])),
         ],
       );
     }
@@ -7882,10 +7840,12 @@ class _DynamicStageGrid extends StatelessWidget {
           Expanded(
             child: Row(
               children: [
-                for (var tileIndex = 0; tileIndex < rows[rowIndex].length; tileIndex++) ...[
-                  Expanded(
-                    child: _StageTile(tile: rows[rowIndex][tileIndex]),
-                  ),
+                for (
+                  var tileIndex = 0;
+                  tileIndex < rows[rowIndex].length;
+                  tileIndex++
+                ) ...[
+                  Expanded(child: _StageTile(tile: rows[rowIndex][tileIndex])),
                   if (tileIndex != rows[rowIndex].length - 1)
                     const SizedBox.shrink(),
                 ],
@@ -8197,11 +8157,11 @@ class _HostModerationSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     final fillRatio =
-        maxSpeakers <= 0 ? 0.0 : (speakerCount / maxSpeakers).clamp(0, 1).toDouble();
+        maxSpeakers <= 0
+            ? 0.0
+            : (speakerCount / maxSpeakers).clamp(0, 1).toDouble();
     return GdModalSurface(
       tokens: tokens,
       radius: 30,
@@ -8214,11 +8174,16 @@ class _HostModerationSheet extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: tokens.chipColor.withOpacity(.60),
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: tokens.borderColor.withOpacity(.18)),
+                  border: Border.all(
+                    color: tokens.borderColor.withOpacity(.18),
+                  ),
                 ),
                 child: Text(
                   'MODERATION',
@@ -8237,7 +8202,9 @@ class _HostModerationSheet extends StatelessWidget {
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(tokens.textPrimary),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      tokens.textPrimary,
+                    ),
                   ),
                 ),
             ],
@@ -8299,7 +8266,9 @@ class _HostModerationSheet extends StatelessWidget {
                 if (speakers.isEmpty)
                   Text(
                     'Only the host is on camera.',
-                    style: TextStyle(color: tokens.textSecondary.withOpacity(.74)),
+                    style: TextStyle(
+                      color: tokens.textSecondary.withOpacity(.74),
+                    ),
                   )
                 else
                   SizedBox(
@@ -8310,7 +8279,8 @@ class _HostModerationSheet extends StatelessWidget {
                       separatorBuilder: (_, __) => const SizedBox(width: 10),
                       itemBuilder: (context, index) {
                         final row = speakers[index];
-                        final userId = int.tryParse('${row['user_id'] ?? ''}') ?? 0;
+                        final userId =
+                            int.tryParse('${row['user_id'] ?? ''}') ?? 0;
                         final name = (row['name'] ?? 'Speaker').toString();
                         final frameTokens = getBrandTokens(kGdLiveBrandKey);
                         final isVip = row['is_vip'] == true;
@@ -8339,7 +8309,10 @@ class _HostModerationSheet extends StatelessWidget {
                                             row['avatar']?.toString(),
                                         label: name,
                                         size: 42,
-                                        backgroundColor: frameTokens.primaryButtonGradient.first,
+                                        backgroundColor:
+                                            frameTokens
+                                                .primaryButtonGradient
+                                                .first,
                                       ),
                                     ),
                                     const Spacer(),
@@ -8350,9 +8323,13 @@ class _HostModerationSheet extends StatelessWidget {
                                           vertical: 3,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: frameTokens.primaryButtonGradient.first
+                                          color: frameTokens
+                                              .primaryButtonGradient
+                                              .first
                                               .withOpacity(.24),
-                                          borderRadius: BorderRadius.circular(999),
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
                                         ),
                                         child: const Text(
                                           'VIP',
@@ -8382,7 +8359,9 @@ class _HostModerationSheet extends StatelessWidget {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      color: tokens.textSecondary.withOpacity(.82),
+                                      color: tokens.textSecondary.withOpacity(
+                                        .82,
+                                      ),
                                       fontSize: 11.5,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -8399,9 +8378,13 @@ class _HostModerationSheet extends StatelessWidget {
                                     style: OutlinedButton.styleFrom(
                                       foregroundColor: tokens.textPrimary,
                                       side: BorderSide(
-                                        color: tokens.dangerColor.withOpacity(.34),
+                                        color: tokens.dangerColor.withOpacity(
+                                          .34,
+                                        ),
                                       ),
-                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 10,
+                                      ),
                                     ),
                                     child: const Text('Remove'),
                                   ),
@@ -8442,11 +8425,13 @@ class _HostModerationSheet extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final row = pendingRequests[index];
                   final requestId =
-                      int.tryParse('${row['request_id'] ?? row['id'] ?? ''}') ?? 0;
+                      int.tryParse('${row['request_id'] ?? row['id'] ?? ''}') ??
+                      0;
                   final user = (row['user'] as Map?) ?? const {};
                   final name = (user['name'] ?? 'Viewer').toString();
-                  final level =
-                      int.tryParse('${user['level'] ?? row['level'] ?? ''}');
+                  final level = int.tryParse(
+                    '${user['level'] ?? row['level'] ?? ''}',
+                  );
                   final isVip = user['is_vip'] == true || row['is_vip'] == true;
                   return Container(
                     padding: const EdgeInsets.all(12),
@@ -8486,8 +8471,7 @@ class _HostModerationSheet extends StatelessWidget {
                                       ),
                                     ),
                                   ),
-                                  if (isVip)
-                                    _MetaPill(label: 'VIP'),
+                                  if (isVip) _MetaPill(label: 'VIP'),
                                   if (level != null) ...[
                                     const SizedBox(width: 6),
                                     _MetaPill(label: 'LV $level'),
@@ -8521,7 +8505,9 @@ class _HostModerationSheet extends StatelessWidget {
                                       style: OutlinedButton.styleFrom(
                                         foregroundColor: tokens.textPrimary,
                                         side: BorderSide(
-                                          color: tokens.borderColor.withOpacity(.34),
+                                          color: tokens.borderColor.withOpacity(
+                                            .34,
+                                          ),
                                         ),
                                       ),
                                       child: const Text('Reject'),
@@ -8565,9 +8551,7 @@ class _RoleActionDock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: compact ? 10 : 12,
@@ -8616,9 +8600,7 @@ class _DockAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     final tint =
         accent ??
         (active
@@ -8774,9 +8756,7 @@ class _ViewerSpeakerRequestPanel extends StatelessWidget {
             icon: Icon(
               pendingRequest ? Icons.close_rounded : Icons.mic_rounded,
             ),
-            label: Text(
-              pendingRequest ? 'Cancel Stage Request' : 'Join Stage',
-            ),
+            label: Text(pendingRequest ? 'Cancel Stage Request' : 'Join Stage'),
           ),
           if (pendingRequest)
             const Padding(
@@ -8818,9 +8798,7 @@ class _InlineErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
@@ -8847,9 +8825,7 @@ class _FrostedCapsule extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       margin: const EdgeInsets.only(top: 10),
@@ -8868,9 +8844,7 @@ class _GlassPad extends StatelessWidget {
   const _GlassPad({required this.child});
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -8947,9 +8921,7 @@ class _AnimatedVeil extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
     return AnimatedBuilder(
       animation: glow,
       builder: (_, __) {
@@ -9284,7 +9256,7 @@ class _LiveInRoomBannerState extends State<_LiveInRoomBanner> {
                       ),
                       child: const Icon(
                         Icons.chevron_right_rounded,
-                          color: Colors.white,
+                        color: Colors.white,
                         size: 16,
                       ),
                     ),

@@ -21,14 +21,14 @@ class CallSocketService {
     Future<void> Function(String reason)? onForceLogout,
   }) async {
     await stop();
-    final deviceId = await DeviceIdService.getAndroidId();
+    final deviceId = await DeviceIdService.getDeviceId();
 
     _socket = io.io(url, <String, dynamic>{
       'transports': ['websocket'],
       'auth': {
         'token': bearerToken,
         if (deviceId.isNotEmpty) 'device_id': deviceId,
-        'platform': AppSettingsService.androidPlatform,
+        'platform': AppSettingsService.clientPlatform,
         'app_version': AppSettingsService.appVersionName,
         'app_version_code': AppSettingsService.appVersionCode,
       },

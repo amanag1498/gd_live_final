@@ -8,6 +8,10 @@ import 'package:gd_live/services/device_id_service.dart';
 import 'package:gd_live/services/app_settings_service.dart';
 
 String _ts() => DateTime.now().toIso8601String();
+const bool _verbosePresenceLogs = bool.fromEnvironment(
+  'VERBOSE_PRESENCE_LOGS',
+  defaultValue: false,
+);
 typedef ForceLogoutHandler = Future<void> Function(String reason);
 typedef NotifyHandler = Future<void> Function(Map<String, dynamic> payload);
 
@@ -34,6 +38,12 @@ class PresenceService with WidgetsBindingObserver {
 
   bool get isConnected => _sock?.connected == true;
 
+  void _log(String message, {bool verbose = true}) {
+    if (!kDebugMode) return;
+    if (verbose && !_verbosePresenceLogs) return;
+    debugPrint(message);
+  }
+
   Future<void> start({
     required String wsPresenceUrl,
     required String bearerToken,
@@ -44,11 +54,11 @@ class PresenceService with WidgetsBindingObserver {
         _url == wsPresenceUrl && _token == bearerToken && _sock != null;
     _url = wsPresenceUrl;
     _token = bearerToken;
-    _deviceId = await DeviceIdService.getAndroidId();
+    _deviceId = await DeviceIdService.getDeviceId();
     _onForceLogout = onForceLogout;
     _onNotify = onNotify;
 
-    debugPrint(
+    _log(
       '[presence][${_ts()}] start -> url=$_url token.len=${_token?.length ?? 0}',
     );
     if (!_observerRegistered) {
@@ -56,10 +66,12 @@ class PresenceService with WidgetsBindingObserver {
       _observerRegistered = true;
     }
 
-    _connSub ??= Connectivity().onConnectivityChanged.listen((dynamic event) async {
+    _connSub ??= Connectivity().onConnectivityChanged.listen((
+      dynamic event,
+    ) async {
       final results = _normalizeConnectivity(event);
       final online = _isAnyOnline(results);
-      debugPrint('[presence][${_ts()}] connectivity=$results online=$online');
+      _log('[presence][${_ts()}] connectivity=$results online=$online');
 
       if (!online) return;
 
@@ -83,7 +95,7 @@ class PresenceService with WidgetsBindingObserver {
   }
 
   Future<void> stop() async {
-    debugPrint('[presence][${_ts()}] stop()');
+    _log('[presence][${_ts()}] stop()');
     try {
       _sock?.emit('presence:offline');
     } catch (_) {}
@@ -112,7 +124,7 @@ class PresenceService with WidgetsBindingObserver {
         _sock?.emit('presence:ping');
       }
     });
-    debugPrint('[presence][${_ts()}] heartbeat started (10s)');
+    _log('[presence][${_ts()}] heartbeat started (10s)');
   }
 
   Future<bool> _ensureConnected({
@@ -174,12 +186,15 @@ class PresenceService with WidgetsBindingObserver {
     final ok = await _ensureConnected();
     try {
       if (!ok) {
-        debugPrint('[presence][${_ts()}] resumeOnline: failed to reconnect');
+        _log(
+          '[presence][${_ts()}] resumeOnline: failed to reconnect',
+          verbose: false,
+        );
         return;
       }
       _sock?.emit('presence:online');
       _sock?.emit('presence:subscribe');
-      debugPrint('[presence][${_ts()}] -> presence:online (manual resume)');
+      _log('[presence][${_ts()}] -> presence:online (manual resume)');
       _startHB();
     } finally {
       _resumeInFlight = false;
@@ -188,11 +203,11 @@ class PresenceService with WidgetsBindingObserver {
 
   Future<void> _connect() async {
     if (_url == null || _token == null) {
-      debugPrint('[presence][${_ts()}] skip connect: url/token missing');
+      _log('[presence][${_ts()}] skip connect: url/token missing');
       return;
     }
     if (_connecting) {
-      debugPrint('[presence][${_ts()}] skip connect: already connecting');
+      _log('[presence][${_ts()}] skip connect: already connecting');
       return;
     }
 
@@ -212,7 +227,7 @@ class PresenceService with WidgetsBindingObserver {
         'auth': {
           'token': _token,
           if ((_deviceId ?? '').isNotEmpty) 'device_id': _deviceId,
-          'platform': AppSettingsService.androidPlatform,
+          'platform': AppSettingsService.clientPlatform,
           'app_version': AppSettingsService.appVersionName,
           'app_version_code': AppSettingsService.appVersionCode,
         },
@@ -223,12 +238,12 @@ class PresenceService with WidgetsBindingObserver {
         'timeout': 8000,
       };
 
-      debugPrint('[presence][${_ts()}] connecting -> $_url');
+      _log('[presence][${_ts()}] connecting -> $_url');
       final s = IO.io(_url!, opts);
       _sock = s;
 
       s.on('connect', (_) {
-        debugPrint('[presence][${_ts()}] connected (id=${s.id})');
+        _log('[presence][${_ts()}] connected (id=${s.id})', verbose: false);
         _statusCtrl.add('connected');
         s.emit('presence:online');
         s.emit('presence:subscribe');
@@ -236,7 +251,7 @@ class PresenceService with WidgetsBindingObserver {
       });
 
       s.on('disconnect', (reason) {
-        debugPrint('[presence][${_ts()}] disconnected: $reason');
+        _log('[presence][${_ts()}] disconnected: $reason', verbose: false);
         _statusCtrl.add('disconnected');
         _hb?.cancel();
         _hb = null;
@@ -244,7 +259,7 @@ class PresenceService with WidgetsBindingObserver {
 
       s.on('connect_error', (e) async {
         final msg = e?.toString() ?? '';
-        debugPrint('[presence] connect_error: $msg');
+        _log('[presence] connect_error: $msg', verbose: false);
         if (_onForceLogout != null) {
           if (msg.contains('blocked'))
             await _onForceLogout!('blocked');
@@ -255,7 +270,7 @@ class PresenceService with WidgetsBindingObserver {
 
       s.on('error', (e) async {
         final msg = e?.toString() ?? (e is Map ? e['message']?.toString() : '');
-        debugPrint('[presence] error: $msg');
+        _log('[presence] error: $msg', verbose: false);
         if (_onForceLogout != null) {
           if (msg!.contains('blocked'))
             await _onForceLogout!('blocked');
@@ -267,7 +282,7 @@ class PresenceService with WidgetsBindingObserver {
       // runtime block
       // runtime logout (server kicks you because another device logged in)
       s.on('auth:logout', (data) async {
-        debugPrint('[presence][${_ts()}] <auth:logout> $data');
+        _log('[presence][${_ts()}] <auth:logout> $data', verbose: false);
         if (_onForceLogout != null) {
           final reason =
               (data is Map && data['reason'] is String)
@@ -278,7 +293,7 @@ class PresenceService with WidgetsBindingObserver {
       });
 
       s.on('auth:blocked', (data) async {
-        debugPrint('[presence][${_ts()}] <auth:blocked> $data');
+        _log('[presence][${_ts()}] <auth:blocked> $data', verbose: false);
         if (_onForceLogout != null) {
           await _onForceLogout!.call('blocked');
         }
@@ -291,10 +306,10 @@ class PresenceService with WidgetsBindingObserver {
               (data is Map)
                   ? Map<String, dynamic>.from(data)
                   : <String, dynamic>{};
-          debugPrint('[presence][${_ts()}] <notify> $payload');
+          _log('[presence][${_ts()}] <notify> $payload');
           if (_onNotify != null) await _onNotify!(payload);
         } catch (e) {
-          debugPrint('[presence] notify parse error: $e');
+          _log('[presence] notify parse error: $e', verbose: false);
         }
       });
 
@@ -302,7 +317,7 @@ class PresenceService with WidgetsBindingObserver {
       //  s.on('presence:snapshot', (d) => debugPrint('[presence][${_ts()}] <presence:snapshot> $d'));
       s.on(
         'presence:count',
-        (d) => debugPrint('[presence][${_ts()}] <presence:count> $d'),
+        (d) => _log('[presence][${_ts()}] <presence:count> $d'),
       );
       //  s.on('presence:delta',   (d) => debugPrint('[presence][${_ts()}] <presence:delta> $d'));
     } finally {
@@ -326,7 +341,7 @@ class PresenceService with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) async {
     if (_sock == null) return;
-    debugPrint('[presence][${_ts()}] lifecycle: $state');
+    _log('[presence][${_ts()}] lifecycle: $state');
 
     if (state == AppLifecycleState.resumed) {
       await resumeOnline();
@@ -335,7 +350,7 @@ class PresenceService with WidgetsBindingObserver {
       try {
         _sock?.emit('presence:offline');
       } catch (_) {}
-      debugPrint('[presence][${_ts()}] -> presence:offline (bg)');
+      _log('[presence][${_ts()}] -> presence:offline (bg)');
       _hb?.cancel();
       _hb = null;
     }

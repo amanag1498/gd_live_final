@@ -43,13 +43,19 @@ class GreedyGameService
     public function enabled(): bool
     {
         return (bool) config('games.greedy.enabled', false)
-            && (bool) config('app_features.platform.android.greedy_enabled', false);
+            && (
+                (bool) config('app_features.platform.android.greedy_enabled', false)
+                || (bool) config('app_features.platform.ios.greedy_enabled', false)
+            );
     }
 
     public function visibleInVideoRoomStrip(): bool
     {
         return (bool) config('games.greedy.visible_in_video_room_strip', true)
-            && (bool) config('app_features.platform.android.video_room_games_enabled', true);
+            && (
+                (bool) config('app_features.platform.android.video_room_games_enabled', true)
+                || (bool) config('app_features.platform.ios.video_room_games_enabled', false)
+            );
     }
 
     public function fakeBetsEnabled(): bool

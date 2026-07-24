@@ -212,10 +212,10 @@ class _DashboardPageState extends State<DashboardPage>
                 rank: item.rank,
                 avatarUrl: resolveAvatarUrl(api, item.avatar),
                 title: item.name,
-                subtitle:
-                    'Gift ${_compact(item.giftCoins)} • Call ${_compact(item.callCoins)}',
-                value: item.totalCoins,
-                valueLabel: 'gross coins',
+                subtitle: 'Host',
+                value: 0,
+                valueLabel: '',
+                showValue: false,
               ),
             )
             .toList(growable: false);
@@ -231,10 +231,10 @@ class _DashboardPageState extends State<DashboardPage>
                 rank: item.rank,
                 avatarUrl: null,
                 title: item.name,
-                subtitle:
-                    'Gift ${_compact(item.giftCoins)} • Call ${_compact(item.callCoins)}',
-                value: item.totalCoins,
-                valueLabel: 'gross coins',
+                subtitle: 'Agency',
+                value: 0,
+                valueLabel: '',
+                showValue: false,
                 fallbackIcon: Icons.apartment_rounded,
               ),
             )
@@ -625,39 +625,34 @@ class _DashboardControlDock extends StatelessWidget {
             onChanged: onGroupChanged,
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                flex: 7,
-                child: _ModeSwitcher<_BoardPeriod>(
-                  value: period,
-                  options: const [
-                    _ModeOption(_BoardPeriod.weekly, 'This Week'),
-                    _ModeOption(_BoardPeriod.lastWeek, 'Last Week'),
-                    _ModeOption(_BoardPeriod.alltime, 'All Time'),
-                  ],
-                  onChanged: onPeriodChanged,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(flex: 5, child: _MiniDateBoard(label: label)),
+          _ModeSwitcher<_BoardPeriod>(
+            value: period,
+            options: const [
+              _ModeOption(_BoardPeriod.weekly, 'This Week'),
+              _ModeOption(_BoardPeriod.lastWeek, 'Last Week'),
+              _ModeOption(_BoardPeriod.alltime, 'All Time'),
             ],
+            onChanged: onPeriodChanged,
           ),
+          const SizedBox(height: 10),
+          _PeriodInfoStrip(label: label, countdown: countdown),
         ],
       ),
     );
   }
 }
 
-class _MiniDateBoard extends StatelessWidget {
-  const _MiniDateBoard({required this.label});
+class _PeriodInfoStrip extends StatelessWidget {
+  const _PeriodInfoStrip({required this.label, required this.countdown});
 
   final String label;
+  final String countdown;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
         gradient: const LinearGradient(
@@ -669,24 +664,48 @@ class _MiniDateBoard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Window',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 10.5,
-              fontWeight: FontWeight.w700,
-            ),
+          Row(
+            children: [
+              const Text(
+                'Board Window',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(.10),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: Colors.white.withOpacity(.12)),
+                ),
+                child: Text(
+                  countdown,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             label,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
-              fontSize: 12,
+              fontSize: 12.5,
               fontWeight: FontWeight.w800,
-              height: 1.15,
+              height: 1.2,
             ),
           ),
         ],
@@ -787,36 +806,43 @@ class _LeadPulseCard extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    entry.valueLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF67816F),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+                  if (entry.showValue) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      entry.valueLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF67816F),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
-            const SizedBox(width: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                color: Colors.white.withOpacity(.86),
-              ),
-              child: Text(
-                _compact(entry.value),
-                style: TextStyle(
-                  color: tokens.primaryButtonGradient.first,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
+            if (entry.showValue) ...[
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  color: Colors.white.withOpacity(.86),
+                ),
+                child: Text(
+                  _compact(entry.value),
+                  style: TextStyle(
+                    color: tokens.primaryButtonGradient.first,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -1646,6 +1672,7 @@ class _FocusedLeaderboard extends StatelessWidget {
                     subtitle: entry.subtitle,
                     value: entry.value,
                     valueLabel: entry.valueLabel,
+                    showValue: entry.showValue,
                     fallbackIcon: entry.fallbackIcon,
                   );
                 }),
@@ -1986,10 +2013,10 @@ class _HostLeaderboardList extends StatelessWidget {
                   rank: item.rank,
                   avatarUrl: resolveAvatarUrl(api, item.avatar),
                   title: item.name,
-                  subtitle:
-                      'Gift ${_compact(item.giftCoins)} • Call ${_compact(item.callCoins)}',
-                  value: item.totalCoins,
-                  valueLabel: 'gross coins',
+                  subtitle: 'Host',
+                  value: 0,
+                  valueLabel: '',
+                  showValue: false,
                 ),
               )
               .toList(growable: false),
@@ -2000,10 +2027,10 @@ class _HostLeaderboardList extends StatelessWidget {
             rank: item.rank,
             avatarUrl: resolveAvatarUrl(api, item.avatar),
             title: item.name,
-            subtitle:
-                'Gift ${_compact(item.giftCoins)} • Call ${_compact(item.callCoins)}',
-            value: item.totalCoins,
-            valueLabel: 'gross coins',
+            subtitle: 'Host',
+            value: 0,
+            valueLabel: '',
+            showValue: false,
           );
         }),
       ],
@@ -2034,10 +2061,10 @@ class _AgencyLeaderboardList extends StatelessWidget {
                   rank: item.rank,
                   avatarUrl: null,
                   title: item.name,
-                  subtitle:
-                      'Gift ${_compact(item.giftCoins)} • Call ${_compact(item.callCoins)}',
-                  value: item.totalCoins,
-                  valueLabel: 'gross coins',
+                  subtitle: 'Agency',
+                  value: 0,
+                  valueLabel: '',
+                  showValue: false,
                   fallbackIcon: Icons.apartment_rounded,
                 ),
               )
@@ -2049,10 +2076,10 @@ class _AgencyLeaderboardList extends StatelessWidget {
             rank: item.rank,
             avatarUrl: null,
             title: item.name,
-            subtitle:
-                'Gift ${_compact(item.giftCoins)} • Call ${_compact(item.callCoins)}',
-            value: item.totalCoins,
-            valueLabel: 'gross coins',
+            subtitle: 'Agency',
+            value: 0,
+            valueLabel: '',
+            showValue: false,
             fallbackIcon: Icons.apartment_rounded,
           );
         }),
@@ -2068,6 +2095,7 @@ class _SpotlightEntry {
     required this.subtitle,
     required this.value,
     required this.valueLabel,
+    this.showValue = true,
     this.avatarUrl,
     this.fallbackIcon = Icons.person_rounded,
   });
@@ -2077,6 +2105,7 @@ class _SpotlightEntry {
   final String subtitle;
   final int value;
   final String valueLabel;
+  final bool showValue;
   final String? avatarUrl;
   final IconData fallbackIcon;
 }
@@ -2234,11 +2263,13 @@ class _SpotlightCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  _ValuePill(
-                    value: _compact(entry.value),
-                    label: entry.valueLabel,
-                  ),
+                  if (entry.showValue) ...[
+                    const SizedBox(width: 8),
+                    _ValuePill(
+                      value: _compact(entry.value),
+                      label: entry.valueLabel,
+                    ),
+                  ],
                 ],
               )
               : Column(
@@ -2278,11 +2309,13 @@ class _SpotlightCard extends StatelessWidget {
                       height: 1.3,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  _ValuePill(
-                    value: _compact(entry.value),
-                    label: entry.valueLabel,
-                  ),
+                  if (entry.showValue) ...[
+                    const SizedBox(height: 12),
+                    _ValuePill(
+                      value: _compact(entry.value),
+                      label: entry.valueLabel,
+                    ),
+                  ],
                 ],
               ),
     );
@@ -2441,6 +2474,11 @@ class _ChampionShowcase extends StatelessWidget {
                 builder: (context, constraints) {
                   final compact = constraints.maxWidth < 370;
                   final body = _ChampionIdentity(entry: entry);
+
+                  if (!entry.showValue) {
+                    return body;
+                  }
+
                   final value = _ValuePill(
                     value: _compact(entry.value),
                     label: entry.valueLabel,
@@ -2592,6 +2630,7 @@ class _LeaderboardRow extends StatelessWidget {
     required this.subtitle,
     required this.value,
     required this.valueLabel,
+    this.showValue = true,
     this.fallbackIcon = Icons.person_rounded,
   });
 
@@ -2601,6 +2640,7 @@ class _LeaderboardRow extends StatelessWidget {
   final String subtitle;
   final int value;
   final String valueLabel;
+  final bool showValue;
   final IconData fallbackIcon;
 
   @override
@@ -2690,43 +2730,45 @@ class _LeaderboardRow extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              color: const Color(0xFFF0FAF2),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const CoinLottie(size: 16),
-                    const SizedBox(width: 6),
-                    Text(
-                      _compact(value),
-                      style: const TextStyle(
-                        color: Color(0xFF102715),
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
+          if (showValue) ...[
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                color: const Color(0xFFF0FAF2),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CoinLottie(size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        _compact(value),
+                        style: const TextStyle(
+                          color: Color(0xFF102715),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  valueLabel,
-                  style: TextStyle(
-                    color: const Color(0xFF66816F),
-                    fontWeight: FontWeight.w500,
-                    fontSize: 10,
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 2),
+                  Text(
+                    valueLabel,
+                    style: TextStyle(
+                      color: const Color(0xFF66816F),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

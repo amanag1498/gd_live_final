@@ -24,7 +24,7 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        Paginator::useBootstrapFive();
+        Paginator::useTailwind();
 
         try {
             if (Schema::hasTable('app_settings')) {

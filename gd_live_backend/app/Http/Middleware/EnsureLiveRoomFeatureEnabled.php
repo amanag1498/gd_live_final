@@ -3,17 +3,26 @@
 namespace App\Http\Middleware;
 
 use App\Models\LiveRoom;
+use App\Services\AppSettingsService;
 use Closure;
 use Illuminate\Http\Request;
 
 class EnsureLiveRoomFeatureEnabled
 {
+    public function __construct(private AppSettingsService $settings)
+    {
+    }
+
     public function handle(Request $request, Closure $next)
     {
         $roomType = $this->resolveRoomType($request);
+        $platform = $request->header('X-Client-Platform');
 
         if ($roomType === null) {
-            $videoEnabled = (bool) config('app_features.platform.android.video_rooms_enabled', true);
+            $videoEnabled = $this->settings->featureEnabled(
+                'video_rooms_enabled',
+                $platform,
+            );
 
             if ($videoEnabled) {
                 return $next($request);
@@ -22,7 +31,10 @@ class EnsureLiveRoomFeatureEnabled
             return $this->reject('live_rooms_disabled', 'Live rooms are currently unavailable.');
         }
 
-        if ($roomType === 'video' && !(bool) config('app_features.platform.android.video_rooms_enabled', true)) {
+        if (
+            $roomType === 'video'
+            && !$this->settings->featureEnabled('video_rooms_enabled', $platform)
+        ) {
             return $this->reject('video_rooms_enabled', 'Video rooms are currently unavailable.');
         }
 

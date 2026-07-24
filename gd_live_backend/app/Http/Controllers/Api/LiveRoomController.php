@@ -90,7 +90,14 @@ class LiveRoomController extends Controller
         $viewer = $request->user();
         abort_unless($viewer, 401);
 
-        abort_unless((bool) config('app_features.platform.android.video_rooms_enabled', true), 403, 'Live rooms are currently unavailable.');
+        abort_unless(
+            app(\App\Services\AppSettingsService::class)->featureEnabled(
+                'video_rooms_enabled',
+                $request->header('X-Client-Platform'),
+            ),
+            403,
+            'Live rooms are currently unavailable.',
+        );
 
         $this->state->syncRedis();
 

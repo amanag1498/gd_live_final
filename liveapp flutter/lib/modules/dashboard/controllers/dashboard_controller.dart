@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
-
 import 'package:get/get.dart';
 
 import '../models/leaderboard_dto.dart';
@@ -45,18 +43,6 @@ class DashboardController extends GetxController {
       final payload = await _api.fetchLeaderboards();
       leaderboards.value = payload;
       _lastLoadedAt = DateTime.now();
-      final firstWeeklyUser = payload.usersWeekly.isNotEmpty
-          ? payload.usersWeekly.first
-          : null;
-      final firstWeeklyHost = payload.hostsWeekly.isNotEmpty
-          ? payload.hostsWeekly.first
-          : null;
-      debugPrint(
-        '[dashboard][payload] '
-        'usersWeekly.first.avatar=${firstWeeklyUser?.avatar} '
-        'hostsWeekly.first.avatar=${firstWeeklyHost?.avatar} '
-        'hostsWeekly.first.id=${firstWeeklyHost?.hostId}',
-      );
     } catch (e) {
       error.value = e.toString();
     } finally {

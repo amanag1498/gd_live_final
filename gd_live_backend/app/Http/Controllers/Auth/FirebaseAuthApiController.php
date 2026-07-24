@@ -230,6 +230,15 @@ class FirebaseAuthApiController extends Controller
         $name  = $verified->claims()->get('name');
         $pic   = $verified->claims()->get('picture');
         $ev    = (bool) ($verified->claims()->get('email_verified') ?? false);
+        $firebaseClaims = $verified->claims()->get('firebase') ?? [];
+        $signInProvider = is_array($firebaseClaims)
+            ? ($firebaseClaims['sign_in_provider'] ?? null)
+            : null;
+        $provider = match ($signInProvider) {
+            'apple.com' => 'apple',
+            'google.com' => 'google',
+            default => 'google',
+        };
 
         if (!$email) {
             OpsMetrics::increment(OpsMetrics::AUTH_FAILURES);
@@ -250,7 +259,7 @@ class FirebaseAuthApiController extends Controller
                 'email'             => $email,
                 'firebase_uid'      => $uid,
                 'avatar_url'        => $pic,
-                'provider'          => 'google',
+                'provider'          => $provider,
                 'email_verified_at' => $ev ? now() : null,
                 'device_id'         => $deviceId,
                 'password'          => bcrypt(str()->random(32)),
@@ -260,6 +269,7 @@ class FirebaseAuthApiController extends Controller
             $patch = [];
             if ($deviceId)                                 $patch['device_id'] = $deviceId;  // 👈 always current
             if (!$user->firebase_uid)                      $patch['firebase_uid'] = $uid;
+            if ($user->provider !== $provider)              $patch['provider'] = $provider;
             if ($ev && is_null($user->email_verified_at))  $patch['email_verified_at'] = now();
             if (!$user->avatar_url && $pic)                $patch['avatar_url'] = $pic;
             if (!empty($patch)) $user->forceFill($patch)->save();

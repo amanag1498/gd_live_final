@@ -83,36 +83,45 @@ class RemoteMediaArt extends StatelessWidget {
           SizedBox(
             width: width,
             height: height,
-            child: isBundled
-                ? SVGAEasyPlayer(
-                    assetsName: value,
-                    fit: fit,
-                    enableAudio: enableAudio,
-                  )
-                : SVGAEasyPlayer(
-                    resUrl: value,
-                    fit: fit,
-                    enableAudio: enableAudio,
-                  ),
+            child:
+                isBundled
+                    ? SVGAEasyPlayer(
+                      assetsName: value,
+                      fit: fit,
+                      enableAudio: enableAudio,
+                    )
+                    : SVGAEasyPlayer(
+                      resUrl: value,
+                      fit: fit,
+                      enableAudio: enableAudio,
+                    ),
           ),
         );
       case RemoteMediaKind.svg:
         return _clip(
-          isBundled
-              ? SvgPicture.asset(
-                  value,
+          SizedBox(
+            width: width,
+            height: height,
+            child: FutureBuilder<String?>(
+              future:
+                  isBundled ? _loadBundledSvg(value) : _loadNetworkSvg(value),
+              builder: (context, snapshot) {
+                final data = snapshot.data;
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return placeholder;
+                }
+                if (snapshot.hasError || data == null || data.trim().isEmpty) {
+                  return placeholder;
+                }
+                return SvgPicture.string(
+                  data,
                   width: width,
                   height: height,
                   fit: fit,
-                  placeholderBuilder: (_) => placeholder,
-                )
-              : SvgPicture.network(
-                  value,
-                  width: width,
-                  height: height,
-                  fit: fit,
-                  placeholderBuilder: (_) => placeholder,
-                ),
+                );
+              },
+            ),
+          ),
         );
       case RemoteMediaKind.gif:
       case RemoteMediaKind.image:
@@ -120,23 +129,23 @@ class RemoteMediaArt extends StatelessWidget {
         return _clip(
           isBundled
               ? Image.asset(
-                  value,
-                  width: width,
-                  height: height,
-                  fit: fit,
-                  errorBuilder: (_, __, ___) => placeholder,
-                )
+                value,
+                width: width,
+                height: height,
+                fit: fit,
+                errorBuilder: (_, __, ___) => placeholder,
+              )
               : Image.network(
-                  value,
-                  width: width,
-                  height: height,
-                  fit: fit,
-                  errorBuilder: (_, __, ___) => placeholder,
-                  loadingBuilder: (context, child, progress) {
-                    if (progress == null) return child;
-                    return placeholder;
-                  },
-                ),
+                value,
+                width: width,
+                height: height,
+                fit: fit,
+                errorBuilder: (_, __, ___) => placeholder,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return placeholder;
+                },
+              ),
         );
     }
   }
@@ -150,6 +159,23 @@ class RemoteMediaArt extends StatelessWidget {
         return false;
       }
     });
+  }
+
+  Future<String?> _loadBundledSvg(String value) async {
+    try {
+      return await rootBundle.loadString(value);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String?> _loadNetworkSvg(String value) async {
+    try {
+      final asset = NetworkAssetBundle(Uri.parse(value));
+      return await asset.loadString(value);
+    } catch (_) {
+      return null;
+    }
   }
 
   Widget _clip(Widget child) {
