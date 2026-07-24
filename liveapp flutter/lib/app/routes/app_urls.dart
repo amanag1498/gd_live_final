@@ -1,12 +1,14 @@
+import 'package:flutter/foundation.dart';
+
 class AppUrls {
   static const String apiHost = String.fromEnvironment(
     'APP_API_HOST',
     defaultValue: 'api.gdlive.in',
   );
 
-  static const String socketHost = String.fromEnvironment(
+  static const String _configuredSocketHost = String.fromEnvironment(
     'APP_SOCKET_HOST',
-    defaultValue: '31.97.233.109',
+    defaultValue: '',
   );
 
   static const int apiPort = int.fromEnvironment(
@@ -14,9 +16,9 @@ class AppUrls {
     defaultValue: 443,
   );
 
-  static const int wsPort = int.fromEnvironment(
+  static const int _configuredWsPort = int.fromEnvironment(
     'APP_WS_PORT',
-    defaultValue: 4001,
+    defaultValue: 0,
   );
 
   static const String apiScheme = String.fromEnvironment(
@@ -24,23 +26,32 @@ class AppUrls {
     defaultValue: 'https',
   );
 
-  static const String socketScheme = String.fromEnvironment(
+  static const String _configuredSocketScheme = String.fromEnvironment(
     'APP_SOCKET_SCHEME',
-    defaultValue: 'ws',
+    defaultValue: '',
   );
 
-  static String get apiOrigin => _buildOrigin(
-        apiScheme,
-        apiHost,
-        apiPort,
-        omitDefaultPort: true,
-      );
+  static bool get _isIos =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
-  static String get socketOrigin => _buildSocketOrigin(
-        socketScheme,
-        socketHost,
-        wsPort,
-      );
+  static String get socketHost =>
+      _configuredSocketHost.isNotEmpty
+          ? _configuredSocketHost
+          : (_isIos ? 'ws.gdlive.in' : '31.97.233.109');
+
+  static int get wsPort =>
+      _configuredWsPort > 0 ? _configuredWsPort : (_isIos ? 443 : 4001);
+
+  static String get socketScheme =>
+      _configuredSocketScheme.isNotEmpty
+          ? _configuredSocketScheme
+          : (_isIos ? 'wss' : 'ws');
+
+  static String get apiOrigin =>
+      _buildOrigin(apiScheme, apiHost, apiPort, omitDefaultPort: true);
+
+  static String get socketOrigin =>
+      _buildSocketOrigin(socketScheme, socketHost, wsPort);
 
   static String get websiteOrigin => apiOrigin;
 
@@ -61,23 +72,19 @@ class AppUrls {
   static String get deactivateAccountMailto =>
       'mailto:$supportEmail?subject=${Uri.encodeComponent('GD Live account deactivation request')}';
 
-  static String _buildSocketOrigin(
-    String scheme,
-    String host,
-    int port,
-  ) {
-    final normalizedScheme = scheme
-        .trim()
-        .toLowerCase()
-        .replaceAll('://', '');
+  static String _buildSocketOrigin(String scheme, String host, int port) {
+    final normalizedScheme = scheme.trim().toLowerCase().replaceAll('://', '');
 
     final normalizedHost = host.trim();
 
     // socket_io_client 2.x uses Uri.port directly. If the URL omits the port,
     // Uri.port becomes 0 and the transport ends up dialing :0.
-    final safePort = port <= 0
-        ? ((normalizedScheme == 'ws' || normalizedScheme == 'http') ? 80 : 443)
-        : port;
+    final safePort =
+        port <= 0
+            ? ((normalizedScheme == 'ws' || normalizedScheme == 'http')
+                ? 80
+                : 443)
+            : port;
 
     return '$normalizedScheme://$normalizedHost:$safePort';
   }
@@ -88,10 +95,7 @@ class AppUrls {
     int port, {
     bool omitDefaultPort = true,
   }) {
-    final normalizedScheme = scheme
-        .trim()
-        .toLowerCase()
-        .replaceAll('://', '');
+    final normalizedScheme = scheme.trim().toLowerCase().replaceAll('://', '');
 
     final normalizedHost = host.trim();
 

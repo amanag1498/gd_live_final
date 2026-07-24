@@ -60,41 +60,18 @@ class AuthService {
   // Google -> Firebase -> Laravel (returns UserModel)
   Future<UserModel> signInWithGoogleAndBackend() async {
     try {
-      debugPrint('[auth] starting Google sign-in');
-      // 1) Google Sign-In
-      final GoogleSignInAccount? gUser = await _gsi.signIn();
-      if (gUser == null) {
-        debugPrint('[auth] Google sign-in aborted by user');
-        throw Exception('Sign-in aborted');
-      }
-      debugPrint('[auth] Google account selected: ${gUser.email}');
-
-      final GoogleSignInAuthentication gAuth = await gUser.authentication;
-      debugPrint(
-        '[auth] Google auth received '
-        'idToken=${gAuth.idToken != null && gAuth.idToken!.isNotEmpty} '
-        'accessToken=${gAuth.accessToken != null && gAuth.accessToken!.isNotEmpty}',
-      );
-
-      // 2) Firebase sign-in to obtain a *fresh* ID token
-      final credential = fb.GoogleAuthProvider.credential(
-        idToken: gAuth.idToken,
-        accessToken: gAuth.accessToken,
-      );
-      debugPrint('[auth] signing into Firebase with Google credential');
-      final fb.UserCredential fbCred = await fb.FirebaseAuth.instance
-          .signInWithCredential(credential);
-      final fb.User? fUser = fbCred.user;
-      if (fUser == null) {
-        debugPrint('[auth] Firebase sign-in returned null user');
-        throw Exception('Firebase user missing');
-      }
+      final fUser = await _signInToFirebaseWithGoogle();
       debugPrint('[auth] Firebase sign-in success uid=${fUser.uid}');
       return await _completeFirebaseLogin(fUser, deviceName: 'flutter-google');
     } on fb.FirebaseAuthException catch (e) {
       debugPrint(
         '[auth] FirebaseAuthException code=${e.code} message=${e.message}',
       );
+      if (isStaleGoogleCredential(e.code, e.message)) {
+        throw Exception(
+          'Google sign-in session expired. Enable automatic date and time, then try again.',
+        );
+      }
       throw Exception('Firebase sign-in failed: ${e.message ?? e.code}');
     } on DioException catch (e) {
       // If backend actively signals block via 423 or payload, convert it
@@ -123,6 +100,57 @@ class AuthService {
     } catch (e) {
       debugPrint('[auth] unexpected auth error: $e');
       rethrow;
+    }
+  }
+
+  Future<fb.User> _signInToFirebaseWithGoogle({bool isRetry = false}) async {
+    debugPrint(
+      isRetry
+          ? '[auth] retrying Google sign-in with a fresh provider session'
+          : '[auth] starting Google sign-in',
+    );
+    final GoogleSignInAccount? gUser = await _gsi.signIn();
+    if (gUser == null) {
+      debugPrint('[auth] Google sign-in aborted by user');
+      throw Exception('Sign-in aborted');
+    }
+    debugPrint('[auth] Google account selected: ${gUser.email}');
+
+    final GoogleSignInAuthentication gAuth = await gUser.authentication;
+    debugPrint(
+      '[auth] Google auth received '
+      'idToken=${gAuth.idToken != null && gAuth.idToken!.isNotEmpty} '
+      'accessToken=${gAuth.accessToken != null && gAuth.accessToken!.isNotEmpty}',
+    );
+
+    final credential = fb.GoogleAuthProvider.credential(
+      idToken: gAuth.idToken,
+      accessToken: gAuth.accessToken,
+    );
+    debugPrint('[auth] signing into Firebase with Google credential');
+    try {
+      final fbCred = await fb.FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
+      final user = fbCred.user;
+      if (user == null) {
+        debugPrint('[auth] Firebase sign-in returned null user');
+        throw Exception('Firebase user missing');
+      }
+      return user;
+    } on fb.FirebaseAuthException catch (error) {
+      if (isRetry || !isStaleGoogleCredential(error.code, error.message)) {
+        rethrow;
+      }
+
+      debugPrint('[auth] stale Google credential detected; refreshing once');
+      try {
+        await _gsi.signOut();
+      } catch (_) {}
+      try {
+        await fb.FirebaseAuth.instance.signOut();
+      } catch (_) {}
+      return _signInToFirebaseWithGoogle(isRetry: true);
     }
   }
 
@@ -282,4 +310,13 @@ class AuthService {
     }
     return msg;
   }
+}
+
+@visibleForTesting
+bool isStaleGoogleCredential(String code, String? message) {
+  if (code != 'invalid-credential') return false;
+  final normalized = (message ?? '').toLowerCase();
+  return normalized.contains('stale') ||
+      normalized.contains('expired') ||
+      normalized.contains('malformed');
 }
