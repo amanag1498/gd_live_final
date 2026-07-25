@@ -1,11 +1,12 @@
 # Meta App Events release configuration
 
-The SDK stays disabled unless the release is built with `--dart-define=META_APP_EVENTS_ENABLED=true`.
+The SDK is enabled by default. Use `--dart-define=META_APP_EVENTS_ENABLED=false`
+only when a build must suppress Meta app events.
 
 1. In Meta for Developers, add Android package `com.techybugs.gdlive` and iOS bundle ID `com.techybugs.gdlive`, then link the Meta app to the production Business Portfolio and ad account.
 2. Copy `android/meta.properties.example` to `android/meta.properties` and set the Meta App ID and Client Token.
 3. Copy `ios/Flutter/Meta.xcconfig.example` to `ios/Flutter/Meta.xcconfig` and set the same values.
-4. Build the release with `--dart-define=META_APP_EVENTS_ENABLED=true`.
+4. Build normally. No Meta-specific Dart define is required.
 5. Verify app launch, registration, login, ATT consent, and a confirmed Razorpay recharge in Meta App Ads Helper and `/admin/meta-app-events`.
 
 The Laravel environment can also expose non-secret integration health in the admin Setup & Health tab:

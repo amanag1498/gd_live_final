@@ -11,7 +11,10 @@ import 'api_client.dart';
 class MetaAttributionService {
   MetaAttributionService(this._api);
 
-  static const _enabled = bool.fromEnvironment('META_APP_EVENTS_ENABLED');
+  static const _enabled = bool.fromEnvironment(
+    'META_APP_EVENTS_ENABLED',
+    defaultValue: true,
+  );
   final ApiClient _api;
   final FacebookAppEvents _meta = FacebookAppEvents();
   final Uuid _uuid = const Uuid();
