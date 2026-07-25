@@ -244,7 +244,9 @@ class AgencyPayoutReportTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.agency-payout-reports.index'))
             ->assertOk()
-            ->assertSee('Weekly Agency Payout Reports');
+            ->assertSee('Weekly Agency Payout Reports')
+            ->assertDontSee('onclick="this.showPicker()"', false)
+            ->assertDontSee('readonly', false);
 
         $this->actingAs($admin)
             ->get(route('admin.agency-payout-reports.show', $report))

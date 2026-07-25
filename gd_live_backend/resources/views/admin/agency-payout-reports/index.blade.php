@@ -55,8 +55,6 @@
                 name="start"
                 class="{{ $inputClass }} appearance-none pr-11"
                 value="{{ request('start', request('date_from')) }}"
-                onclick="this.showPicker()"
-                readonly
               >
               <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">
                 <svg class="size-5 fill-current" viewBox="0 0 20 20" aria-hidden="true">
@@ -73,8 +71,6 @@
                 name="end"
                 class="{{ $inputClass }} appearance-none pr-11"
                 value="{{ request('end', request('date_to')) }}"
-                onclick="this.showPicker()"
-                readonly
               >
               <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">
                 <svg class="size-5 fill-current" viewBox="0 0 20 20" aria-hidden="true">
