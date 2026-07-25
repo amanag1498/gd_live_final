@@ -55,6 +55,7 @@ import '../../services/call_socket_service.dart';
 import '../../services/live_rooms_ws_service.dart';
 import '../../services/storage_service.dart';
 import '../../services/live_eligibility_service.dart'; // 👈 add
+import '../../services/meta_attribution_service.dart';
 import '../../services/push_service.dart';
 import '../../modules/wallet/services/wallet_api.dart';
 import '../../modules/wallet/services/razorpay_checkout_service.dart';
@@ -74,6 +75,15 @@ class AppPages {
     Get.put<StorageService>(storage, permanent: true);
     Get.put<ApiClient>(api, permanent: true);
     Get.put<AuthService>(authService, permanent: true);
+    final metaAttribution = Get.put<MetaAttributionService>(
+      MetaAttributionService(api),
+      permanent: true,
+    );
+    unawaited(
+      metaAttribution.initialize(
+        hasAuthenticatedSession: authService.isLoggedIn,
+      ),
+    );
     final appSettings = Get.put<AppSettingsService>(
       AppSettingsService(api),
       permanent: true,

@@ -10,6 +10,7 @@ import '../../../app/widgets/gd_live_logo.dart';
 import '../../../app/widgets/gd_modal_surface.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/app_settings_service.dart';
+import '../../../services/meta_attribution_service.dart';
 import '../models/wallet_summary_dto.dart';
 import '../services/razorpay_checkout_service.dart';
 import '../services/wallet_api.dart';
@@ -165,6 +166,12 @@ class _RechargeBottomSheetState extends State<RechargeBottomSheet> {
             gatewaySignature: checkoutResult.signature,
             gatewayResponse: checkoutResult.raw,
           );
+          if (Get.isRegistered<MetaAttributionService>()) {
+            await Get.find<MetaAttributionService>().logVerifiedPurchase(
+              amountInr: order.amountRupees.toDouble(),
+              orderId: order.orderId,
+            );
+          }
           if (!mounted) return;
           setState(() {
             _summary = updated;
@@ -359,8 +366,10 @@ class _RechargeBottomSheetState extends State<RechargeBottomSheet> {
             Text(
               'Choose a pack',
               style: TextStyle(
-                color: getBrandTokens(Get.find<AppSettingsService>().brandKey)
-                    .textPrimary,
+                color:
+                    getBrandTokens(
+                      Get.find<AppSettingsService>().brandKey,
+                    ).textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
               ),
@@ -369,9 +378,9 @@ class _RechargeBottomSheetState extends State<RechargeBottomSheet> {
             Text(
               '${packs.length} options',
               style: TextStyle(
-                color: getBrandTokens(Get.find<AppSettingsService>().brandKey)
-                    .textSecondary
-                    .withOpacity(.72),
+                color: getBrandTokens(
+                  Get.find<AppSettingsService>().brandKey,
+                ).textSecondary.withOpacity(.72),
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
@@ -521,8 +530,7 @@ class _PaymentNotice extends StatelessWidget {
         !ready
             ? const Color(0xFFFFD36E).withValues(alpha: .18)
             : Colors.white.withValues(alpha: .08);
-    final textColor =
-        !ready ? const Color(0xFF9A6B13) : tokens.textSecondary;
+    final textColor = !ready ? const Color(0xFF9A6B13) : tokens.textSecondary;
 
     return Container(
       width: double.infinity,
@@ -597,39 +605,40 @@ class _FooterBar extends StatelessWidget {
         onTap: onContinue,
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 180),
-          child: submitting
-              ? Row(
-                  key: const ValueKey('loading'),
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(label),
-                  ],
-                )
-              : Column(
-                  key: const ValueKey('idle'),
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(label),
-                    if (secondaryLabel != null && paymentReady)
-                      Text(
-                        secondaryLabel,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(.82),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
+          child:
+              submitting
+                  ? Row(
+                    key: const ValueKey('loading'),
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
                         ),
                       ),
-                  ],
-                ),
+                      const SizedBox(width: 10),
+                      Text(label),
+                    ],
+                  )
+                  : Column(
+                    key: const ValueKey('idle'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(label),
+                      if (secondaryLabel != null && paymentReady)
+                        Text(
+                          secondaryLabel,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(.82),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                    ],
+                  ),
         ),
       ),
     );
@@ -659,15 +668,10 @@ class _PlanCard extends StatelessWidget {
       curve: Curves.easeOut,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: selected
-              ? [
-                  const Color(0xFFEAFBEA),
-                  const Color(0xFFF8FFFA),
-                ]
-              : [
-                  Colors.white.withOpacity(.92),
-                  const Color(0xFFF6FCF7),
-                ],
+          colors:
+              selected
+                  ? [const Color(0xFFEAFBEA), const Color(0xFFF8FFFA)]
+                  : [Colors.white.withOpacity(.92), const Color(0xFFF6FCF7)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

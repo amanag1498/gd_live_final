@@ -43,6 +43,7 @@ use App\Http\Controllers\Agency\PkBattleController as AgencyPkBattleController;
 use App\Http\Controllers\Agency\WalletController as AgencyWalletController;
 use App\Http\Controllers\Host\CallReportController as HostCallReportController;
 use App\Http\Controllers\Admin\AgencyPayoutReportController as AdminAgencyPayoutReportController;
+use App\Http\Controllers\Admin\MetaAppEventAdminController;
 use App\Http\Controllers\Agency\PayoutReportController as AgencyPayoutReportController;
 use App\Http\Controllers\Agency\ProfileController as AgencyProfileController;
 
@@ -173,6 +174,7 @@ Route::middleware(['auth','not_blocked','role:admin'])->prefix('admin')->name('a
   Route::get('reports/hosts/{host}', [ReportsController::class,'hostShow'])->name('reports.hosts.show');
   Route::get('reports/hosts.csv', [ReportsController::class,'hostsCsv'])->name('reports.hosts.csv');
   Route::get('reports/levels', [ReportsController::class,'levels'])->name('reports.levels');
+  Route::get('meta-app-events', [MetaAppEventAdminController::class, 'index'])->name('meta-app-events.index');
   Route::get('reports/leaderboards', [AdminLeaderboardReportController::class, 'index'])->name('reports.leaderboards');
   Route::get('reports/leaderboards/export', [AdminLeaderboardReportController::class, 'export'])->name('reports.leaderboards.export');
   Route::resource('levels', UserLevelAdminController::class)->except(['show']);

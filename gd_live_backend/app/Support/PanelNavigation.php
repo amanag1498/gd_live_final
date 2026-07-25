@@ -63,6 +63,7 @@ class PanelNavigation
                     self::item('Followers Report', 'admin.reports.host-followers', 'chart', ['admin.reports.host-followers*']),
                     self::item('Leaderboards', 'admin.reports.leaderboards', 'chart', ['admin.reports.leaderboards*']),
                     self::item('Levels Report', 'admin.reports.levels', 'chart', ['admin.reports.levels']),
+                    self::item('Meta App Events', 'admin.meta-app-events.index', 'chart', ['admin.meta-app-events.*']),
                 ],
             ],
             [

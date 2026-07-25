@@ -7,6 +7,7 @@ import 'package:dio/dio.dart';
 import 'package:gd_live/services/presence_service.dart';
 import 'package:gd_live/services/push_service.dart';
 import 'package:gd_live/services/call_socket_service.dart';
+import 'package:gd_live/services/meta_attribution_service.dart';
 
 import '../app/routes/app_routes.dart';
 import '../data/models/user_model.dart';
@@ -224,6 +225,18 @@ class AuthService {
     }
 
     await storage.saveAuth(token, model.toJson());
+    if (Get.isRegistered<MetaAttributionService>()) {
+      final attribution = Get.find<MetaAttributionService>();
+      await attribution.requestTrackingConsent();
+      await attribution.logLifecycleEvent(
+        'login',
+        provider: deviceName.replaceFirst('flutter-', ''),
+        isNewUser: data['is_new_user'] == true,
+      );
+      if (data['is_new_user'] == true) {
+        await attribution.logLifecycleEvent('complete_registration');
+      }
+    }
     try {
       await PushService.instance.init(api: api);
       await PushService.instance.requestPermissionAndRegister();
