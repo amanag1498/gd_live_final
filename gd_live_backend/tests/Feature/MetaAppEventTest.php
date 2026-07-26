@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\MetaAppEventRecorder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -95,5 +96,28 @@ class MetaAppEventTest extends TestCase
                 ->assertOk()
                 ->assertSee($expected);
         }
+    }
+
+    public function test_missing_meta_migration_does_not_break_admin_or_app_requests(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        $user = User::factory()->create();
+
+        Schema::dropIfExists('meta_app_events');
+
+        $this->actingAs($admin)
+            ->get(route('admin.meta-app-events.index'))
+            ->assertOk()
+            ->assertSee('Meta event database migration is missing');
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/marketing/meta-events', [
+                'event_id' => 'ddcf43ac-9fd5-48fa-b68d-4d6d8a2bc771',
+                'event_name' => 'login',
+                'platform' => 'android',
+            ])
+            ->assertStatus(503)
+            ->assertJsonPath('ok', false);
     }
 }

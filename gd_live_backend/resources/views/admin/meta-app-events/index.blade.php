@@ -25,6 +25,18 @@
     </nav>
   </x-common.component-card>
 
+  @if(!$setup['database_ready'])
+    <div class="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-500/10 dark:text-red-200">
+      <p class="font-semibold">Meta event database migration is missing.</p>
+      <p class="mt-1">Run <code class="rounded bg-white/70 px-1.5 py-0.5 text-xs dark:bg-black/20">php artisan migrate --force</code> on the production backend. App login and verified recharge remain available while auditing is paused.</p>
+    </div>
+  @endif
+
+  <div class="rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm text-blue-800 dark:border-blue-900/40 dark:bg-blue-500/10 dark:text-blue-200">
+    <p class="font-semibold">Event audit is not user acquisition attribution.</p>
+    <p class="mt-1">This page confirms that GD Live recorded an app event. Meta decides whether an install came from a Facebook or Instagram ad inside Ads Manager. Per-user campaign attribution requires an MMP attribution callback to be stored in GD Live.</p>
+  </div>
+
   @if($activeTab === 'overview')
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <x-admin.stat-card label="Events" :value="number_format($summary['events'])" tone="brand" />
@@ -120,6 +132,7 @@
       <x-common.component-card title="Integration Health" desc="Secrets are never displayed in the admin panel.">
         <div class="space-y-3">
           @foreach([
+            ['Database migration', $setup['database_ready'], $setup['database_ready'] ? 'meta_app_events is ready' : 'Run php artisan migrate --force'],
             ['Meta App ID', filled($setup['app_id']), $setup['app_id'] ?: 'Missing META_APP_ID'],
             ['Client Token', $setup['client_token_configured'], $setup['client_token_configured'] ? 'Configured securely' : 'Missing META_CLIENT_TOKEN'],
             ['Ad Account', filled($setup['ad_account_id']), $setup['ad_account_id'] ?: 'Missing META_AD_ACCOUNT_ID'],
@@ -138,7 +151,7 @@
         <ol class="space-y-3 text-sm text-gray-600 dark:text-gray-300">
           <li>1. Link the Meta app, ad account, and Business Portfolio.</li>
           <li>2. Add native App ID and Client Token files to Android and iOS.</li>
-          <li>3. Build with <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs dark:bg-gray-800">META_APP_EVENTS_ENABLED=true</code>.</li>
+          <li>3. Build normally; Meta app events are enabled by default.</li>
           <li>4. Run Laravel migrations before releasing the app.</li>
           <li>5. Verify install, registration, consent, login, and purchase in App Ads Helper.</li>
         </ol>

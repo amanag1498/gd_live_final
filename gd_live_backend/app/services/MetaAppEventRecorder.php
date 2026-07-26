@@ -6,6 +6,8 @@ use App\Models\MetaAppEvent;
 use App\Models\PaymentOrder;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class MetaAppEventRecorder
@@ -15,7 +17,11 @@ class MetaAppEventRecorder
         ?User $user = null,
         array $attributes = [],
         ?Request $request = null,
-    ): MetaAppEvent {
+    ): ?MetaAppEvent {
+        if (!$this->schemaReady()) {
+            return null;
+        }
+
         $eventId = $attributes['event_id'] ?? (string) Str::uuid();
 
         return MetaAppEvent::query()->firstOrCreate(
@@ -38,8 +44,12 @@ class MetaAppEventRecorder
         );
     }
 
-    public function recordVerifiedPurchase(PaymentOrder $order, ?Request $request = null): MetaAppEvent
+    public function recordVerifiedPurchase(PaymentOrder $order, ?Request $request = null): ?MetaAppEvent
     {
+        if (!$this->schemaReady()) {
+            return null;
+        }
+
         return MetaAppEvent::query()->firstOrCreate(['payment_order_id' => $order->id], [
             'user_id' => $order->user_id,
             'event_id' => (string) Str::uuid(),
@@ -56,5 +66,18 @@ class MetaAppEventRecorder
             'ip' => $request?->ip(),
             'user_agent' => $request ? substr((string) $request->userAgent(), 0, 512) : null,
         ]);
+    }
+
+    private function schemaReady(): bool
+    {
+        $ready = Schema::hasTable('meta_app_events');
+
+        if (!$ready) {
+            Log::warning('META_APP_EVENTS_TABLE_MISSING', [
+                'action' => 'Run php artisan migrate --force',
+            ]);
+        }
+
+        return $ready;
     }
 }

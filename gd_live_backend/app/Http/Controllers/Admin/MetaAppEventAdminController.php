@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\MetaAppEvent;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Schema;
 
 class MetaAppEventAdminController extends Controller
 {
@@ -13,6 +15,30 @@ class MetaAppEventAdminController extends Controller
         $activeTab = in_array($request->string('tab')->toString(), ['overview', 'events', 'setup'], true)
             ? $request->string('tab')->toString()
             : 'overview';
+
+        if (!Schema::hasTable('meta_app_events')) {
+            return view('admin.meta-app-events.index', [
+                'events' => new LengthAwarePaginator(
+                    [],
+                    0,
+                    50,
+                    max(1, $request->integer('page', 1)),
+                    ['path' => $request->url(), 'query' => $request->query()],
+                ),
+                'summary' => [
+                    'events' => 0,
+                    'registrations' => 0,
+                    'purchases' => 0,
+                    'revenue' => 0,
+                ],
+                'eventNames' => ['app_launch', 'login', 'complete_registration', 'advertiser_tracking_consent', 'purchase'],
+                'eventBreakdown' => collect(),
+                'platformBreakdown' => collect(),
+                'consent' => ['allowed' => 0, 'declined' => 0],
+                'activeTab' => 'setup',
+                'setup' => $this->setupStatus(false),
+            ]);
+        }
 
         $query = MetaAppEvent::query()
             ->with(['user:id,name,email', 'paymentOrder:id,order_id,status'])
@@ -51,15 +77,21 @@ class MetaAppEventAdminController extends Controller
             'platformBreakdown' => $platformBreakdown,
             'consent' => $consent,
             'activeTab' => $activeTab,
-            'setup' => [
-                'app_id' => (string) config('services.meta.app_id', ''),
-                'client_token_configured' => filled(config('services.meta.client_token')),
-                'ad_account_id' => (string) config('services.meta.ad_account_id', ''),
-                'business_id' => (string) config('services.meta.business_id', ''),
-                'last_event_at' => MetaAppEvent::query()->max('occurred_at'),
-                'server_events' => MetaAppEvent::query()->where('source', 'server')->count(),
-                'app_events' => MetaAppEvent::query()->where('source', 'app')->count(),
-            ],
+            'setup' => $this->setupStatus(true),
         ]);
+    }
+
+    private function setupStatus(bool $databaseReady): array
+    {
+        return [
+            'database_ready' => $databaseReady,
+            'app_id' => (string) config('services.meta.app_id', ''),
+            'client_token_configured' => filled(config('services.meta.client_token')),
+            'ad_account_id' => (string) config('services.meta.ad_account_id', ''),
+            'business_id' => (string) config('services.meta.business_id', ''),
+            'last_event_at' => $databaseReady ? MetaAppEvent::query()->max('occurred_at') : null,
+            'server_events' => $databaseReady ? MetaAppEvent::query()->where('source', 'server')->count() : 0,
+            'app_events' => $databaseReady ? MetaAppEvent::query()->where('source', 'app')->count() : 0,
+        ];
     }
 }

@@ -28,6 +28,13 @@ class MetaAppEventController extends Controller
             'properties' => $this->safeProperties($data['properties'] ?? []),
         ], $request);
 
+        if (!$event) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Meta event auditing is temporarily unavailable.',
+            ], 503);
+        }
+
         return response()->json(['ok' => true, 'data' => ['event_id' => $event->event_id]], 201);
     }
 
