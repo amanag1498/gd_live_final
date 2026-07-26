@@ -1257,9 +1257,9 @@ class _HostPerformanceBoard extends StatelessWidget {
                   accent: const Color(0xFF06B430),
                 ),
                 _ReportStat(
-                  label: 'Gifted coins',
+                  label: 'Video room gifts',
                   value: NumberFormat.compact().format(
-                    summary.totalGiftedCoins,
+                    summary.videoRoomGiftsCoins,
                   ),
                   accent: const Color(0xFFFFB400),
                 ),
@@ -1278,16 +1278,6 @@ class _HostPerformanceBoard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            _MiniLedgerRow(
-              label: 'Video room gifts',
-              value:
-                  '${NumberFormat.compact().format(summary.videoRoomGiftsCoins)} coins',
-            ),
-            _MiniLedgerRow(
-              label: 'PK gift coins',
-              value:
-                  '${NumberFormat.compact().format(summary.pkGiftCoins)} coins',
-            ),
             _MiniLedgerRow(
               label: 'Grand total',
               value: '${NumberFormat.compact().format(total)} coins',
