@@ -1889,15 +1889,17 @@ class _StageLane extends StatelessWidget {
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        _compact(entry!.value),
-                        style: TextStyle(
-                          color: const Color(0xFF456453),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
+                      if (entry!.showValue) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          _compact(entry!.value),
+                          style: TextStyle(
+                            color: const Color(0xFF456453),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
