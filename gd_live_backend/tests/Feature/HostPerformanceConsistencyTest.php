@@ -239,6 +239,13 @@ class HostPerformanceConsistencyTest extends TestCase
         $this->assertSame(5_500, $payoutItem->pk_gift_coins);
         $this->assertSame(18_600, $payoutItem->video_call_coins);
         $this->assertSame(105_101, $payoutItem->total_coins);
+
+        $this->actingAs($admin)
+            ->get(route('admin.agency-payout-reports.show', $payout))
+            ->assertOk()
+            ->assertSee('min-w-[160px]', false)
+            ->assertSee('md:sticky md:left-0', false)
+            ->assertSee('Swipe sideways to review and edit every settlement field.');
     }
 
     private function createGiftLedger(

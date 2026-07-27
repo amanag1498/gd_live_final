@@ -5,6 +5,7 @@
 @php
   $locked = $report->status === 'paid' || $report->paid_at;
   $inputClass = 'h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 shadow-theme-xs outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white';
+  $settlementInputClass = $inputClass . ' min-w-[160px] appearance-none tabular-nums';
   $dashboardHref = ($report->agency_id && \Illuminate\Support\Facades\Route::has('admin.agencies.dashboard'))
       ? route('admin.agencies.dashboard', $report->agency_id)
       : null;
@@ -108,50 +109,53 @@
   </div>
 
   <x-common.component-card title="Host Settlement Grid" desc="Format matches the desktop GD payout workflow with only the required fields.">
-    <div class="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-800">
-      <table class="min-w-[1500px] divide-y divide-gray-200 text-sm dark:divide-gray-800">
+    <p class="mb-3 text-xs font-medium text-gray-500 md:hidden dark:text-gray-400">
+      Swipe sideways to review and edit every settlement field.
+    </p>
+    <div class="max-w-full touch-pan-x overflow-x-auto overscroll-x-contain rounded-2xl border border-gray-200 [-webkit-overflow-scrolling:touch] dark:border-gray-800">
+      <table class="min-w-[2200px] table-auto divide-y divide-gray-200 text-sm dark:divide-gray-800">
         <thead class="bg-gray-50 dark:bg-gray-950/60">
           <tr>
-            <th class="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:bg-gray-950/60 dark:text-gray-400">Host</th>
-            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total Video Room Timing</th>
-            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total Video Room Gifts</th>
-            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total PK Gifts</th>
-            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Video Calls Coins</th>
-            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Video Calls Min</th>
-            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Bonus Coins</th>
-            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total Coins</th>
-            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Host Payout INR</th>
-            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Agency Commission INR</th>
-            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total INR</th>
-            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Admin Notes</th>
-            <th class="sticky right-0 z-10 bg-gray-50 px-4 py-3 text-right font-medium uppercase tracking-[0.18em] text-gray-500 dark:bg-gray-950/60 dark:text-gray-400">Save</th>
+            <th class="min-w-[180px] whitespace-nowrap bg-gray-50 px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 md:sticky md:left-0 md:z-10 dark:bg-gray-950/60 dark:text-gray-400">Host</th>
+            <th class="min-w-[190px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total Video Room Timing</th>
+            <th class="min-w-[190px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total Video Room Gifts</th>
+            <th class="min-w-[180px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total PK Gifts</th>
+            <th class="min-w-[180px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Video Calls Coins</th>
+            <th class="min-w-[180px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Video Calls Min</th>
+            <th class="min-w-[170px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Bonus Coins</th>
+            <th class="min-w-[150px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total Coins</th>
+            <th class="min-w-[180px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Host Payout INR</th>
+            <th class="min-w-[210px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Agency Commission INR</th>
+            <th class="min-w-[150px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total INR</th>
+            <th class="min-w-[250px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Admin Notes</th>
+            <th class="min-w-[110px] whitespace-nowrap bg-gray-50 px-4 py-3 text-right font-medium uppercase tracking-[0.18em] text-gray-500 md:sticky md:right-0 md:z-10 dark:bg-gray-950/60 dark:text-gray-400">Save</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
           @forelse($report->items as $item)
             @php($formId = 'payout-row-' . $item->id)
             <tr class="bg-white dark:bg-gray-900">
-              <td class="sticky left-0 z-10 bg-white px-4 py-4 dark:bg-gray-900">
+              <td class="min-w-[180px] bg-white px-4 py-4 md:sticky md:left-0 md:z-10 dark:bg-gray-900">
                 <form id="{{ $formId }}" method="post" action="{{ route('admin.agency-payout-reports.items.update', [$report, $item]) }}">
                   @csrf
                 </form>
                 <div class="font-semibold text-gray-900 dark:text-white">{{ $item->host?->user?->name ?? $item->host?->stage_name ?? '—' }}</div>
                 <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $item->host?->stage_name ?? '—' }}</div>
               </td>
-              <td class="px-4 py-4"><input type="number" min="0" name="video_room_minutes" form="{{ $formId }}" class="{{ $inputClass }}" value="{{ old('video_room_minutes', $item->video_room_minutes) }}" @disabled($locked)></td>
-              <td class="px-4 py-4"><input type="number" min="0" name="video_gift_coins" form="{{ $formId }}" class="{{ $inputClass }}" value="{{ old('video_gift_coins', $item->video_gift_coins) }}" @disabled($locked)></td>
-              <td class="px-4 py-4"><input type="number" min="0" name="pk_gift_coins" form="{{ $formId }}" class="{{ $inputClass }}" value="{{ old('pk_gift_coins', $item->pk_gift_coins) }}" @disabled($locked)></td>
-              <td class="px-4 py-4"><input type="number" min="0" name="video_call_coins" form="{{ $formId }}" class="{{ $inputClass }}" value="{{ old('video_call_coins', $item->video_call_coins) }}" @disabled($locked)></td>
-              <td class="px-4 py-4"><input type="number" min="0" name="video_call_minutes" form="{{ $formId }}" class="{{ $inputClass }}" value="{{ old('video_call_minutes', $item->video_call_minutes) }}" @disabled($locked)></td>
-              <td class="px-4 py-4"><input type="number" min="0" name="bonus_coins" form="{{ $formId }}" class="{{ $inputClass }}" value="{{ old('bonus_coins', $item->bonus_coins) }}" @disabled($locked)></td>
-              <td class="px-4 py-4 text-gray-700 dark:text-gray-200">{{ number_format($item->total_coins) }}</td>
-              <td class="px-4 py-4"><input type="number" step="0.01" min="0" name="host_payout_inr" form="{{ $formId }}" class="{{ $inputClass }}" value="{{ old('host_payout_inr', number_format($item->host_payout_inr, 2, '.', '')) }}" @disabled($locked)></td>
-              <td class="px-4 py-4"><input type="number" step="0.01" min="0" name="agency_commission_inr" form="{{ $formId }}" class="{{ $inputClass }}" value="{{ old('agency_commission_inr', number_format($item->agency_commission_inr, 2, '.', '')) }}" @disabled($locked)></td>
-              <td class="px-4 py-4 text-gray-700 dark:text-gray-200">{{ number_format($item->total_inr, 2) }}</td>
+              <td class="min-w-[190px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="video_room_minutes" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('video_room_minutes', $item->video_room_minutes) }}" @disabled($locked)></td>
+              <td class="min-w-[190px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="video_gift_coins" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('video_gift_coins', $item->video_gift_coins) }}" @disabled($locked)></td>
+              <td class="min-w-[180px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="pk_gift_coins" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('pk_gift_coins', $item->pk_gift_coins) }}" @disabled($locked)></td>
+              <td class="min-w-[180px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="video_call_coins" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('video_call_coins', $item->video_call_coins) }}" @disabled($locked)></td>
+              <td class="min-w-[180px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="video_call_minutes" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('video_call_minutes', $item->video_call_minutes) }}" @disabled($locked)></td>
+              <td class="min-w-[170px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="bonus_coins" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('bonus_coins', $item->bonus_coins) }}" @disabled($locked)></td>
+              <td class="min-w-[150px] whitespace-nowrap px-4 py-4 tabular-nums text-gray-700 dark:text-gray-200">{{ number_format($item->total_coins) }}</td>
+              <td class="min-w-[180px] px-4 py-4"><input type="number" inputmode="decimal" step="0.01" min="0" name="host_payout_inr" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('host_payout_inr', number_format($item->host_payout_inr, 2, '.', '')) }}" @disabled($locked)></td>
+              <td class="min-w-[210px] px-4 py-4"><input type="number" inputmode="decimal" step="0.01" min="0" name="agency_commission_inr" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('agency_commission_inr', number_format($item->agency_commission_inr, 2, '.', '')) }}" @disabled($locked)></td>
+              <td class="min-w-[150px] whitespace-nowrap px-4 py-4 tabular-nums text-gray-700 dark:text-gray-200">{{ number_format($item->total_inr, 2) }}</td>
               <td class="px-4 py-4">
                 <textarea name="admin_note" form="{{ $formId }}" rows="2" class="min-w-[220px] rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 shadow-theme-xs outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white" placeholder="Admin note" @disabled($locked)>{{ old('admin_note', $item->admin_note) }}</textarea>
               </td>
-              <td class="sticky right-0 z-10 bg-white px-4 py-4 text-right dark:bg-gray-900">
+              <td class="min-w-[110px] bg-white px-4 py-4 text-right md:sticky md:right-0 md:z-10 dark:bg-gray-900">
                 <x-ui.button type="submit" size="sm" form="{{ $formId }}" :disabled="$locked">Save</x-ui.button>
               </td>
             </tr>
