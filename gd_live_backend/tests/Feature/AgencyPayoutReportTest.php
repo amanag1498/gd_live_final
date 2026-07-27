@@ -184,7 +184,14 @@ class AgencyPayoutReportTest extends TestCase
             ->get(route('admin.agency-payout-reports.show', $report))
             ->assertOk()
             ->assertSee('js-payout-row-form', false)
-            ->assertSee("'X-Requested-With': 'XMLHttpRequest'", false);
+            ->assertSee("'X-Requested-With': 'XMLHttpRequest'", false)
+            ->assertSee("field.addEventListener('change'", false)
+            ->assertSee("form.requestSubmit()", false)
+            ->assertSee('payout-grid-scroll', false)
+            ->assertSee('payout-grid-sticky-left', false)
+            ->assertSee('payout-grid-sticky-right', false)
+            ->assertSee('data-grid-total="total_coins"', false)
+            ->assertSee('const recalculateGrid', false);
 
         $response = $this->actingAs($admin)->postJson(
             route('admin.agency-payout-reports.items.update', [$report, $item]),

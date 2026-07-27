@@ -1,6 +1,81 @@
 @extends('layouts.admin-tailadmin')
 @section('title', 'Agency Payout Report #' . $report->id)
 
+@push('styles')
+<style>
+  .payout-grid-scroll {
+    max-height: 72vh;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    -webkit-overflow-scrolling: touch;
+  }
+  .payout-grid-table {
+    min-width: 2200px;
+    white-space: nowrap;
+  }
+  .payout-grid-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: #f9fafb;
+    box-shadow: inset 0 -1px 0 #e5e7eb;
+  }
+  .payout-grid-sticky-left,
+  .payout-grid-sticky-right {
+    position: sticky;
+    z-index: 15;
+    background: #fff;
+  }
+  .payout-grid-sticky-left {
+    left: 0;
+    box-shadow: 1px 0 0 #e5e7eb;
+  }
+  .payout-grid-sticky-right {
+    right: 0;
+    box-shadow: -1px 0 0 #e5e7eb;
+  }
+  .payout-grid-table thead .payout-grid-sticky-left,
+  .payout-grid-table thead .payout-grid-sticky-right {
+    z-index: 30;
+    background: #f3f4f6;
+  }
+  .payout-grid-table tfoot td {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    background: #f3f4f6;
+    box-shadow: inset 0 1px 0 #d1d5db;
+  }
+  .payout-grid-table tfoot .payout-grid-sticky-left,
+  .payout-grid-table tfoot .payout-grid-sticky-right {
+    z-index: 30;
+  }
+  .dark .payout-grid-table thead th,
+  .dark .payout-grid-table thead .payout-grid-sticky-left,
+  .dark .payout-grid-table thead .payout-grid-sticky-right,
+  .dark .payout-grid-table tfoot td {
+    background: #101828;
+    box-shadow: inset 0 -1px 0 #1f2937;
+  }
+  .dark .payout-grid-sticky-left,
+  .dark .payout-grid-sticky-right {
+    background: #111827;
+  }
+  .dark .payout-grid-sticky-left {
+    box-shadow: 1px 0 0 #1f2937;
+  }
+  .dark .payout-grid-sticky-right {
+    box-shadow: -1px 0 0 #1f2937;
+  }
+  @media (max-width: 991px) {
+    .payout-grid-scroll {
+      max-height: 68vh;
+    }
+  }
+</style>
+@endpush
+
 @section('content')
 @php
   $locked = $report->status === 'paid' || $report->paid_at;
@@ -110,14 +185,15 @@
   </div>
 
   <x-common.component-card title="Host Settlement Grid" desc="Format matches the desktop GD payout workflow with only the required fields.">
-    <p class="mb-3 text-xs font-medium text-gray-500 md:hidden dark:text-gray-400">
-      Swipe sideways to review and edit every settlement field.
-    </p>
-    <div class="max-w-full touch-pan-x overflow-x-auto overscroll-x-contain rounded-2xl border border-gray-200 [-webkit-overflow-scrolling:touch] dark:border-gray-800">
-      <table class="min-w-[2200px] table-auto divide-y divide-gray-200 text-sm dark:divide-gray-800">
+    <div class="mb-4 flex flex-col gap-2 rounded-2xl bg-gray-50 px-4 py-3 text-xs text-gray-500 sm:flex-row sm:items-center sm:justify-between dark:bg-gray-950/60 dark:text-gray-400">
+      <span>Edit values directly; row and grand totals update while you type.</span>
+      <span class="sm:text-right">Scroll vertically across hosts and horizontally across settlement fields. Header, host, totals, and Save stay visible.</span>
+    </div>
+    <div class="payout-grid-scroll max-w-full touch-pan-x rounded-2xl border border-gray-200 dark:border-gray-800">
+      <table id="payout-settlement-grid" class="payout-grid-table table-auto divide-y divide-gray-200 text-sm dark:divide-gray-800">
         <thead class="bg-gray-50 dark:bg-gray-950/60">
           <tr>
-            <th class="min-w-[180px] whitespace-nowrap bg-gray-50 px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 md:sticky md:left-0 md:z-10 dark:bg-gray-950/60 dark:text-gray-400">Host</th>
+            <th class="payout-grid-sticky-left min-w-[180px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Host</th>
             <th class="min-w-[190px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total Video Room Timing</th>
             <th class="min-w-[190px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total Video Room Gifts</th>
             <th class="min-w-[180px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total PK Gifts</th>
@@ -129,14 +205,14 @@
             <th class="min-w-[210px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Agency Commission INR</th>
             <th class="min-w-[150px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total INR</th>
             <th class="min-w-[250px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Admin Notes</th>
-            <th class="min-w-[110px] whitespace-nowrap bg-gray-50 px-4 py-3 text-right font-medium uppercase tracking-[0.18em] text-gray-500 md:sticky md:right-0 md:z-10 dark:bg-gray-950/60 dark:text-gray-400">Save</th>
+            <th class="payout-grid-sticky-right min-w-[110px] whitespace-nowrap px-4 py-3 text-right font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Save</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
           @forelse($report->items as $item)
             @php($formId = 'payout-row-' . $item->id)
-            <tr id="payout-item-{{ $item->id }}" class="bg-white transition-opacity dark:bg-gray-900">
-              <td class="min-w-[180px] bg-white px-4 py-4 md:sticky md:left-0 md:z-10 dark:bg-gray-900">
+            <tr id="payout-item-{{ $item->id }}" data-payout-row data-hidden-coins="{{ (int) data_get($item->meta, 'audio_gift_coins', data_get($item->meta, 'audio_gift_gross', 0)) + (int) data_get($item->meta, 'audio_call_coins', data_get($item->meta, 'audio_call_gross', 0)) }}" class="bg-white transition-opacity dark:bg-gray-900">
+              <td class="payout-grid-sticky-left min-w-[180px] px-4 py-4">
                 <form id="{{ $formId }}" class="js-payout-row-form" method="post" action="{{ route('admin.agency-payout-reports.items.update', [$report, $item]) }}" data-row-id="{{ $item->id }}">
                   @csrf
                 </form>
@@ -156,7 +232,7 @@
               <td class="px-4 py-4">
                 <textarea name="admin_note" form="{{ $formId }}" rows="2" class="min-w-[220px] rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 shadow-theme-xs outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white" placeholder="Admin note" @disabled($locked)>{{ old('admin_note', $item->admin_note) }}</textarea>
               </td>
-              <td class="min-w-[110px] bg-white px-4 py-4 text-right md:sticky md:right-0 md:z-10 dark:bg-gray-900">
+              <td class="payout-grid-sticky-right min-w-[110px] px-4 py-4 text-right">
                 <x-ui.button data-row-save type="submit" size="sm" form="{{ $formId }}" :disabled="$locked">Save</x-ui.button>
                 <div data-row-feedback class="mt-2 min-h-4 text-xs font-medium" aria-live="polite"></div>
               </td>
@@ -167,6 +243,23 @@
             </tr>
           @endforelse
         </tbody>
+        <tfoot>
+          <tr class="font-semibold text-gray-900 dark:text-white">
+            <td class="payout-grid-sticky-left min-w-[180px] px-4 py-3">Grand Total</td>
+            <td data-grid-total="video_room_minutes" class="px-4 py-3">{{ number_format($report->total_video_room_minutes) }}</td>
+            <td data-grid-total="video_gift_coins" class="px-4 py-3">{{ number_format($report->total_video_gift_coins) }}</td>
+            <td data-grid-total="pk_gift_coins" class="px-4 py-3">{{ number_format($report->total_pk_gift_coins) }}</td>
+            <td data-grid-total="video_call_coins" class="px-4 py-3">{{ number_format($report->total_video_call_coins) }}</td>
+            <td data-grid-total="video_call_minutes" class="px-4 py-3">{{ number_format($report->total_video_call_minutes) }}</td>
+            <td data-grid-total="bonus_coins" class="px-4 py-3">{{ number_format($report->total_bonus_coins) }}</td>
+            <td data-grid-total="total_coins" class="px-4 py-3">{{ number_format($report->total_coins) }}</td>
+            <td data-grid-total="host_payout_inr" class="px-4 py-3">{{ number_format($report->total_host_payout_inr, 2) }}</td>
+            <td data-grid-total="agency_commission_inr" class="px-4 py-3">{{ number_format($report->total_agency_commission_inr, 2) }}</td>
+            <td data-grid-total="total_inr" class="px-4 py-3">{{ number_format($report->total_inr, 2) }}</td>
+            <td class="px-4 py-3">—</td>
+            <td class="payout-grid-sticky-right px-4 py-3 text-right">—</td>
+          </tr>
+        </tfoot>
       </table>
     </div>
   </x-common.component-card>
@@ -179,11 +272,64 @@
   const integerFormatter = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
   const moneyFormatter = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const feedback = document.getElementById('payout-update-feedback');
+  const grid = document.getElementById('payout-settlement-grid');
 
   const format = (value, type = 'integer') => {
     if (type === 'money') return moneyFormatter.format(Number(value || 0));
     if (type === 'minutes') return `${integerFormatter.format(Number(value || 0))} min`;
     return integerFormatter.format(Number(value || 0));
+  };
+
+  const numberValue = (row, name) => {
+    const value = Number.parseFloat(row.querySelector(`[name="${name}"]`)?.value || '0');
+    return Number.isFinite(value) ? Math.max(0, value) : 0;
+  };
+
+  const recalculateGrid = () => {
+    const totals = {
+      video_room_minutes: 0,
+      video_gift_coins: 0,
+      pk_gift_coins: 0,
+      video_call_coins: 0,
+      video_call_minutes: 0,
+      bonus_coins: 0,
+      total_coins: 0,
+      host_payout_inr: 0,
+      agency_commission_inr: 0,
+      total_inr: 0,
+    };
+
+    grid.querySelectorAll('tbody tr[data-payout-row]').forEach((row) => {
+      const hiddenCoins = Number.parseInt(row.dataset.hiddenCoins || '0', 10) || 0;
+      const rowTotalCoins = hiddenCoins
+        + numberValue(row, 'video_gift_coins')
+        + numberValue(row, 'pk_gift_coins')
+        + numberValue(row, 'video_call_coins')
+        + numberValue(row, 'bonus_coins');
+      const rowTotalInr = numberValue(row, 'host_payout_inr') + numberValue(row, 'agency_commission_inr');
+
+      row.querySelector('[data-row-total-coins]').textContent = format(rowTotalCoins);
+      row.querySelector('[data-row-total-inr]').textContent = format(rowTotalInr, 'money');
+
+      totals.video_room_minutes += numberValue(row, 'video_room_minutes');
+      totals.video_gift_coins += numberValue(row, 'video_gift_coins');
+      totals.pk_gift_coins += numberValue(row, 'pk_gift_coins');
+      totals.video_call_coins += numberValue(row, 'video_call_coins');
+      totals.video_call_minutes += numberValue(row, 'video_call_minutes');
+      totals.bonus_coins += numberValue(row, 'bonus_coins');
+      totals.total_coins += rowTotalCoins;
+      totals.host_payout_inr += numberValue(row, 'host_payout_inr');
+      totals.agency_commission_inr += numberValue(row, 'agency_commission_inr');
+      totals.total_inr += rowTotalInr;
+    });
+
+    Object.entries(totals).forEach(([key, value]) => {
+      const cell = grid.querySelector(`[data-grid-total="${key}"]`);
+      if (!cell) return;
+      cell.textContent = ['host_payout_inr', 'agency_commission_inr', 'total_inr'].includes(key)
+        ? format(value, 'money')
+        : format(value);
+    });
   };
 
   const showFeedback = (message, isError = false) => {
@@ -226,7 +372,7 @@
     if (rejectRemarks) rejectRemarks.disabled = !report.actions.can_reject;
   };
 
-  const updateRow = (form, item) => {
+  const updateRow = (form, item, preserveEditedFields = false) => {
     const row = document.getElementById(`payout-item-${item.id}`);
     [
       'video_room_minutes',
@@ -239,6 +385,7 @@
       'agency_commission_inr',
       'admin_note',
     ].forEach((name) => {
+      if (preserveEditedFields) return;
       const field = document.querySelector(`[name="${name}"][form="${form.id}"]`);
       if (field && Object.hasOwn(item, name)) {
         field.value = ['host_payout_inr', 'agency_commission_inr'].includes(name)
@@ -248,12 +395,46 @@
     });
     row.querySelector('[data-row-total-coins]').textContent = format(item.total_coins);
     row.querySelector('[data-row-total-inr]').textContent = format(item.total_inr, 'money');
+    recalculateGrid();
   };
 
   document.querySelectorAll('.js-payout-row-form').forEach((form) => {
+    let autoSaveTimer;
+    const rowFields = document.querySelectorAll(`[form="${form.id}"]:not([type="hidden"]):not([type="submit"])`);
+
+    rowFields.forEach((field) => {
+      field.addEventListener('input', () => {
+        const row = document.getElementById(`payout-item-${form.dataset.rowId}`);
+        const rowFeedback = row.querySelector('[data-row-feedback]');
+        if (form.dataset.saving === 'true') form.dataset.resave = 'true';
+        recalculateGrid();
+        rowFeedback.textContent = 'Changes pending…';
+        rowFeedback.className = 'mt-2 min-h-4 text-xs font-medium text-warning-600 dark:text-warning-400';
+      });
+
+      field.addEventListener('change', () => {
+        window.clearTimeout(autoSaveTimer);
+        autoSaveTimer = window.setTimeout(() => form.requestSubmit(), 500);
+      });
+
+      field.addEventListener('keydown', (event) => {
+        const submitFromField = event.key === 'Enter'
+          && (field.tagName !== 'TEXTAREA' || event.ctrlKey || event.metaKey);
+        if (!submitFromField) return;
+
+        event.preventDefault();
+        window.clearTimeout(autoSaveTimer);
+        form.requestSubmit();
+      });
+    });
+
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      if (form.dataset.saving === 'true') return;
+      if (form.dataset.saving === 'true') {
+        form.dataset.resave = 'true';
+        return;
+      }
+      window.clearTimeout(autoSaveTimer);
       form.dataset.saving = 'true';
 
       const row = document.getElementById(`payout-item-${form.dataset.rowId}`);
@@ -265,6 +446,7 @@
       rowFeedback.textContent = '';
       row.classList.add('opacity-60');
       row.setAttribute('aria-busy', 'true');
+      let savedSuccessfully = false;
 
       try {
         const response = await fetch(form.action, {
@@ -286,11 +468,15 @@
           throw new Error(errors || 'Unable to update this payout row.');
         }
 
-        updateRow(form, payload.item);
+        const hasNewerChanges = form.dataset.resave === 'true';
+        updateRow(form, payload.item, hasNewerChanges);
         updateReport(payload.report);
         showFeedback(payload.message);
-        rowFeedback.textContent = 'Saved';
-        rowFeedback.className = 'mt-2 min-h-4 text-xs font-medium text-success-600 dark:text-success-400';
+        savedSuccessfully = true;
+        rowFeedback.textContent = hasNewerChanges ? 'Saving latest…' : 'Saved';
+        rowFeedback.className = hasNewerChanges
+          ? 'mt-2 min-h-4 text-xs font-medium text-warning-600 dark:text-warning-400'
+          : 'mt-2 min-h-4 text-xs font-medium text-success-600 dark:text-success-400';
       } catch (error) {
         showFeedback(error.message || 'Unable to update this payout row.', true);
         rowFeedback.textContent = 'Failed';
@@ -301,12 +487,20 @@
         row.classList.remove('opacity-60');
         row.removeAttribute('aria-busy');
         delete form.dataset.saving;
-        window.setTimeout(() => {
-          rowFeedback.textContent = '';
-        }, 3000);
+        if (savedSuccessfully && form.dataset.resave === 'true') {
+          delete form.dataset.resave;
+          window.setTimeout(() => form.requestSubmit(), 0);
+        } else {
+          delete form.dataset.resave;
+          window.setTimeout(() => {
+            rowFeedback.textContent = '';
+          }, 3000);
+        }
       }
     });
   });
+
+  recalculateGrid();
 })();
 </script>
 @endpush
