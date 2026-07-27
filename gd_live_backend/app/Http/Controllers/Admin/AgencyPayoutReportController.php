@@ -236,14 +236,72 @@ class AgencyPayoutReportController extends Controller
         ]);
 
         try {
-            $this->service->updateItem(
+            $updatedReport = $this->service->updateItem(
                 report: $agency_payout_report,
                 item: $agency_payout_report_item,
                 payload: $data,
                 actor: $request->user(),
             );
         } catch (InvalidArgumentException $e) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => $e->getMessage(),
+                    'errors' => ['update_item' => [$e->getMessage()]],
+                ], 422);
+            }
+
             return back()->withInput()->withErrors(['update_item' => $e->getMessage()]);
+        }
+
+        if ($request->expectsJson()) {
+            $updatedItem = $updatedReport->items->firstWhere('id', $agency_payout_report_item->id);
+
+            return response()->json([
+                'message' => 'Host payout row updated. Approved reports return to pending review after edits.',
+                'item' => [
+                    'id' => $updatedItem->id,
+                    'video_room_minutes' => $updatedItem->video_room_minutes,
+                    'video_gift_coins' => $updatedItem->video_gift_coins,
+                    'pk_gift_coins' => $updatedItem->pk_gift_coins,
+                    'video_call_coins' => $updatedItem->video_call_coins,
+                    'video_call_minutes' => $updatedItem->video_call_minutes,
+                    'bonus_coins' => $updatedItem->bonus_coins,
+                    'total_coins' => $updatedItem->total_coins,
+                    'host_payout_inr' => $updatedItem->host_payout_inr,
+                    'agency_commission_inr' => $updatedItem->agency_commission_inr,
+                    'total_inr' => $updatedItem->total_inr,
+                    'admin_note' => $updatedItem->admin_note,
+                ],
+                'report' => [
+                    'id' => $updatedReport->id,
+                    'status' => $updatedReport->status,
+                    'status_label' => str($updatedReport->status)->replace('_', ' ')->title()->toString(),
+                    'published' => (bool) $updatedReport->published_at,
+                    'visibility_label' => $updatedReport->published_at ? 'Published' : 'Draft only',
+                    'totals' => [
+                        'total_hosts' => $updatedReport->total_hosts,
+                        'active_hosts_count' => $updatedReport->active_hosts_count,
+                        'total_coins' => $updatedReport->total_coins,
+                        'final_payable' => $updatedReport->final_payable,
+                        'total_video_room_minutes' => $updatedReport->total_video_room_minutes,
+                        'total_video_gift_coins' => $updatedReport->total_video_gift_coins,
+                        'total_pk_gift_coins' => $updatedReport->total_pk_gift_coins,
+                        'total_video_call_coins' => $updatedReport->total_video_call_coins,
+                        'total_video_call_minutes' => $updatedReport->total_video_call_minutes,
+                        'total_bonus_coins' => $updatedReport->total_bonus_coins,
+                        'total_host_payout_inr' => $updatedReport->total_host_payout_inr,
+                        'total_agency_commission_inr' => $updatedReport->total_agency_commission_inr,
+                        'total_inr' => $updatedReport->total_inr,
+                    ],
+                    'actions' => [
+                        'can_review' => in_array($updatedReport->status, ['generated', 'pending_review'], true),
+                        'can_approve' => in_array($updatedReport->status, ['generated', 'pending_review'], true),
+                        'can_publish' => $updatedReport->status === 'approved' && ! $updatedReport->published_at,
+                        'can_mark_paid' => $updatedReport->status === 'approved' && (bool) $updatedReport->published_at,
+                        'can_reject' => in_array($updatedReport->status, ['generated', 'pending_review'], true),
+                    ],
+                ],
+            ]);
         }
 
         return redirect()

@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\HostRequestController as AdminHostRequestControll
 use App\Http\Controllers\Me\ApplicationsController;
 use App\Http\Controllers\Admin\NotificationController as AdminNotificationController;
 use App\Http\Controllers\Admin\WalletAdminController;
+use App\Http\Controllers\Admin\WalletTransactionAdminController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\UserAdminController;
 use App\Http\Controllers\Admin\HostAdminController;
@@ -163,6 +164,9 @@ Route::middleware(['auth','not_blocked','role:admin'])->prefix('admin')->name('a
   Route::post('notifications/read-all', [AdminNotificationController::class, 'readAll'])->name('notifications.read-all');
   Route::post('notifications/{id}/read', [AdminNotificationController::class, 'readOne'])->name('notifications.read-one');
     
+  Route::get('wallet-transactions', [WalletTransactionAdminController::class, 'index'])->name('wallet-transactions.index');
+  Route::get('wallet-transactions/export', [WalletTransactionAdminController::class, 'export'])->name('wallet-transactions.export');
+  Route::get('wallet-transactions/{walletTransaction}', [WalletTransactionAdminController::class, 'show'])->name('wallet-transactions.show');
   Route::get('wallets', [WalletAdminController::class,'index'])->name('wallets.index');
   Route::get('wallets/{user}', [WalletAdminController::class,'show'])->name('wallets.show');
   Route::post('wallets/{user}/purchase', [WalletAdminController::class,'purchase'])->name('wallets.purchase');

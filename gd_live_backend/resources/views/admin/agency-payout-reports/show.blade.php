@@ -12,6 +12,7 @@
 @endphp
 
 <div class="space-y-6">
+  <div id="payout-update-feedback" class="hidden rounded-xl border px-4 py-3 text-sm" role="status" aria-live="polite"></div>
   @if(session('status'))
     <x-ui.alert variant="success">{{ session('status') }}</x-ui.alert>
   @endif
@@ -32,8 +33,8 @@
           <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ $report->agency?->name ?? 'Agency' }} · Report #{{ $report->id }}</h3>
           <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {{ optional($report->period_start)->format('d M Y H:i') }} to {{ optional($report->period_end)->format('d M Y H:i') }} ·
-            Status: {{ ucwords(str_replace('_', ' ', $report->status)) }} ·
-            Agency visibility: {{ $report->published_at ? 'Published' : 'Draft only' }}
+            Status: <span id="report-status-label">{{ ucwords(str_replace('_', ' ', $report->status)) }}</span> ·
+            Agency visibility: <span id="report-visibility-label">{{ $report->published_at ? 'Published' : 'Draft only' }}</span>
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -47,18 +48,18 @@
     </x-slot:header>
 
     <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <x-admin.stat-card label="Total Hosts" :value="number_format($report->total_hosts)" />
-      <x-admin.stat-card label="Active Hosts" :value="number_format($report->active_hosts_count)" tone="brand" />
-      <x-admin.stat-card label="Total Coins" :value="number_format($report->total_coins)" tone="dark" />
-      <x-admin.stat-card label="Final Payable" :value="number_format($report->final_payable)" tone="success" />
-      <x-admin.stat-card label="Video Room Timing" :value="number_format($report->total_video_room_minutes) . ' min'" />
-      <x-admin.stat-card label="Video Room Gifts" :value="number_format($report->total_video_gift_coins)" />
-      <x-admin.stat-card label="PK Gifts" :value="number_format($report->total_pk_gift_coins)" tone="warning" />
-      <x-admin.stat-card label="Video Calls" :value="number_format($report->total_video_call_coins)" :meta="number_format($report->total_video_call_minutes) . ' min'" />
-      <x-admin.stat-card label="Bonus Coins" :value="number_format($report->total_bonus_coins)" />
-      <x-admin.stat-card label="Host Payout INR" :value="number_format($report->total_host_payout_inr, 2)" />
-      <x-admin.stat-card label="Agency Commission INR" :value="number_format($report->total_agency_commission_inr, 2)" />
-      <x-admin.stat-card label="Total INR" :value="number_format($report->total_inr, 2)" tone="success" />
+      <x-admin.stat-card data-summary-key="total_hosts" data-summary-format="integer" label="Total Hosts" :value="number_format($report->total_hosts)" />
+      <x-admin.stat-card data-summary-key="active_hosts_count" data-summary-format="integer" label="Active Hosts" :value="number_format($report->active_hosts_count)" tone="brand" />
+      <x-admin.stat-card data-summary-key="total_coins" data-summary-format="integer" label="Total Coins" :value="number_format($report->total_coins)" tone="dark" />
+      <x-admin.stat-card data-summary-key="final_payable" data-summary-format="integer" label="Final Payable" :value="number_format($report->final_payable)" tone="success" />
+      <x-admin.stat-card data-summary-key="total_video_room_minutes" data-summary-format="minutes" label="Video Room Timing" :value="number_format($report->total_video_room_minutes) . ' min'" />
+      <x-admin.stat-card data-summary-key="total_video_gift_coins" data-summary-format="integer" label="Video Room Gifts" :value="number_format($report->total_video_gift_coins)" />
+      <x-admin.stat-card data-summary-key="total_pk_gift_coins" data-summary-format="integer" label="PK Gifts" :value="number_format($report->total_pk_gift_coins)" tone="warning" />
+      <x-admin.stat-card data-summary-key="total_video_call_coins" data-summary-format="integer" data-summary-meta-key="total_video_call_minutes" label="Video Calls" :value="number_format($report->total_video_call_coins)" :meta="number_format($report->total_video_call_minutes) . ' min'" />
+      <x-admin.stat-card data-summary-key="total_bonus_coins" data-summary-format="integer" label="Bonus Coins" :value="number_format($report->total_bonus_coins)" />
+      <x-admin.stat-card data-summary-key="total_host_payout_inr" data-summary-format="money" label="Host Payout INR" :value="number_format($report->total_host_payout_inr, 2)" />
+      <x-admin.stat-card data-summary-key="total_agency_commission_inr" data-summary-format="money" label="Agency Commission INR" :value="number_format($report->total_agency_commission_inr, 2)" />
+      <x-admin.stat-card data-summary-key="total_inr" data-summary-format="money" label="Total INR" :value="number_format($report->total_inr, 2)" tone="success" />
     </section>
   </x-common.component-card>
 
@@ -74,7 +75,7 @@
           <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Admin Remarks</label>
           <textarea name="admin_remarks" rows="4" class="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 shadow-theme-xs outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white">{{ old('admin_remarks', $report->admin_remarks) }}</textarea>
         </div>
-        <x-ui.button type="submit" size="sm" :disabled="!in_array($report->status, ['generated', 'pending_review'])">Save Pending Review</x-ui.button>
+        <x-ui.button id="report-review-button" type="submit" size="sm" :disabled="!in_array($report->status, ['generated', 'pending_review'])">Save Pending Review</x-ui.button>
       </form>
     </x-common.component-card>
 
@@ -84,25 +85,25 @@
           @csrf
           <input type="hidden" name="deductions" value="{{ $report->deductions }}">
           <input type="text" name="admin_remarks" class="{{ $inputClass }}" value="{{ $report->admin_remarks }}" placeholder="Approval remarks">
-          <x-ui.button type="submit" size="sm" :disabled="!in_array($report->status, ['generated', 'pending_review'])">Approve Report</x-ui.button>
+          <x-ui.button id="report-approve-button" type="submit" size="sm" :disabled="!in_array($report->status, ['generated', 'pending_review'])">Approve Report</x-ui.button>
         </form>
 
         <form method="post" action="{{ route('admin.agency-payout-reports.publish', $report) }}" class="grid gap-4">
           @csrf
           <input type="text" name="admin_remarks" class="{{ $inputClass }}" value="{{ $report->admin_remarks }}" placeholder="Publish remarks">
-          <x-ui.button type="submit" variant="secondary" size="sm" :disabled="$report->status !== 'approved' || $report->published_at">Publish To Agency</x-ui.button>
+          <x-ui.button id="report-publish-button" type="submit" variant="secondary" size="sm" :disabled="$report->status !== 'approved' || $report->published_at">Publish To Agency</x-ui.button>
         </form>
 
         <form method="post" action="{{ route('admin.agency-payout-reports.mark-paid', $report) }}" class="grid gap-4">
           @csrf
           <input type="text" name="admin_remarks" class="{{ $inputClass }}" value="{{ $report->admin_remarks }}" placeholder="Paid remarks">
-          <x-ui.button type="submit" variant="success" size="sm" :disabled="$report->status !== 'approved' || !$report->published_at || $report->status === 'paid'">Mark Paid</x-ui.button>
+          <x-ui.button id="report-paid-button" type="submit" variant="success" size="sm" :disabled="$report->status !== 'approved' || !$report->published_at || $report->status === 'paid'">Mark Paid</x-ui.button>
         </form>
 
         <form method="post" action="{{ route('admin.agency-payout-reports.reject', $report) }}" class="grid gap-4">
           @csrf
-          <textarea name="admin_remarks" rows="3" class="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 shadow-theme-xs outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white" placeholder="Rejection reason" @disabled(!in_array($report->status, ['generated', 'pending_review']))></textarea>
-          <x-ui.button type="submit" variant="danger" size="sm" :disabled="!in_array($report->status, ['generated', 'pending_review'])">Reject Report</x-ui.button>
+          <textarea id="report-reject-remarks" name="admin_remarks" rows="3" class="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 shadow-theme-xs outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white" placeholder="Rejection reason" @disabled(!in_array($report->status, ['generated', 'pending_review']))></textarea>
+          <x-ui.button id="report-reject-button" type="submit" variant="danger" size="sm" :disabled="!in_array($report->status, ['generated', 'pending_review'])">Reject Report</x-ui.button>
         </form>
       </div>
     </x-common.component-card>
@@ -134,9 +135,9 @@
         <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
           @forelse($report->items as $item)
             @php($formId = 'payout-row-' . $item->id)
-            <tr class="bg-white dark:bg-gray-900">
+            <tr id="payout-item-{{ $item->id }}" class="bg-white transition-opacity dark:bg-gray-900">
               <td class="min-w-[180px] bg-white px-4 py-4 md:sticky md:left-0 md:z-10 dark:bg-gray-900">
-                <form id="{{ $formId }}" method="post" action="{{ route('admin.agency-payout-reports.items.update', [$report, $item]) }}">
+                <form id="{{ $formId }}" class="js-payout-row-form" method="post" action="{{ route('admin.agency-payout-reports.items.update', [$report, $item]) }}" data-row-id="{{ $item->id }}">
                   @csrf
                 </form>
                 <div class="font-semibold text-gray-900 dark:text-white">{{ $item->host?->user?->name ?? $item->host?->stage_name ?? '—' }}</div>
@@ -148,15 +149,16 @@
               <td class="min-w-[180px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="video_call_coins" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('video_call_coins', $item->video_call_coins) }}" @disabled($locked)></td>
               <td class="min-w-[180px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="video_call_minutes" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('video_call_minutes', $item->video_call_minutes) }}" @disabled($locked)></td>
               <td class="min-w-[170px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="bonus_coins" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('bonus_coins', $item->bonus_coins) }}" @disabled($locked)></td>
-              <td class="min-w-[150px] whitespace-nowrap px-4 py-4 tabular-nums text-gray-700 dark:text-gray-200">{{ number_format($item->total_coins) }}</td>
+              <td data-row-total-coins class="min-w-[150px] whitespace-nowrap px-4 py-4 tabular-nums text-gray-700 dark:text-gray-200">{{ number_format($item->total_coins) }}</td>
               <td class="min-w-[180px] px-4 py-4"><input type="number" inputmode="decimal" step="0.01" min="0" name="host_payout_inr" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('host_payout_inr', number_format($item->host_payout_inr, 2, '.', '')) }}" @disabled($locked)></td>
               <td class="min-w-[210px] px-4 py-4"><input type="number" inputmode="decimal" step="0.01" min="0" name="agency_commission_inr" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('agency_commission_inr', number_format($item->agency_commission_inr, 2, '.', '')) }}" @disabled($locked)></td>
-              <td class="min-w-[150px] whitespace-nowrap px-4 py-4 tabular-nums text-gray-700 dark:text-gray-200">{{ number_format($item->total_inr, 2) }}</td>
+              <td data-row-total-inr class="min-w-[150px] whitespace-nowrap px-4 py-4 tabular-nums text-gray-700 dark:text-gray-200">{{ number_format($item->total_inr, 2) }}</td>
               <td class="px-4 py-4">
                 <textarea name="admin_note" form="{{ $formId }}" rows="2" class="min-w-[220px] rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 shadow-theme-xs outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white" placeholder="Admin note" @disabled($locked)>{{ old('admin_note', $item->admin_note) }}</textarea>
               </td>
               <td class="min-w-[110px] bg-white px-4 py-4 text-right md:sticky md:right-0 md:z-10 dark:bg-gray-900">
-                <x-ui.button type="submit" size="sm" form="{{ $formId }}" :disabled="$locked">Save</x-ui.button>
+                <x-ui.button data-row-save type="submit" size="sm" form="{{ $formId }}" :disabled="$locked">Save</x-ui.button>
+                <div data-row-feedback class="mt-2 min-h-4 text-xs font-medium" aria-live="polite"></div>
               </td>
             </tr>
           @empty
@@ -170,3 +172,141 @@
   </x-common.component-card>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(() => {
+  const integerFormatter = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
+  const moneyFormatter = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const feedback = document.getElementById('payout-update-feedback');
+
+  const format = (value, type = 'integer') => {
+    if (type === 'money') return moneyFormatter.format(Number(value || 0));
+    if (type === 'minutes') return `${integerFormatter.format(Number(value || 0))} min`;
+    return integerFormatter.format(Number(value || 0));
+  };
+
+  const showFeedback = (message, isError = false) => {
+    feedback.textContent = message;
+    feedback.className = isError
+      ? 'rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-900/50 dark:bg-error-950/20 dark:text-error-300'
+      : 'rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-900/50 dark:bg-success-950/20 dark:text-success-300';
+  };
+
+  const updateReport = (report) => {
+    document.getElementById('report-status-label').textContent = report.status_label;
+    document.getElementById('report-visibility-label').textContent = report.visibility_label;
+
+    document.querySelectorAll('[data-summary-key]').forEach((card) => {
+      const value = card.querySelector('.text-3xl');
+      if (value && Object.hasOwn(report.totals, card.dataset.summaryKey)) {
+        value.textContent = format(report.totals[card.dataset.summaryKey], card.dataset.summaryFormat);
+      }
+
+      if (card.dataset.summaryMetaKey) {
+        const meta = card.querySelector('.mt-3.text-sm');
+        if (meta && Object.hasOwn(report.totals, card.dataset.summaryMetaKey)) {
+          meta.textContent = format(report.totals[card.dataset.summaryMetaKey], 'minutes');
+        }
+      }
+    });
+
+    const actions = {
+      'report-review-button': report.actions.can_review,
+      'report-approve-button': report.actions.can_approve,
+      'report-publish-button': report.actions.can_publish,
+      'report-paid-button': report.actions.can_mark_paid,
+      'report-reject-button': report.actions.can_reject,
+    };
+    Object.entries(actions).forEach(([id, enabled]) => {
+      const button = document.getElementById(id);
+      if (button) button.disabled = !enabled;
+    });
+    const rejectRemarks = document.getElementById('report-reject-remarks');
+    if (rejectRemarks) rejectRemarks.disabled = !report.actions.can_reject;
+  };
+
+  const updateRow = (form, item) => {
+    const row = document.getElementById(`payout-item-${item.id}`);
+    [
+      'video_room_minutes',
+      'video_gift_coins',
+      'pk_gift_coins',
+      'video_call_coins',
+      'video_call_minutes',
+      'bonus_coins',
+      'host_payout_inr',
+      'agency_commission_inr',
+      'admin_note',
+    ].forEach((name) => {
+      const field = document.querySelector(`[name="${name}"][form="${form.id}"]`);
+      if (field && Object.hasOwn(item, name)) {
+        field.value = ['host_payout_inr', 'agency_commission_inr'].includes(name)
+          ? Number(item[name] || 0).toFixed(2)
+          : item[name];
+      }
+    });
+    row.querySelector('[data-row-total-coins]').textContent = format(item.total_coins);
+    row.querySelector('[data-row-total-inr]').textContent = format(item.total_inr, 'money');
+  };
+
+  document.querySelectorAll('.js-payout-row-form').forEach((form) => {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (form.dataset.saving === 'true') return;
+      form.dataset.saving = 'true';
+
+      const row = document.getElementById(`payout-item-${form.dataset.rowId}`);
+      const button = document.querySelector(`[data-row-save][form="${form.id}"]`);
+      const rowFeedback = row.querySelector('[data-row-feedback]');
+      const originalLabel = button.textContent;
+      button.disabled = true;
+      button.textContent = 'Saving…';
+      rowFeedback.textContent = '';
+      row.classList.add('opacity-60');
+      row.setAttribute('aria-busy', 'true');
+
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          body: new FormData(form),
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+        });
+        const payload = await response.json().catch(() => ({
+          message: response.status === 419
+            ? 'Your admin session expired. Refresh this page and try again.'
+            : 'The server returned an unexpected response.',
+        }));
+
+        if (!response.ok) {
+          const errors = payload.errors ? Object.values(payload.errors).flat().join(' ') : payload.message;
+          throw new Error(errors || 'Unable to update this payout row.');
+        }
+
+        updateRow(form, payload.item);
+        updateReport(payload.report);
+        showFeedback(payload.message);
+        rowFeedback.textContent = 'Saved';
+        rowFeedback.className = 'mt-2 min-h-4 text-xs font-medium text-success-600 dark:text-success-400';
+      } catch (error) {
+        showFeedback(error.message || 'Unable to update this payout row.', true);
+        rowFeedback.textContent = 'Failed';
+        rowFeedback.className = 'mt-2 min-h-4 text-xs font-medium text-error-600 dark:text-error-400';
+      } finally {
+        button.disabled = false;
+        button.textContent = originalLabel;
+        row.classList.remove('opacity-60');
+        row.removeAttribute('aria-busy');
+        delete form.dataset.saving;
+        window.setTimeout(() => {
+          rowFeedback.textContent = '';
+        }, 3000);
+      }
+    });
+  });
+})();
+</script>
+@endpush

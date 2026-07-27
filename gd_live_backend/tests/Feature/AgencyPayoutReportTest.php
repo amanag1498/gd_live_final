@@ -168,6 +168,56 @@ class AgencyPayoutReportTest extends TestCase
         $service->markPendingReview($report, 5, 'Should fail');
     }
 
+    public function test_admin_can_update_a_host_row_without_a_page_redirect(): void
+    {
+        [$agency] = $this->seedAgencyFixture();
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+
+        $service = app(AgencyWeeklyPayoutReportService::class);
+        [$start, $end] = $service->resolvePeriod('2026-04-21', '2026-04-27');
+        $report = $service->generate($start, $end, $agency->id, false)['reports'][0];
+        $service->approve($report, 0, 'Approved before correction');
+        $item = $report->fresh('items')->items->firstOrFail();
+
+        $this->actingAs($admin)
+            ->get(route('admin.agency-payout-reports.show', $report))
+            ->assertOk()
+            ->assertSee('js-payout-row-form', false)
+            ->assertSee("'X-Requested-With': 'XMLHttpRequest'", false);
+
+        $response = $this->actingAs($admin)->postJson(
+            route('admin.agency-payout-reports.items.update', [$report, $item]),
+            [
+                'video_room_minutes' => $item->video_room_minutes + 5,
+                'video_gift_coins' => $item->video_gift_coins,
+                'pk_gift_coins' => $item->pk_gift_coins,
+                'video_call_coins' => $item->video_call_coins,
+                'video_call_minutes' => $item->video_call_minutes,
+                'bonus_coins' => 25,
+                'host_payout_inr' => 125.50,
+                'agency_commission_inr' => 20.25,
+                'admin_note' => 'Corrected without reloading',
+            ],
+        );
+
+        $response->assertOk()
+            ->assertJsonPath('report.status', 'pending_review')
+            ->assertJsonPath('report.published', false)
+            ->assertJsonPath('report.actions.can_approve', true)
+            ->assertJsonPath('report.actions.can_publish', false)
+            ->assertJsonPath('item.id', $item->id)
+            ->assertJsonPath('item.bonus_coins', 25)
+            ->assertJsonPath('item.total_inr', 145.75)
+            ->assertJsonPath('item.admin_note', 'Corrected without reloading');
+
+        $report->refresh();
+        $this->assertSame('pending_review', $report->status);
+        $this->assertNull($report->approved_at);
+        $this->assertNull($report->published_at);
+        $this->assertSame(25, $item->fresh()->bonus_coins);
+    }
+
     public function test_invalid_generate_input_is_rejected(): void
     {
         $admin = User::factory()->create();

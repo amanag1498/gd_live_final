@@ -44,6 +44,7 @@ class PanelNavigation
                 'title' => 'Economy',
                 'items' => [
                     self::item('Wallets', 'admin.wallets.index', 'wallet', ['admin.wallets.*']),
+                    self::item('Transaction Ledger', 'admin.wallet-transactions.index', 'history', ['admin.wallet-transactions.*']),
                     self::item('Recharge Plans', 'admin.recharge-plans.index', 'credit-card', ['admin.recharge-plans.*']),
                     self::item('Recharge Audit', 'admin.recharge-audit.index', 'receipt', ['admin.recharge-audit.*']),
                     self::item('Gifts', 'admin.gifts.index', 'gift', ['admin.gifts.*']),
