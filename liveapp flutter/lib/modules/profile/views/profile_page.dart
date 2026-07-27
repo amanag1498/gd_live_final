@@ -273,9 +273,7 @@ class _ProfilePageIntro extends StatelessWidget {
             width: 58,
             height: 58,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: tokens.primaryButtonGradient,
-              ),
+              gradient: LinearGradient(colors: tokens.primaryButtonGradient),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Icon(
@@ -397,106 +395,116 @@ class _ProfileHeroBoard extends StatelessWidget {
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _HeroAvatar(avatarUrl: avatarUrl, fallbackText: profile.name),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      profile.name,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.headlineSmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'User ID #${profile.id}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withOpacity(.82),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _HeroAvatar(avatarUrl: avatarUrl, fallbackText: profile.name),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        for (final label in roleLabels)
-                          _HeroChip(label: label.toUpperCase(), filled: false),
-                        if (profile.canGoLive)
-                          const _HeroChip(label: 'LIVE READY'),
-                        if (profile.status.agencyAttached)
-                          const _HeroChip(label: 'AGENCY'),
+                        Text(
+                          profile.name,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.headlineSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'User ID #${profile.id}',
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodyMedium?.copyWith(
+                            color: Colors.white.withOpacity(.82),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final label in roleLabels)
+                              _HeroChip(
+                                label: label.toUpperCase(),
+                                filled: false,
+                              ),
+                            if (profile.canGoLive)
+                              const _HeroChip(label: 'LIVE READY'),
+                            if (profile.status.agencyAttached)
+                              const _HeroChip(label: 'AGENCY'),
+                          ],
+                        ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-              IconButton(
-                onPressed: onEdit,
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.white.withOpacity(.14),
-                  foregroundColor: Colors.white,
-                ),
-                icon: const Icon(Icons.edit_rounded),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  profile.nextLevelRequiredSpend != null
-                      ? '${NumberFormat.compact().format(profile.remainingSpendToNextLevel ?? 0)} coins to ${profile.nextLevelTitle ?? 'next level'}'
-                      : 'Keep spending to rank up.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withOpacity(.86),
-                    height: 1.35,
                   ),
-                ),
+                  IconButton(
+                    onPressed: onEdit,
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.white.withOpacity(.14),
+                      foregroundColor: Colors.white,
+                    ),
+                    icon: const Icon(Icons.edit_rounded),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Container(
-                width: 70,
-                height: 70,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(.12),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: accent.withOpacity(.85), width: 2.5),
-                ),
-                child: Center(
-                  child: Text(
-                    profile.level?.toString() ?? '1',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      profile.nextLevelRequiredSpend != null
+                          ? '${NumberFormat.compact().format(profile.remainingSpendToNextLevel ?? 0)} coins to ${profile.nextLevelTitle ?? 'next level'}'
+                          : 'Keep spending to rank up.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white.withOpacity(.86),
+                        height: 1.35,
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 12),
+                  Container(
+                    width: 70,
+                    height: 70,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(.12),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: accent.withOpacity(.85),
+                        width: 2.5,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        profile.level?.toString() ?? '1',
+                        style: Theme.of(
+                          context,
+                        ).textTheme.headlineSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 9,
+                  backgroundColor: Colors.white.withOpacity(.18),
+                  valueColor: AlwaysStoppedAnimation<Color>(accent),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 9,
-              backgroundColor: Colors.white.withOpacity(.18),
-              valueColor: AlwaysStoppedAnimation<Color>(accent),
-            ),
-          ),
-        ],
-      ),
         ],
       ),
     );
@@ -554,10 +562,7 @@ class _HeroAvatarFallback extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Colors.white,
-            const Color(0xFFF0FBF2),
-          ],
+          colors: [Colors.white, const Color(0xFFF0FBF2)],
         ),
       ),
       alignment: Alignment.center,
@@ -778,7 +783,9 @@ class _StatTile extends StatelessWidget {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [accent.withOpacity(.16), accent.withOpacity(.08)]),
+              gradient: LinearGradient(
+                colors: [accent.withOpacity(.16), accent.withOpacity(.08)],
+              ),
               borderRadius: BorderRadius.circular(12),
             ),
             alignment: Alignment.center,
@@ -1145,10 +1152,7 @@ class _HostPerformanceBoard extends StatelessWidget {
       _HostReportRange.lastWeek => report?.lastWeek,
     };
     final summary = period?.summary;
-    final total =
-        summary == null
-            ? 0
-            : summary.totalGiftedCoins + summary.videoCallEarnings;
+    final total = summary?.grandTotalCoins ?? 0;
 
     return Container(
       padding: const EdgeInsets.all(20),

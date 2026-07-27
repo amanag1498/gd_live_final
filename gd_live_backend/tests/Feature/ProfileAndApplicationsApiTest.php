@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Agency;
 use App\Models\AgencyRequest;
+use App\Models\CallEarningLedger;
 use App\Models\CallSession;
+use App\Models\Host;
 use App\Models\HostRequest;
 use App\Models\User;
 use App\Models\Wallet;
@@ -166,7 +168,7 @@ class ProfileAndApplicationsApiTest extends TestCase
             'stage_name' => 'Nova',
         ]);
 
-        CallSession::query()->create([
+        $firstCall = CallSession::query()->create([
             'caller_id' => $caller->id,
             'receiver_id' => $hostUser->id,
             'host_id' => $host->id,
@@ -186,8 +188,20 @@ class ProfileAndApplicationsApiTest extends TestCase
             'end_reason' => 'completed',
             'billing_processed_at' => now()->startOfWeek()->addDay()->setHour(12)->addMinutes(3),
         ]);
+        CallEarningLedger::query()->create([
+            'call_session_id' => $firstCall->id,
+            'caller_id' => $caller->id,
+            'host_id' => $host->id,
+            'agency_id' => null,
+            'total_coins' => 60,
+            'host_earning' => 36,
+            'agency_earning' => 0,
+            'platform_earning' => 24,
+            'duration_seconds' => 180,
+            'billable_minutes' => 3,
+        ]);
 
-        CallSession::query()->create([
+        $secondCall = CallSession::query()->create([
             'caller_id' => $caller->id,
             'receiver_id' => $hostUser->id,
             'host_id' => $host->id,
@@ -206,6 +220,18 @@ class ProfileAndApplicationsApiTest extends TestCase
             'platform_earning' => 32,
             'end_reason' => 'completed',
             'billing_processed_at' => now()->startOfWeek()->addDays(2)->setHour(15)->addMinutes(4),
+        ]);
+        CallEarningLedger::query()->create([
+            'call_session_id' => $secondCall->id,
+            'caller_id' => $caller->id,
+            'host_id' => $host->id,
+            'agency_id' => null,
+            'total_coins' => 80,
+            'host_earning' => 48,
+            'agency_earning' => 0,
+            'platform_earning' => 32,
+            'duration_seconds' => 240,
+            'billable_minutes' => 4,
         ]);
 
         Sanctum::actingAs($hostUser);

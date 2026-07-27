@@ -45,7 +45,9 @@ class HostEarningsPeriodDto {
       summary: HostEarningsSummaryDto.fromJson(
         json['summary'] is Map<String, dynamic>
             ? json['summary'] as Map<String, dynamic>
-            : Map<String, dynamic>.from(json['summary'] as Map? ?? const <String, dynamic>{}),
+            : Map<String, dynamic>.from(
+              json['summary'] as Map? ?? const <String, dynamic>{},
+            ),
       ),
     );
   }
@@ -76,8 +78,11 @@ class HostEarningsSummaryDto {
     required this.pkEarnings,
   });
 
+  int get grandTotalCoins => totalGiftedCoins + videoCallEarnings;
+
   factory HostEarningsSummaryDto.fromJson(Map<String, dynamic> json) {
-    int asInt(dynamic value) => (value as num?)?.toInt() ?? int.tryParse('${value ?? 0}') ?? 0;
+    int asInt(dynamic value) =>
+        (value as num?)?.toInt() ?? int.tryParse('${value ?? 0}') ?? 0;
 
     return HostEarningsSummaryDto(
       totalVideoRoomMinutes: asInt(json['total_video_room_minutes']),

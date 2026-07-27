@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\CallEarningLedger;
 use App\Models\CallSession;
 use App\Models\Host;
 use App\Models\LiveRoom;
@@ -27,17 +28,18 @@ class ReportsController extends Controller
         $range = $request->input('range', 'daily');
         $from = $request->date('from') ?: now()->subDays(6)->startOfDay();
         $to = $request->date('to') ?: now()->endOfDay();
+        $from = $from->copy()->startOfDay();
+        $to = $to->copy()->endOfDay();
 
         $hosts = Host::with(['user', 'agency'])->orderBy('id', 'desc')->limit(500)->get();
         $hostsById = $hosts->keyBy('id');
 
         $rooms = LiveRoom::query()
             ->when($hostId, fn ($query) => $query->where('host_id', $hostId))
-            ->where(function ($query) use ($from, $to) {
-                $query->whereBetween('started_at', [$from, $to])
-                    ->orWhereBetween('ended_at', [$from, $to]);
-            })
-            ->get(['id', 'host_id', 'started_at', 'ended_at']);
+            ->whereNotNull('started_at')
+            ->where('started_at', '<=', $to)
+            ->whereRaw('COALESCE(ended_at, last_activity_at, started_at) >= ?', [$from->toDateTimeString()])
+            ->get(['id', 'host_id', 'started_at', 'ended_at', 'last_activity_at']);
 
         $roomIds = $rooms->pluck('id');
         $reportHostIds = $hostId
@@ -45,11 +47,8 @@ class ReportsController extends Controller
             : $hosts->pluck('id')->unique()->values();
 
         $giftAgg = LiveRoomGiftEarningLedger::query()
-            ->when(
-                $roomIds->isNotEmpty(),
-                fn ($query) => $query->whereIn('live_room_id', $roomIds),
-                fn ($query) => $query->whereRaw('1 = 0')
-            )
+            ->when($hostId, fn ($query) => $query->where('host_id', $hostId))
+            ->whereBetween('created_at', [$from, $to])
             ->selectRaw('host_id, DATE(created_at) as d, SUM(total_coins) as gift_coins, COUNT(*) as gift_events, SUM(host_payout_coins) as host_earnings, SUM(agency_payout_coins) as agency_earnings')
             ->groupBy('host_id', 'd')
             ->get()
@@ -61,23 +60,21 @@ class ReportsController extends Controller
                 $join->on('live_room_pk_events.wallet_transaction_id', '=', 'live_room_gifts.transaction_id')
                     ->where('live_room_pk_events.event_type', '=', 'gift');
             })
-            ->when(
-                $roomIds->isNotEmpty(),
-                fn ($query) => $query->whereIn('live_room_gift_earning_ledgers.live_room_id', $roomIds),
-                fn ($query) => $query->whereRaw('1 = 0')
-            )
+            ->when($hostId, fn ($query) => $query->where('live_room_gift_earning_ledgers.host_id', $hostId))
+            ->whereBetween('live_room_gift_earning_ledgers.created_at', [$from, $to])
             ->selectRaw('live_room_gift_earning_ledgers.host_id as host_id, DATE(live_room_gift_earning_ledgers.created_at) as d, SUM(live_room_gift_earning_ledgers.total_coins) as pk_coins, COUNT(live_room_pk_events.id) as pk_events')
             ->groupBy('host_id', 'd')
             ->get()
             ->groupBy('d');
 
-        $callAgg = CallSession::query()
-            ->when($hostId, fn ($query) => $query->where('host_id', $hostId))
-            ->whereNotNull('host_id')
-            ->where('status', 'ended')
-            ->whereBetween('ended_at', [$from, $to])
-            ->selectRaw('host_id, DATE(ended_at) as d, SUM(total_coins_charged) as call_coins, COUNT(*) as call_count, SUM(host_earning) as host_earning, SUM(agency_earning) as agency_earning, SUM(CASE WHEN type = "video" THEN billable_minutes ELSE 0 END) as video_call_minutes, SUM(CASE WHEN type = "video" THEN total_coins_charged ELSE 0 END) as video_call_coins')
-            ->groupBy('host_id', 'd')
+        $callAgg = CallEarningLedger::query()
+            ->join('call_sessions', 'call_sessions.id', '=', 'call_earning_ledgers.call_session_id')
+            ->when($hostId, fn ($query) => $query->where('call_earning_ledgers.host_id', $hostId))
+            ->where('call_sessions.status', 'ended')
+            ->where('call_earning_ledgers.total_coins', '>', 0)
+            ->whereBetween('call_earning_ledgers.created_at', [$from, $to])
+            ->selectRaw('call_earning_ledgers.host_id as host_id, DATE(call_earning_ledgers.created_at) as d, SUM(call_earning_ledgers.total_coins) as call_coins, COUNT(*) as call_count, SUM(call_earning_ledgers.host_earning) as host_earning, SUM(call_earning_ledgers.agency_earning) as agency_earning, SUM(CASE WHEN call_sessions.type = "video" THEN call_earning_ledgers.billable_minutes ELSE 0 END) as video_call_minutes, SUM(CASE WHEN call_sessions.type = "video" THEN call_earning_ledgers.total_coins ELSE 0 END) as video_call_coins')
+            ->groupBy('call_earning_ledgers.host_id', 'd')
             ->get()
             ->groupBy('d');
 
@@ -90,22 +87,8 @@ class ReportsController extends Controller
             ->selectRaw('live_rooms.host_id as host_id,
                          DATE(live_room_participants.joined_at) as d,
                          COUNT(*) as participants_total,
-                         COUNT(DISTINCT ' . $this->participantIdentitySql() . ') as participants_unique')
+                         COUNT(DISTINCT '.$this->participantIdentitySql().') as participants_unique')
             ->join('live_rooms', 'live_rooms.id', '=', 'live_room_participants.live_room_id')
-            ->groupBy('host_id', 'd')
-            ->get()
-            ->groupBy('d');
-
-        $durAgg = LiveRoom::query()
-            ->when(
-                $roomIds->isNotEmpty(),
-                fn ($query) => $query->whereIn('id', $roomIds),
-                fn ($query) => $query->whereRaw('1 = 0')
-            )
-            ->selectRaw('host_id,
-                         DATE(COALESCE(started_at, created_at)) as d,
-                         ' . $this->roomDurationSecondsSelectSql() . ',
-                         COUNT(*) as rooms')
             ->groupBy('host_id', 'd')
             ->get()
             ->groupBy('d');
@@ -115,9 +98,11 @@ class ReportsController extends Controller
 
         foreach ($period as $dt) {
             $key = $dt->format('Y-m-d');
+            $dayFrom = Carbon::parse($key, config('app.timezone'))->startOfDay()->max($from);
+            $dayTo = Carbon::parse($key, config('app.timezone'))->endOfDay()->min($to);
             foreach ($reportHostIds as $hid) {
                 $host = $hostsById->get($hid);
-                if (!$host) {
+                if (! $host) {
                     continue;
                 }
 
@@ -125,7 +110,7 @@ class ReportsController extends Controller
                 $pk = optional($pkAgg->get($key))->firstWhere('host_id', $hid);
                 $call = optional($callAgg->get($key))->firstWhere('host_id', $hid);
                 $participants = optional($partAgg->get($key))->firstWhere('host_id', $hid);
-                $duration = optional($durAgg->get($key))->firstWhere('host_id', $hid);
+                $hostRooms = $rooms->where('host_id', $hid);
 
                 $giftCoins = (int) ($gift->gift_coins ?? 0);
                 $pkCoins = (int) ($pk->pk_coins ?? 0);
@@ -135,8 +120,8 @@ class ReportsController extends Controller
                 $days->push([
                     'date' => $key,
                     'host_id' => $hid,
-                    'rooms' => (int) ($duration->rooms ?? 0),
-                    'duration_min' => (int) round(((int) ($duration->duration_sec ?? 0)) / 60),
+                    'rooms' => $this->countOverlappingRooms($hostRooms, $dayFrom, $dayTo),
+                    'duration_min' => $this->sumLiveRoomMinutes($hostRooms, $dayFrom, $dayTo),
                     'participants_total' => (int) ($participants->participants_total ?? 0),
                     'participants_unique' => (int) ($participants->participants_unique ?? 0),
                     'call_count' => (int) ($call->call_count ?? 0),
@@ -157,15 +142,19 @@ class ReportsController extends Controller
         if ($range === 'weekly') {
             $rows = $rows
                 ->groupBy(fn ($row) => Carbon::parse($row['date'])->startOfWeek(Carbon::MONDAY)->format('Y-m-d'))
-                ->flatMap(function ($weekRows, $weekStart) {
-                    return $weekRows->groupBy('host_id')->map(function ($group) use ($weekStart) {
+                ->flatMap(function ($weekRows, $weekStart) use ($rooms, $from, $to) {
+                    $weekFrom = Carbon::parse($weekStart, config('app.timezone'))->startOfDay()->max($from);
+                    $weekTo = $weekFrom->copy()->endOfWeek(Carbon::SUNDAY)->endOfDay()->min($to);
+
+                    return $weekRows->groupBy('host_id')->map(function ($group) use ($weekStart, $weekFrom, $weekTo, $rooms) {
                         $grossCoins = (int) $group->sum('gross_coins');
+                        $hostRooms = $rooms->where('host_id', $group->first()['host_id']);
 
                         return [
                             'week_start' => $weekStart,
                             'host_id' => $group->first()['host_id'],
-                            'rooms' => (int) $group->sum('rooms'),
-                            'duration_min' => (int) $group->sum('duration_min'),
+                            'rooms' => $this->countOverlappingRooms($hostRooms, $weekFrom, $weekTo),
+                            'duration_min' => $this->sumLiveRoomMinutes($hostRooms, $weekFrom, $weekTo),
                             'participants_total' => (int) $group->sum('participants_total'),
                             'participants_unique' => (int) $group->sum('participants_unique'),
                             'call_count' => (int) $group->sum('call_count'),
@@ -202,7 +191,7 @@ class ReportsController extends Controller
         $data = $view->getData();
         $rows = collect($data['rows']);
 
-        $filename = 'host-report-' . $data['range'] . '-' . now()->format('Ymd_His') . '.csv';
+        $filename = 'host-report-'.$data['range'].'-'.now()->format('Ymd_His').'.csv';
         $headers = [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
@@ -360,7 +349,7 @@ class ReportsController extends Controller
                     ->count(),
                 'participants_unique' => (int) $participantsBase
                     ->get(['user_id', 'session_id'])
-                    ->map(fn ($row) => $row->user_id ? 'user:' . $row->user_id : 'sess:' . $row->session_id)
+                    ->map(fn ($row) => $row->user_id ? 'user:'.$row->user_id : 'sess:'.$row->session_id)
                     ->filter()
                     ->unique()
                     ->count(),
@@ -410,15 +399,6 @@ class ReportsController extends Controller
         };
     }
 
-    private function roomDurationSecondsSelectSql(): string
-    {
-        return match (DB::connection()->getDriverName()) {
-            'sqlite' => "SUM(CASE WHEN started_at IS NOT NULL THEN MAX(strftime('%s', COALESCE(ended_at, CURRENT_TIMESTAMP)) - strftime('%s', started_at), 0) ELSE 0 END) as duration_sec",
-            'pgsql' => "SUM(CASE WHEN started_at IS NOT NULL THEN GREATEST(EXTRACT(EPOCH FROM (COALESCE(ended_at, NOW()) - started_at)), 0) ELSE 0 END) as duration_sec",
-            default => "SUM(TIMESTAMPDIFF(SECOND, started_at, COALESCE(ended_at, NOW()))) as duration_sec",
-        };
-    }
-
     private function hostLiveRoomRangeQuery(int $hostId, Carbon $from, Carbon $to)
     {
         return LiveRoom::query()
@@ -434,7 +414,7 @@ class ReportsController extends Controller
             $roomStart = $room->started_at?->copy();
             $roomEnd = ($room->ended_at ?? $room->last_activity_at ?? $room->started_at)?->copy();
 
-            if (!$roomStart || !$roomEnd) {
+            if (! $roomStart || ! $roomEnd) {
                 return 0;
             }
 
@@ -447,5 +427,18 @@ class ReportsController extends Controller
 
             return (int) floor($effectiveStart->diffInSeconds($effectiveEnd) / 60);
         });
+    }
+
+    private function countOverlappingRooms($rooms, Carbon $from, Carbon $to): int
+    {
+        return (int) $rooms->filter(function (LiveRoom $room) use ($from, $to) {
+            $roomStart = $room->started_at?->copy();
+            $roomEnd = ($room->ended_at ?? $room->last_activity_at ?? $room->started_at)?->copy();
+
+            return $roomStart
+                && $roomEnd
+                && $roomStart->lessThanOrEqualTo($to)
+                && $roomEnd->greaterThan($from);
+        })->count();
     }
 }

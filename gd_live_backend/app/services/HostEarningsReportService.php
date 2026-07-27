@@ -2,22 +2,18 @@
 
 namespace App\Services;
 
-use App\Models\CallSession;
+use App\Models\CallEarningLedger;
 use App\Models\Host;
 use App\Models\LiveRoom;
 use App\Models\LiveRoomGiftEarningLedger;
 use App\Models\LiveRoomPkBattle;
-use App\Models\LiveRoomPkEvent;
 use Carbon\Carbon;
-use Illuminate\Support\Collection;
 
 class HostEarningsReportService
 {
-    private const BUSINESS_TIMEZONE = 'Asia/Kolkata';
-
     public function payloadForHost(Host $host): array
     {
-        $now = now(self::BUSINESS_TIMEZONE);
+        $now = now($this->businessTimezone());
 
         return [
             'today' => $this->buildPeriodPayload(
@@ -43,36 +39,58 @@ class HostEarningsReportService
 
     private function buildPeriodPayload(Host $host, Carbon $from, Carbon $to, string $label): array
     {
-        $callRows = CallSession::query()
-            ->where('host_id', $host->id)
-            ->whereNotNull('ended_at')
-            ->whereBetween('ended_at', [$from, $to])
-            ->get();
+        $callSummary = CallEarningLedger::query()
+            ->join('call_sessions', 'call_sessions.id', '=', 'call_earning_ledgers.call_session_id')
+            ->where('call_earning_ledgers.host_id', $host->id)
+            ->where('call_sessions.status', 'ended')
+            ->where('call_earning_ledgers.total_coins', '>', 0)
+            ->whereBetween('call_earning_ledgers.created_at', [$from, $to])
+            ->selectRaw("
+                SUM(CASE
+                    WHEN call_sessions.type = 'video'
+                    THEN call_earning_ledgers.billable_minutes
+                    ELSE 0
+                END) as video_minutes,
+                SUM(CASE
+                    WHEN call_sessions.type = 'video'
+                    THEN call_earning_ledgers.total_coins
+                    ELSE 0
+                END) as video_earnings
+            ")
+            ->first();
 
-        $giftRows = LiveRoomGiftEarningLedger::query()
-            ->with('room:id,room_type')
-            ->where('host_id', $host->id)
-            ->whereBetween('created_at', [$from, $to])
-            ->get();
+        $giftSummary = LiveRoomGiftEarningLedger::query()
+            ->join('live_room_gifts', 'live_room_gifts.id', '=', 'live_room_gift_earning_ledgers.live_room_gift_id')
+            ->join('live_rooms', 'live_rooms.id', '=', 'live_room_gift_earning_ledgers.live_room_id')
+            ->leftJoin('live_room_pk_events', function ($join) {
+                $join->on('live_room_pk_events.wallet_transaction_id', '=', 'live_room_gifts.transaction_id')
+                    ->where('live_room_pk_events.event_type', '=', 'gift');
+            })
+            ->where('live_room_gift_earning_ledgers.host_id', $host->id)
+            ->whereBetween('live_room_gift_earning_ledgers.created_at', [$from, $to])
+            ->selectRaw("
+                SUM(CASE
+                    WHEN live_room_pk_events.id IS NULL AND live_rooms.room_type = 'video'
+                    THEN live_room_gift_earning_ledgers.total_coins
+                    ELSE 0
+                END) as video_room_gift_coins,
+                SUM(CASE
+                    WHEN live_room_pk_events.id IS NOT NULL
+                    THEN live_room_gift_earning_ledgers.total_coins
+                    ELSE 0
+                END) as pk_gift_coins
+            ")
+            ->first();
 
         $rooms = LiveRoom::query()
             ->where('host_id', $host->id)
             ->whereNotNull('started_at')
-            ->where(function ($query) use ($from, $to) {
-                $query
-                    ->whereBetween('started_at', [$from, $to])
-                    ->orWhereBetween('ended_at', [$from, $to])
-                    ->orWhere(function ($inner) use ($from, $to) {
-                        $inner
-                            ->where('started_at', '<=', $from)
-                            ->where(function ($overlap) use ($to) {
-                                $overlap
-                                    ->whereNull('ended_at')
-                                    ->orWhere('ended_at', '>=', $to);
-                            });
-                    });
-            })
-            ->get(['id', 'room_type', 'started_at', 'ended_at', 'status']);
+            ->where('started_at', '<=', $to)
+            ->whereRaw(
+                'COALESCE(ended_at, last_activity_at, started_at) >= ?',
+                [$from->toDateTimeString()]
+            )
+            ->get(['id', 'room_type', 'started_at', 'ended_at', 'last_activity_at', 'status']);
 
         $pkBattles = LiveRoomPkBattle::query()
             ->where(function ($query) use ($host) {
@@ -86,28 +104,19 @@ class HostEarningsReportService
             })
             ->get(['id', 'host_a_id', 'host_b_id', 'status', 'started_at', 'ended_at', 'created_at']);
 
-        $pkCoins = (int) LiveRoomPkEvent::query()
-            ->whereHas('battle', function ($query) use ($host) {
-                $query->where('host_a_id', $host->id)->orWhere('host_b_id', $host->id);
-            })
-            ->whereBetween('created_at', [$from, $to])
-            ->sum('coins');
-
-        $callSummary = [
-            'video_minutes' => (int) $callRows->where('type', 'video')->sum('billable_minutes'),
-            'video_earnings' => (int) $callRows->where('type', 'video')->sum('total_coins_charged'),
-        ];
-
-        $videoGiftCoins = 0;
-        foreach ($giftRows as $row) {
-            $videoGiftCoins += (int) $row->total_coins;
-        }
+        $videoGiftCoins = (int) ($giftSummary?->video_room_gift_coins ?? 0);
+        $pkCoins = (int) ($giftSummary?->pk_gift_coins ?? 0);
 
         $videoRoomMinutes = 0;
         foreach ($rooms as $room) {
+            if (($room->room_type ?? 'video') !== 'video') {
+                continue;
+            }
+
             $minutes = $this->overlapMinutes(
-                $room->started_at?->copy()?->timezone(self::BUSINESS_TIMEZONE),
-                ($room->ended_at ?? now())->copy()->timezone(self::BUSINESS_TIMEZONE),
+                $room->started_at?->copy(),
+                ($room->ended_at ?? $room->last_activity_at ?? $room->started_at)
+                    ?->copy(),
                 $from,
                 $to
             );
@@ -127,8 +136,8 @@ class HostEarningsReportService
                 'total_room_gifts_coins' => $videoGiftCoins,
                 'video_room_gifts_coins' => $videoGiftCoins,
                 'video_room_gift_earnings' => $videoGiftCoins,
-                'video_call_minutes' => $callSummary['video_minutes'],
-                'video_call_earnings' => $callSummary['video_earnings'],
+                'video_call_minutes' => (int) ($callSummary?->video_minutes ?? 0),
+                'video_call_earnings' => (int) ($callSummary?->video_earnings ?? 0),
                 'pk_room_count' => $pkBattles->count(),
                 'pk_gift_coins' => $pkCoins,
                 'pk_earnings' => $pkCoins,
@@ -149,6 +158,11 @@ class HostEarningsReportService
             return 0;
         }
 
-        return (int) ceil($effectiveStart->diffInSeconds($effectiveEnd) / 60);
+        return (int) floor($effectiveStart->diffInSeconds($effectiveEnd) / 60);
+    }
+
+    private function businessTimezone(): string
+    {
+        return (string) config('app.timezone', 'Asia/Kolkata');
     }
 }
