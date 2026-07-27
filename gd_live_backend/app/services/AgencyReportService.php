@@ -96,12 +96,13 @@ class AgencyReportService
             ->where('agency_id', $agency->id)
             ->withCount('followers')
             ->get()
-            ->map(function (Host $host) use ($from, $to) {
-                $calls = $this->callEarningsRangeQuery($from, $to, null, $host->id);
+            ->map(function (Host $host) use ($agency, $from, $to) {
+                $calls = $this->callEarningsRangeQuery($from, $to, $agency->id, $host->id);
                 $liveRooms = $this->liveRoomRangeQuery($from, $to)
                     ->where('host_id', $host->id);
                 $liveGifts = LiveRoomGiftEarningLedger::query()
                     ->where('host_id', $host->id)
+                    ->where('agency_id', $agency->id)
                     ->whereBetween('created_at', [$from, $to]);
                 $pkGifts = $this->pkGiftBase($from, $to, $host->agency_id, $host->id);
                 $roomIds = (clone $liveRooms)->pluck('id');
@@ -159,8 +160,9 @@ class AgencyReportService
 
     private function resolveRange(Request $request): array
     {
-        $from = $request->date('from') ?: now()->subDays(6)->startOfDay();
-        $to = $request->date('to') ?: now()->endOfDay();
+        $timezone = (string) config('app.timezone', 'Asia/Kolkata');
+        $from = $request->date('from', null, $timezone) ?: now($timezone)->subDays(6)->startOfDay();
+        $to = $request->date('to', null, $timezone) ?: now($timezone)->endOfDay();
 
         return [$from->copy()->startOfDay(), $to->copy()->endOfDay()];
     }
@@ -490,6 +492,7 @@ class AgencyReportService
                     ->sum('call_earning_ledgers.total_coins');
                 $liveGifts = LiveRoomGiftEarningLedger::query()
                     ->where('host_id', $host->id)
+                    ->where('agency_id', $agencyId)
                     ->whereBetween('created_at', [$from, $to]);
                 $pkGifts = $this->pkGiftBase($from, $to, $agencyId, $host->id);
                 $pkGiftCoins = (int) (clone $pkGifts)->sum('live_room_gift_earning_ledgers.total_coins');

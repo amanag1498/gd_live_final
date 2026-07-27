@@ -24,10 +24,11 @@ class ReportsController extends Controller
 {
     public function hosts(Request $request)
     {
+        $timezone = (string) config('app.timezone', 'Asia/Kolkata');
         $hostId = $request->integer('host_id');
         $range = $request->input('range', 'daily');
-        $from = $request->date('from') ?: now()->subDays(6)->startOfDay();
-        $to = $request->date('to') ?: now()->endOfDay();
+        $from = $request->date('from', null, $timezone) ?: now($timezone)->subDays(6)->startOfDay();
+        $to = $request->date('to', null, $timezone) ?: now($timezone)->endOfDay();
         $from = $from->copy()->startOfDay();
         $to = $to->copy()->endOfDay();
 
@@ -94,7 +95,11 @@ class ReportsController extends Controller
             ->groupBy('d');
 
         $days = collect();
-        $period = new DatePeriod($from->copy()->startOfDay(), new DateInterval('P1D'), $to->copy()->endOfDay()->addDay());
+        $period = new DatePeriod(
+            $from->copy()->startOfDay(),
+            new DateInterval('P1D'),
+            $to->copy()->startOfDay()->addDay()
+        );
 
         foreach ($period as $dt) {
             $key = $dt->format('Y-m-d');
@@ -249,8 +254,9 @@ class ReportsController extends Controller
 
     public function hostShow(Host $host, Request $request)
     {
-        $from = $request->date('from') ?: now()->subDays(6)->startOfDay();
-        $to = $request->date('to') ?: now()->endOfDay();
+        $timezone = (string) config('app.timezone', 'Asia/Kolkata');
+        $from = $request->date('from', null, $timezone) ?: now($timezone)->subDays(6)->startOfDay();
+        $to = $request->date('to', null, $timezone) ?: now($timezone)->endOfDay();
         $from = $from->copy()->startOfDay();
         $to = $to->copy()->endOfDay();
 

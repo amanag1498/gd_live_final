@@ -253,6 +253,7 @@ class HostPerformanceConsistencyTest extends TestCase
         ]))->assertOk();
         $weeklyRow = collect($reportResponse->viewData('rows'))->firstWhere('host_id', $host->id);
 
+        $this->assertCount(1, $reportResponse->viewData('rows'));
         $this->assertSame(1_254, $weeklyRow['duration_min']);
         $this->assertSame(81_001, $weeklyRow['room_gift_coins']);
         $this->assertSame(5_500, $weeklyRow['pk_coins']);
