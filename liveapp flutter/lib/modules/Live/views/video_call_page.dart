@@ -92,6 +92,7 @@ class _VideoCallPageState extends State<VideoCallPage>
   DateTime? _liveStart;
   Timer? _hudTimer;
   Timer? _heartbeatTimer;
+  Timer? _hostPresenceWatchdog;
   String _timerText = 'LIVE • 00:00';
 
   bool _localSpeaking = false;
@@ -502,6 +503,7 @@ class _VideoCallPageState extends State<VideoCallPage>
     _leaveSocketRoom();
     _hudTimer?.cancel();
     _heartbeatTimer?.cancel();
+    _hostPresenceWatchdog?.cancel();
     _noFrameWatchdog?.cancel();
     _recentGiftTimer?.cancel();
     _pkOverlayTimer?.cancel();
@@ -616,12 +618,15 @@ class _VideoCallPageState extends State<VideoCallPage>
         setState(() => _error = null);
         await _applyPreferredAudioRoute();
         _syncJoinAnimations(room, animate: false);
+        _syncHostPresenceWatchdog(room);
         if (_pkCapable) {
           await _syncPkState();
         }
       });
       l.on<RoomDisconnectedEvent>((e) {
         if (!mounted || _exiting) return;
+        _heartbeatTimer?.cancel();
+        _hostPresenceWatchdog?.cancel();
         final reason = (e.reason ?? 'unknown').toString();
         if (!_isHost) {
           unawaited(
@@ -639,12 +644,18 @@ class _VideoCallPageState extends State<VideoCallPage>
       l.on<ParticipantConnectedEvent>((event) {
         if (!mounted) return;
         _handleParticipantConnected(event.participant, room);
+        _syncHostPresenceWatchdog(room);
         setState(() {});
         unawaited(_refreshSeatSnapshot());
       });
-      l.on<ParticipantDisconnectedEvent>((_) {
+      l.on<ParticipantDisconnectedEvent>((event) {
         if (!mounted) return;
         _syncJoinAnimations(room, animate: false);
+        if (_isHostParticipant(event.participant)) {
+          _scheduleHostPresenceWatchdog(room);
+        } else {
+          _syncHostPresenceWatchdog(room);
+        }
         setState(() {});
         unawaited(_refreshSeatSnapshot());
       });
@@ -737,6 +748,7 @@ class _VideoCallPageState extends State<VideoCallPage>
         _room = room;
         _connecting = false;
       });
+      _syncHostPresenceWatchdog(room);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _showSelfJoinAnimation();
@@ -1152,6 +1164,48 @@ class _VideoCallPageState extends State<VideoCallPage>
       }
     } catch (_) {}
     return const <String, dynamic>{};
+  }
+
+  bool _isHostParticipant(Participant participant) {
+    final metadata = _participantMetadata(participant);
+
+    return participant.identity.startsWith('host-') ||
+        metadata['is_host'] == true ||
+        metadata['role']?.toString().toLowerCase() == 'host';
+  }
+
+  bool _hasConnectedHost(Room room) {
+    if (_isHost) return true;
+
+    return room.remoteParticipants.values.any(_isHostParticipant);
+  }
+
+  void _syncHostPresenceWatchdog(Room room) {
+    if (!_isViewerOnly || _exiting) {
+      _hostPresenceWatchdog?.cancel();
+      return;
+    }
+
+    if (_hasConnectedHost(room)) {
+      _hostPresenceWatchdog?.cancel();
+      return;
+    }
+
+    _scheduleHostPresenceWatchdog(room);
+  }
+
+  void _scheduleHostPresenceWatchdog(Room room) {
+    if (!_isViewerOnly || _exiting || _hostPresenceWatchdog?.isActive == true) {
+      return;
+    }
+
+    _hostPresenceWatchdog = Timer(const Duration(seconds: 12), () {
+      if (!mounted || _exiting || _room != room || _hasConnectedHost(room)) {
+        return;
+      }
+
+      unawaited(_exitBecauseRoomEnded('host_disconnected'));
+    });
   }
 
   String _joinParticipantName(
@@ -3347,6 +3401,7 @@ class _VideoCallPageState extends State<VideoCallPage>
     _leaveSocketRoom();
     _hudTimer?.cancel();
     _heartbeatTimer?.cancel();
+    _hostPresenceWatchdog?.cancel();
     _noFrameWatchdog?.cancel();
     _seatEventsSub?.cancel();
     _giftEventsSub?.cancel();
@@ -3384,6 +3439,7 @@ class _VideoCallPageState extends State<VideoCallPage>
     _leaveSocketRoom();
     _hudTimer?.cancel();
     _heartbeatTimer?.cancel();
+    _hostPresenceWatchdog?.cancel();
     _noFrameWatchdog?.cancel();
     await _disconnectOpponentRoom();
     try {

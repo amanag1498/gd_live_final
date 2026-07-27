@@ -8,6 +8,7 @@ use App\Models\LiveRoomParticipant;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Models\UserSubscription;
+use App\Services\LiveKitRoomAdminService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Redis;
@@ -27,7 +28,14 @@ class LiveRoomFlowTest extends TestCase
             Role::findOrCreate($role, 'web');
         }
 
-        Redis::shouldReceive('publish')->zeroOrMoreTimes()->andReturn(1);
+        Redis::shouldReceive('publish', 'set', 'del', 'sadd', 'srem')
+            ->zeroOrMoreTimes()
+            ->andReturn(1)
+            ->byDefault();
+        Redis::shouldReceive('smembers')
+            ->zeroOrMoreTimes()
+            ->andReturn([])
+            ->byDefault();
     }
 
     public function test_live_room_list_returns_db_backed_counts(): void
@@ -83,6 +91,29 @@ class LiveRoomFlowTest extends TestCase
             ->where('user_id', $viewer->id)
             ->whereNull('left_at')
             ->count());
+    }
+
+    public function test_viewer_join_does_not_refresh_host_liveness(): void
+    {
+        [, $room] = $this->makeLiveRoom();
+        $room->forceFill(['last_activity_at' => now()->subMinutes(10)])->save();
+        $lastHostActivity = $room->last_activity_at;
+
+        $viewer = User::factory()->create();
+        $viewer->assignRole('user');
+        $this->grantSubscription($viewer);
+        Sanctum::actingAs($viewer);
+
+        $this->postJson("/api/live/rooms/{$room->room_id}/join", [
+            'role' => 'viewer',
+            'session_id' => 'viewer-liveness-test',
+        ])->assertOk();
+
+        $this->assertSame(
+            $lastHostActivity->toDateTimeString(),
+            $room->fresh()->last_activity_at->toDateTimeString(),
+            'Viewer traffic must not keep a disconnected host room alive.',
+        );
     }
 
     public function test_join_missing_room_returns_clean_room_not_found_error(): void
@@ -194,6 +225,46 @@ class LiveRoomFlowTest extends TestCase
             'id' => $room->id,
             'status' => 'ended',
             'end_reason' => 'host_left',
+        ]);
+    }
+
+    public function test_cleanup_ends_fresh_database_room_when_livekit_host_is_missing(): void
+    {
+        [, $room] = $this->makeLiveRoom();
+        $room->forceFill(['last_activity_at' => now()])->save();
+
+        $livekit = $this->mock(LiveKitRoomAdminService::class);
+        $livekit->shouldReceive('hasActiveHost')
+            ->once()
+            ->with($room->room_id)
+            ->andReturn(false);
+
+        Artisan::call('live-rooms:cleanup', ['--stale-minutes' => 2]);
+
+        $this->assertDatabaseHas('live_rooms', [
+            'id' => $room->id,
+            'status' => 'ended',
+            'end_reason' => 'host_disconnected',
+        ]);
+    }
+
+    public function test_cleanup_preserves_room_with_active_livekit_host(): void
+    {
+        [, $room] = $this->makeLiveRoom();
+        $room->forceFill(['last_activity_at' => now()])->save();
+
+        $livekit = $this->mock(LiveKitRoomAdminService::class);
+        $livekit->shouldReceive('hasActiveHost')
+            ->once()
+            ->with($room->room_id)
+            ->andReturn(true);
+
+        Artisan::call('live-rooms:cleanup', ['--stale-minutes' => 2]);
+
+        $this->assertDatabaseHas('live_rooms', [
+            'id' => $room->id,
+            'status' => 'live',
+            'ended_at' => null,
         ]);
     }
 

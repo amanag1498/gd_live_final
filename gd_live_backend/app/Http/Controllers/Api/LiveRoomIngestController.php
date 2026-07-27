@@ -310,7 +310,11 @@ public function join(Request $request, string $room_id)
             'last_seen_at' => $now,
         ])->save();
 
-        $room->forceFill(['last_activity_at' => $now])->save();
+        // Viewer traffic must not keep a disconnected host's room alive.
+        // Host liveness is maintained by the authenticated host heartbeat.
+        if ($role === 'host') {
+            $room->forceFill(['last_activity_at' => $now])->save();
+        }
 
         return $participant;
     });
@@ -427,7 +431,7 @@ public function join(Request $request, string $room_id)
                 ]);
             }
 
-            if ($matches->isNotEmpty()) {
+            if ($matches->contains(fn (LiveRoomParticipant $participant) => $participant->role === 'host')) {
                 $room->forceFill(['last_activity_at' => $left])->save();
             }
 
@@ -467,8 +471,6 @@ public function join(Request $request, string $room_id)
             $room->update(['peak_viewers' => $viewerCount]);
             $room = $room->fresh();
         }
-
-        $this->state->touchRoom($room);
 
         LiveRoomBroadcaster::broadcast($room, 'updated');
     }

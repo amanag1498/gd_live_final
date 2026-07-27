@@ -14,6 +14,7 @@ class LiveRoomMaintenanceService
     public function __construct(
         private LiveRoomStateService $state,
         private LiveRoomSeatService $seats,
+        private LiveKitRoomAdminService $livekit,
     )
     {
     }
@@ -142,11 +143,21 @@ class LiveRoomMaintenanceService
             return 'stale_cleanup';
         }
 
-        if ($hasOpenHost) {
+        if (!$hasOpenHost) {
+            return $hasAnyHost ? 'host_left' : 'host_disconnected';
+        }
+
+        $startedAt = $room->started_at ?? $room->created_at;
+        if ($startedAt && $startedAt->gt(now()->subSeconds(45))) {
             return null;
         }
 
-        return $hasAnyHost ? 'host_left' : 'host_disconnected';
+        $hasLivekitHost = $this->livekit->hasActiveHost((string) $room->room_id);
+        if ($hasLivekitHost === false) {
+            return 'host_disconnected';
+        }
+
+        return null;
     }
 
     private function closeOpenParticipants(LiveRoom $room): int
