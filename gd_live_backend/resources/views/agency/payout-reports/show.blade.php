@@ -5,6 +5,7 @@
 @section('content')
   <div class="d-flex gap-2 justify-content-end mb-3">
     <a href="{{ route('agency.payout-reports.index') }}" class="btn btn-light border">Back</a>
+    <a href="{{ route('agency.payout-reports.preview', $report) }}" class="btn btn-outline-primary" target="_blank" rel="noopener">View PDF</a>
     <a href="{{ route('agency.payout-reports.export', $report) }}" class="btn btn-primary">Download PDF</a>
   </div>
 

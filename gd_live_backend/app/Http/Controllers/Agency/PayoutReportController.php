@@ -56,6 +56,16 @@ class PayoutReportController extends Controller
 
     public function export(Request $request, AgencyPayoutReport $agency_payout_report)
     {
+        return $this->pdfResponse($request, $agency_payout_report, false);
+    }
+
+    public function preview(Request $request, AgencyPayoutReport $agency_payout_report)
+    {
+        return $this->pdfResponse($request, $agency_payout_report, true);
+    }
+
+    private function pdfResponse(Request $request, AgencyPayoutReport $agency_payout_report, bool $inline)
+    {
         $agency = Agency::query()->where('owner_user_id', $request->user()->id)->firstOrFail();
         abort_unless((int) $agency_payout_report->agency_id === (int) $agency->id, 403);
         abort_unless(in_array($agency_payout_report->status, self::VISIBLE_STATUSES, true), 404);
@@ -70,14 +80,17 @@ class PayoutReportController extends Controller
                 ->setPaper('a4', 'landscape');
 
             $filename = 'my-agency-payout-report-' . $agency_payout_report->id . '.pdf';
-
-            return response($pdf->output(), 200, [
+            $headers = [
                 'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-                'X-Download-Options' => 'noopen',
+                'Content-Disposition' => ($inline ? 'inline' : 'attachment') . '; filename="' . $filename . '"',
                 'Cache-Control' => 'private, no-store, no-cache, must-revalidate',
                 'Pragma' => 'public',
-            ]);
+            ];
+            if (! $inline) {
+                $headers['X-Download-Options'] = 'noopen';
+            }
+
+            return response($pdf->output(), 200, $headers);
         }
 
         return response()

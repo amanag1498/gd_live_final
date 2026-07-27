@@ -264,6 +264,41 @@ class AgencyPayoutReportTest extends TestCase
         $service = app(AgencyWeeklyPayoutReportService::class);
         [$start, $end] = $service->resolvePeriod('2026-04-21', '2026-04-27');
         $report = $service->generate($start, $end, $agency->id, false)['reports'][0];
+        $report = $service->approve($report, 0, 'Approved for PDF test', $admin);
+        $report = $service->publish($report, 'Published for PDF test', $admin);
+        app()->instance('dompdf.wrapper', new class {
+            public function loadView(string $view, array $data): static
+            {
+                return $this;
+            }
+
+            public function setPaper(string $paper, string $orientation): static
+            {
+                return $this;
+            }
+
+            public function output(): string
+            {
+                return '%PDF-1.4 test';
+            }
+        });
+
+        $this->actingAs($admin)
+            ->get(route('admin.agency-payout-reports.preview', $report))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf')
+            ->assertHeader('content-disposition', 'inline; filename="agency-payout-report-' . $report->id . '.pdf"');
+
+        $this->actingAs($admin)
+            ->get(route('admin.agency-payout-reports.export', $report))
+            ->assertOk()
+            ->assertHeader('content-disposition', 'attachment; filename="agency-payout-report-' . $report->id . '.pdf"');
+
+        $this->actingAs($owner)
+            ->get(route('agency.payout-reports.preview', $report))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf')
+            ->assertHeader('content-disposition', 'inline; filename="my-agency-payout-report-' . $report->id . '.pdf"');
 
         $this->actingAs($owner)
             ->get(route('agency.payout-reports.export', $report))
@@ -273,6 +308,20 @@ class AgencyPayoutReportTest extends TestCase
         $this->actingAs($otherOwner)
             ->get(route('agency.payout-reports.export', $report))
             ->assertForbidden();
+
+        $this->actingAs($otherOwner)
+            ->get(route('agency.payout-reports.preview', $report))
+            ->assertForbidden();
+
+        $this->actingAs($admin)
+            ->get(route('admin.agency-payout-reports.show', $report))
+            ->assertOk()
+            ->assertSee(route('admin.agency-payout-reports.preview', $report), false);
+
+        $this->actingAs($owner)
+            ->get(route('agency.payout-reports.show', $report))
+            ->assertOk()
+            ->assertSee(route('agency.payout-reports.preview', $report), false);
 
         $this->actingAs($admin)
             ->get(route('admin.agencies.dashboard', $agency))

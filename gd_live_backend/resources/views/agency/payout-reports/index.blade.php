@@ -50,7 +50,12 @@
               <td>{{ number_format($report->gross_earnings) }}</td>
               <td>{{ number_format($report->final_payable) }}</td>
               <td>{{ ucwords(str_replace('_', ' ', $report->status)) }}</td>
-              <td class="text-end"><a href="{{ route('agency.payout-reports.show', $report) }}" class="btn btn-sm btn-outline-secondary">View</a></td>
+              <td class="text-end">
+                <div class="d-inline-flex gap-2">
+                  <a href="{{ route('agency.payout-reports.show', $report) }}" class="btn btn-sm btn-outline-secondary">View</a>
+                  <a href="{{ route('agency.payout-reports.preview', $report) }}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">View PDF</a>
+                </div>
+              </td>
             </tr>
           @empty
             <tr><td colspan="7" class="text-center text-muted py-4">No payout reports yet.</td></tr>

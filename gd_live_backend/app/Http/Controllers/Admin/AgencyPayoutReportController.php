@@ -197,6 +197,16 @@ class AgencyPayoutReportController extends Controller
 
     public function export(AgencyPayoutReport $agency_payout_report)
     {
+        return $this->pdfResponse($agency_payout_report, false);
+    }
+
+    public function preview(AgencyPayoutReport $agency_payout_report)
+    {
+        return $this->pdfResponse($agency_payout_report, true);
+    }
+
+    private function pdfResponse(AgencyPayoutReport $agency_payout_report, bool $inline)
+    {
         $agency_payout_report->load(['agency.owner', 'items.host.user', 'publishedByAdmin']);
         $data = ['report' => $agency_payout_report];
 
@@ -206,14 +216,17 @@ class AgencyPayoutReportController extends Controller
                 ->setPaper('a4', 'landscape');
 
             $filename = 'agency-payout-report-' . $agency_payout_report->id . '.pdf';
-
-            return response($pdf->output(), 200, [
+            $headers = [
                 'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-                'X-Download-Options' => 'noopen',
+                'Content-Disposition' => ($inline ? 'inline' : 'attachment') . '; filename="' . $filename . '"',
                 'Cache-Control' => 'private, no-store, no-cache, must-revalidate',
                 'Pragma' => 'public',
-            ]);
+            ];
+            if (! $inline) {
+                $headers['X-Download-Options'] = 'noopen';
+            }
+
+            return response($pdf->output(), 200, $headers);
         }
 
         return response()

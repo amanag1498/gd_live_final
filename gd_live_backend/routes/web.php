@@ -99,6 +99,7 @@ Route::middleware(['auth','not_blocked','role:agency'])->prefix('agency')->name(
   Route::get('/pk-battles/{pk_battle}', [AgencyPkBattleController::class, 'show'])->name('pk-battles.show');
   Route::get('/payout-reports', [AgencyPayoutReportController::class, 'index'])->name('payout-reports.index');
   Route::get('/payout-reports/{agency_payout_report}', [AgencyPayoutReportController::class, 'show'])->name('payout-reports.show');
+  Route::get('/payout-reports/{agency_payout_report}/preview', [AgencyPayoutReportController::class, 'preview'])->name('payout-reports.preview');
   Route::get('/payout-reports/{agency_payout_report}/export', [AgencyPayoutReportController::class, 'export'])->name('payout-reports.export');
   Route::get('/wallet', [AgencyWalletController::class, 'show'])->name('wallet.show');
   Route::post('/wallet/credit-user', [AgencyWalletController::class, 'creditUser'])->name('wallet.credit-user');
@@ -195,6 +196,7 @@ Route::middleware(['auth','not_blocked','role:admin'])->prefix('admin')->name('a
   Route::delete('agency-payout-reports/{agency_payout_report}', [AdminAgencyPayoutReportController::class, 'destroy'])->name('agency-payout-reports.destroy');
   Route::post('agency-payout-reports/{agency_payout_report}/reject', [AdminAgencyPayoutReportController::class, 'reject'])->name('agency-payout-reports.reject');
   Route::post('agency-payout-reports/{agency_payout_report}/mark-paid', [AdminAgencyPayoutReportController::class, 'markPaid'])->name('agency-payout-reports.mark-paid');
+  Route::get('agency-payout-reports/{agency_payout_report}/preview', [AdminAgencyPayoutReportController::class, 'preview'])->name('agency-payout-reports.preview');
   Route::get('agency-payout-reports/{agency_payout_report}/export', [AdminAgencyPayoutReportController::class, 'export'])->name('agency-payout-reports.export');
   Route::get('reports/host-followers', [AdminHostFollowerReportController::class, 'index'])->name('reports.host-followers');
   Route::delete('reports/host-followers/{hostFollower}', [AdminHostFollowerReportController::class, 'destroy'])->name('reports.host-followers.destroy');

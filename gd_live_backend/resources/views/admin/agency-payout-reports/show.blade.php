@@ -117,6 +117,7 @@
           @if($dashboardHref)
             <x-ui.button variant="outline" size="sm" href="{{ $dashboardHref }}">Open Agency Dashboard</x-ui.button>
           @endif
+          <x-ui.button variant="outline" size="sm" href="{{ route('admin.agency-payout-reports.preview', $report) }}" target="_blank" rel="noopener">View PDF</x-ui.button>
           <x-ui.button variant="outline" size="sm" href="{{ route('admin.agency-payout-reports.export', $report) }}">Download PDF</x-ui.button>
         </div>
       </div>
