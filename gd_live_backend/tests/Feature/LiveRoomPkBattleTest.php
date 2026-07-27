@@ -419,7 +419,9 @@ class LiveRoomPkBattleTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.pk-battles.index'))
             ->assertOk()
-            ->assertSee('pk_admin_report');
+            ->assertSee('pk_admin_report')
+            ->assertSee('User ID '.$hostAUser->id)
+            ->assertSee('User ID: '.$hostAUser->id);
     }
 
     private function makeLiveRoom(string $suffix, string $roomType = 'video', int $maxSpeakers = 4): array

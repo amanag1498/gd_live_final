@@ -11,7 +11,7 @@
       <select name="host_user_id" class="form-select">
         <option value="">All hosts</option>
         @foreach($hosts as $host)
-          <option value="{{ $host->id }}" @selected(request('host_user_id') == $host->id)>{{ $host->name }}</option>
+          <option value="{{ $host->id }}" @selected(request('host_user_id') == $host->id)>{{ $host->name }} (User #{{ $host->id }})</option>
         @endforeach
       </select>
       <input type="date" class="form-control" name="from" value="{{ request('from') }}">
@@ -27,7 +27,7 @@
       <tbody>
       @forelse($rows as $row)
         <tr>
-          <td>{{ $row->hostUser?->name ?? '—' }}</td>
+          <td><div>{{ $row->hostUser?->name ?? '—' }}</div><div class="text-muted small">User ID: {{ $row->host_user_id ?? '—' }}</div></td>
           <td>{{ $row->blockedUser?->name ?? '—' }}</td>
           <td>{{ $row->reason ?: '—' }}</td>
           <td>{{ $row->blockedBy?->name ?? '—' }} <span class="text-muted">({{ $row->blocked_by_role }})</span></td>

@@ -46,7 +46,7 @@
         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Host</label>
         <select name="host_id" class="{{ $inputClass }}" required>
           @foreach($hosts as $h)
-            <option value="{{ $h->id }}" @selected((string) old('host_id', $live_room->host_id) === (string) $h->id)>{{ $h->user?->name }} ({{ $h->stage_name ?? '—' }})</option>
+            <option value="{{ $h->id }}" @selected((string) old('host_id', $live_room->host_id) === (string) $h->id)>{{ $h->user?->name }} (User #{{ $h->user_id }} · {{ $h->stage_name ?? '—' }})</option>
           @endforeach
         </select>
       </div>

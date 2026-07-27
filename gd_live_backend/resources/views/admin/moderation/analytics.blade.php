@@ -26,7 +26,7 @@
       <div class="card-body table-responsive">
         <table class="table table-sm align-middle"><thead><tr><th>Host</th><th>Blocks</th></tr></thead><tbody>
           @foreach($analytics['hosts_with_most_blocks'] as $row)
-            <tr><td>{{ $row->hostUser?->name ?? ('User #'.$row->host_user_id) }}</td><td>{{ $row->block_count }}</td></tr>
+            <tr><td><div>{{ $row->hostUser?->name ?? 'Unknown host' }}</div><div class="text-muted small">User ID: {{ $row->host_user_id }}</div></td><td>{{ $row->block_count }}</td></tr>
           @endforeach
         </tbody></table>
       </div>

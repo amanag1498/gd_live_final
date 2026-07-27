@@ -51,7 +51,7 @@
     @if($topHosts->isNotEmpty())
       <div class="mb-5 flex flex-wrap gap-2">
         @foreach($topHosts as $hostId => $wins)
-          <x-ui.badge color="dark">Host {{ $hostId }} · {{ $wins }} wins</x-ui.badge>
+          <x-ui.badge color="dark">User ID {{ $topHostUserIds->get($hostId, '—') }} · {{ $wins }} wins</x-ui.badge>
         @endforeach
       </div>
     @endif
@@ -90,6 +90,7 @@
                     {{ $battle->hostA?->stage_name ?: $battle->hostA?->user?->name ?: '—' }}
                   @endif
                 </div>
+                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">User ID: {{ $battle->hostA?->user_id ?? '—' }}</div>
                 <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   Room:
                   @if($battle->roomA)
@@ -109,6 +110,7 @@
                     {{ $battle->hostB?->stage_name ?: $battle->hostB?->user?->name ?: '—' }}
                   @endif
                 </div>
+                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">User ID: {{ $battle->hostB?->user_id ?? '—' }}</div>
                 <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   Room:
                   @if($battle->roomB)

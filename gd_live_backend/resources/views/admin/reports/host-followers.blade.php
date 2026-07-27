@@ -22,7 +22,7 @@
           <select name="host_id" class="{{ $inputClass }}">
             <option value="">All hosts</option>
             @foreach($hosts as $host)
-              <option value="{{ $host->id }}" @selected((string) $hostId === (string) $host->id)>{{ $host->stage_name ?: $host->user?->name ?: 'Host #'.$host->id }}</option>
+              <option value="{{ $host->id }}" @selected((string) $hostId === (string) $host->id)>{{ $host->stage_name ?: $host->user?->name ?: 'Unknown host' }} (User ID {{ $host->user_id ?? '—' }})</option>
             @endforeach
           </select>
           <x-ui.button type="submit" size="sm">Filter</x-ui.button>
@@ -36,8 +36,8 @@
           <div class="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
             <div class="flex items-center justify-between gap-3">
               <div>
-                <div class="font-semibold text-gray-900 dark:text-white">{{ $host->stage_name ?: $host->user?->name ?: 'Host #'.$host->id }}</div>
-                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $host->user?->email }}</div>
+                <div class="font-semibold text-gray-900 dark:text-white">{{ $host->stage_name ?: $host->user?->name ?: 'Unknown host' }}</div>
+                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">User ID: {{ $host->user_id ?? '—' }} · {{ $host->user?->email }}</div>
               </div>
               <x-ui.badge color="dark">{{ $host->followers_count }} followers</x-ui.badge>
             </div>
@@ -62,8 +62,8 @@
             @forelse($rows as $row)
               <tr class="bg-white dark:bg-gray-900">
                 <td class="px-4 py-4">
-                  <div class="font-semibold text-gray-900 dark:text-white">{{ $row->host?->stage_name ?: $row->host?->user?->name ?: 'Host #'.$row->host_id }}</div>
-                  <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $row->host?->user?->email }}</div>
+                  <div class="font-semibold text-gray-900 dark:text-white">{{ $row->host?->stage_name ?: $row->host?->user?->name ?: 'Unknown host' }}</div>
+                  <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">User ID: {{ $row->host?->user_id ?? '—' }} · {{ $row->host?->user?->email }}</div>
                 </td>
                 <td class="px-4 py-4">
                   <div class="font-semibold text-gray-900 dark:text-white">{{ $row->user?->name ?: 'User #'.$row->user_id }}</div>

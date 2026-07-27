@@ -22,7 +22,7 @@
         <div class="font-semibold text-gray-900 dark:text-white">{{ $live_room->title ?: $live_room->room_id }}</div>
         <div class="text-gray-500 dark:text-gray-400">{{ $live_room->room_id }} · {{ ucfirst($live_room->status) }}</div>
         <div class="grid gap-4 sm:grid-cols-2">
-          <div><div class="text-xs uppercase tracking-[0.18em] text-gray-400">Host</div><div class="mt-1 font-medium text-gray-900 dark:text-white">{{ $live_room->host?->user?->name ?? '—' }}</div></div>
+          <div><div class="text-xs uppercase tracking-[0.18em] text-gray-400">Host</div><div class="mt-1 font-medium text-gray-900 dark:text-white">{{ $live_room->host?->user?->name ?? '—' }}</div>@if($live_room->host?->user_id)<div class="mt-1 text-xs text-gray-500 dark:text-gray-400">User #{{ $live_room->host->user_id }}</div>@endif</div>
           <div><div class="text-xs uppercase tracking-[0.18em] text-gray-400">Peak Viewers</div><div class="mt-1 font-medium text-gray-900 dark:text-white">{{ number_format((int) $live_room->peak_viewers) }}</div></div>
           <div><div class="text-xs uppercase tracking-[0.18em] text-gray-400">Started</div><div class="mt-1 font-medium text-gray-900 dark:text-white">{{ optional($live_room->started_at)->format('d M Y H:i') ?: '—' }}</div></div>
           <div><div class="text-xs uppercase tracking-[0.18em] text-gray-400">Ended</div><div class="mt-1 font-medium text-gray-900 dark:text-white">{{ optional($live_room->ended_at)->format('d M Y H:i') ?: '—' }}</div></div>

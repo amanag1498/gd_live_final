@@ -51,7 +51,7 @@
         <tbody>
           @forelse($report->items as $item)
             <tr>
-              <td>{{ $item->host?->user?->name ?? $item->host?->stage_name ?? '—' }}</td>
+              <td>{{ $item->host?->user?->name ?? $item->host?->stage_name ?? '—' }}@if($item->host?->user_id)<div class="text-muted small">User #{{ $item->host->user_id }}</div>@endif</td>
               <td>{{ number_format($item->video_room_minutes) }}</td>
               <td>{{ number_format($item->video_gift_coins) }}</td>
               <td>{{ number_format($item->pk_gift_coins) }}</td>

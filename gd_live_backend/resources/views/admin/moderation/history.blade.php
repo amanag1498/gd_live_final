@@ -24,7 +24,7 @@
           <td><span class="badge bg-light text-dark border">{{ $row->action_type }}</span></td>
           <td>{{ $row->actor?->name ?? 'System' }} <div class="text-muted small">{{ $row->actor_role }}</div></td>
           <td>{{ $row->targetUser?->name ?? '—' }}</td>
-          <td>{{ $row->hostUser?->name ?? '—' }}</td>
+          <td><div>{{ $row->hostUser?->name ?? '—' }}</div><div class="text-muted small">User ID: {{ $row->host_user_id ?? '—' }}</div></td>
           <td>{{ $row->room_id ?: '—' }} @if($row->room_type)<div class="text-muted small">{{ $row->room_type }}</div>@endif</td>
           <td>{{ $row->reason ?: '—' }}</td>
           <td>{{ optional($row->created_at)->format('d M Y H:i') }}</td>

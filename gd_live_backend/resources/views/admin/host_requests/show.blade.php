@@ -1,5 +1,5 @@
 @extends('layouts.admin-tailadmin')
-@section('title','Review Host #'.$host_request->id)
+@section('title','Review Host Request #'.$host_request->id)
 
 @php
   $inputClass = 'block w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white';

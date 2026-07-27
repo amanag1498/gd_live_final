@@ -43,7 +43,7 @@
             </div>
             <div>
               <div class="text-lg font-semibold text-gray-900 dark:text-white">{{ $host->user?->name ?? '—' }}</div>
-              <div class="text-sm text-gray-500 dark:text-gray-400">{{ $host->stage_name ?: '—' }} · {{ $host->user?->email ?? '—' }}</div>
+              <div class="text-sm text-gray-500 dark:text-gray-400">User #{{ $host->user_id }} · {{ $host->stage_name ?: '—' }} · {{ $host->user?->email ?? '—' }}</div>
               <div class="mt-2 text-sm text-gray-500 dark:text-gray-400">Phone: {{ $host->contact_phone ?: '—' }}</div>
             </div>
           </div>

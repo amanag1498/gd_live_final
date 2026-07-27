@@ -21,7 +21,7 @@
         <div class="card-header"><h5 class="mb-0">Room A</h5></div>
         <div class="card-body">
           <div class="fw-semibold">{{ $pk_battle->roomA?->room_id ?? '—' }}</div>
-          <div class="text-muted small">{{ $pk_battle->hostA?->user?->name ?? '—' }}</div>
+          <div class="text-muted small">{{ $pk_battle->hostA?->user?->name ?? '—' }}@if($pk_battle->hostA?->user_id) · User #{{ $pk_battle->hostA->user_id }}@endif</div>
         </div>
       </div>
     </div>
@@ -30,7 +30,7 @@
         <div class="card-header"><h5 class="mb-0">Room B</h5></div>
         <div class="card-body">
           <div class="fw-semibold">{{ $pk_battle->roomB?->room_id ?? '—' }}</div>
-          <div class="text-muted small">{{ $pk_battle->hostB?->user?->name ?? '—' }}</div>
+          <div class="text-muted small">{{ $pk_battle->hostB?->user?->name ?? '—' }}@if($pk_battle->hostB?->user_id) · User #{{ $pk_battle->hostB->user_id }}@endif</div>
         </div>
       </div>
     </div>

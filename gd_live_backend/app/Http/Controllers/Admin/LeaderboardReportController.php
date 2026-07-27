@@ -59,11 +59,10 @@ class LeaderboardReportController extends Controller
             $out = fopen('php://output', 'w');
 
             if ($dataset === 'hosts') {
-                fputcsv($out, ['rank', 'host_id', 'host_user_id', 'name', 'agency_name', 'gift_coins', 'call_coins', 'total_coins']);
+                fputcsv($out, ['rank', 'host_user_id', 'name', 'agency_name', 'gift_coins', 'call_coins', 'total_coins']);
                 foreach ($rows as $row) {
                     fputcsv($out, [
                         $row['rank'],
-                        $row['host_id'],
                         $row['host_user_id'],
                         $row['name'],
                         $row['agency_name'],

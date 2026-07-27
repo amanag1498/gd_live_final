@@ -66,7 +66,7 @@
               </td>
               <td class="px-4 py-3">
                 <div class="font-medium text-gray-900 dark:text-white">{{ $room->host?->user?->name ?? '—' }}</div>
-                <div class="text-sm text-gray-500 dark:text-gray-400">{{ $room->host?->stage_name ?: '—' }}</div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">@if($room->host?->user_id)User #{{ $room->host->user_id }} · @endif{{ $room->host?->stage_name ?: '—' }}</div>
               </td>
               <td class="px-4 py-3"><x-ui.badge color="dark">{{ ucfirst($room->status) }}</x-ui.badge></td>
               <td class="px-4 py-3">{{ $room->open_participant_count ?? 0 }}</td>

@@ -61,7 +61,7 @@
       <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
         <thead class="bg-gray-50 dark:bg-gray-950/60">
           <tr>
-            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">#</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">User ID</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Stage Name</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">User</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Phone</th>
@@ -78,11 +78,11 @@
               $count = $h->relationLoaded('photos') ? $h->photos->count() : ($h->photos_count ?? 0);
             @endphp
             <tr class="bg-white dark:bg-gray-900">
-              <td class="px-4 py-3">{{ $h->id }}</td>
+              <td class="px-4 py-3">{{ $h->user_id }}</td>
               <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ $h->stage_name ?: '—' }}</td>
               <td class="px-4 py-3">
                 <div class="font-medium text-gray-900 dark:text-white">{{ $h->user?->name ?? '—' }}</div>
-                <div class="text-sm text-gray-500 dark:text-gray-400">{{ $h->user?->email ?? '' }}</div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">User #{{ $h->user_id }} · {{ $h->user?->email ?? '' }}</div>
               </td>
               <td class="px-4 py-3">{{ $h->contact_phone ?: '—' }}</td>
               <td class="px-4 py-3">{{ $h->agency?->name ?: '—' }}</td>

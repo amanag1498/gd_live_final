@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -140,10 +141,32 @@ class AgencyReportingTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.reports.agencies.show', $agency))
             ->assertOk()
-            ->assertSee('Agency Detail')
             ->assertSee('Orbit Agency')
             ->assertSee('Host Nova')
-            ->assertSee('Recent Live Rooms');
+            ->assertSee('User #'.$hostUser->id);
+
+        $this->actingAs($admin)
+            ->get(route('admin.calls.index'))
+            ->assertOk()
+            ->assertSee('User ID: '.$hostUser->id);
+
+        $csv = $this->actingAs($admin)->get(route('admin.calls.export'))->streamedContent();
+        $this->assertStringContainsString('host_user_id', $csv);
+        $this->assertStringContainsString((string) $hostUser->id, $csv);
+
+        Sanctum::actingAs($admin);
+        $this->getJson('/api/admin/calls')
+            ->assertOk()
+            ->assertJsonPath('data.items.0.host_user_id', $hostUser->id);
+
+        $apiCsv = $this->get('/api/admin/calls/export')->streamedContent();
+        $this->assertStringContainsString('host_user_id', $apiCsv);
+        $this->assertStringNotContainsString(',host_id,', $apiCsv);
+
+        $this->actingAs($admin)
+            ->get(route('admin.calls.index'))
+            ->assertOk()
+            ->assertSee('User ID: '.$hostUser->id);
     }
 
     public function test_admin_can_view_host_report_detail(): void
@@ -194,8 +217,8 @@ class AgencyReportingTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.reports.hosts.show', $host))
             ->assertOk()
-            ->assertSee('Host Detail')
             ->assertSee('Host Nova')
+            ->assertSee('User ID: '.$hostUser->id)
             ->assertSee('Recent Calls')
             ->assertSee('Recent Live Rooms');
     }

@@ -35,8 +35,8 @@
           @forelse($battles as $battle)
             <tr>
               <td>{{ $battle->battle_id }}</td>
-              <td>{{ $battle->roomA?->room_id ?? '—' }}<div class="text-muted small">{{ $battle->hostA?->user?->name ?? '—' }}</div></td>
-              <td>{{ $battle->roomB?->room_id ?? '—' }}<div class="text-muted small">{{ $battle->hostB?->user?->name ?? '—' }}</div></td>
+              <td>{{ $battle->roomA?->room_id ?? '—' }}<div class="text-muted small">{{ $battle->hostA?->user?->name ?? '—' }}@if($battle->hostA?->user_id) · User #{{ $battle->hostA->user_id }}@endif</div></td>
+              <td>{{ $battle->roomB?->room_id ?? '—' }}<div class="text-muted small">{{ $battle->hostB?->user?->name ?? '—' }}@if($battle->hostB?->user_id) · User #{{ $battle->hostB->user_id }}@endif</div></td>
               <td><span class="badge bg-light text-dark border">{{ ucfirst($battle->status) }}</span></td>
               <td>{{ number_format((int) $battle->score_a) }} - {{ number_format((int) $battle->score_b) }}</td>
               <td class="text-end">

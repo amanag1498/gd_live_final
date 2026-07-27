@@ -125,6 +125,7 @@ class ReportsController extends Controller
                 $days->push([
                     'date' => $key,
                     'host_id' => $hid,
+                    'host_user_id' => $host->user_id,
                     'rooms' => $this->countOverlappingRooms($hostRooms, $dayFrom, $dayTo),
                     'duration_min' => $this->sumLiveRoomMinutes($hostRooms, $dayFrom, $dayTo),
                     'participants_total' => (int) ($participants->participants_total ?? 0),
@@ -158,6 +159,7 @@ class ReportsController extends Controller
                         return [
                             'week_start' => $weekStart,
                             'host_id' => $group->first()['host_id'],
+                            'host_user_id' => $group->first()['host_user_id'],
                             'rooms' => $this->countOverlappingRooms($hostRooms, $weekFrom, $weekTo),
                             'duration_min' => $this->sumLiveRoomMinutes($hostRooms, $weekFrom, $weekTo),
                             'participants_total' => (int) $group->sum('participants_total'),
@@ -205,15 +207,15 @@ class ReportsController extends Controller
         return response()->stream(function () use ($rows, $data) {
             $out = fopen('php://output', 'w');
             fputcsv($out, $data['range'] === 'weekly'
-                ? ['week_start', 'host_id', 'rooms', 'duration_min', 'participants_total', 'participants_unique', 'call_count', 'video_call_minutes', 'video_call_coins', 'room_gift_coins', 'gift_coins', 'gift_events', 'pk_coins', 'pk_events', 'gross_coins']
-                : ['date', 'host_id', 'rooms', 'duration_min', 'participants_total', 'participants_unique', 'call_count', 'video_call_minutes', 'video_call_coins', 'room_gift_coins', 'gift_coins', 'gift_events', 'pk_coins', 'pk_events', 'gross_coins']
+                ? ['week_start', 'host_user_id', 'rooms', 'duration_min', 'participants_total', 'participants_unique', 'call_count', 'video_call_minutes', 'video_call_coins', 'room_gift_coins', 'gift_coins', 'gift_events', 'pk_coins', 'pk_events', 'gross_coins']
+                : ['date', 'host_user_id', 'rooms', 'duration_min', 'participants_total', 'participants_unique', 'call_count', 'video_call_minutes', 'video_call_coins', 'room_gift_coins', 'gift_coins', 'gift_events', 'pk_coins', 'pk_events', 'gross_coins']
             );
 
             foreach ($rows as $row) {
                 if ($data['range'] === 'weekly') {
                     fputcsv($out, [
                         $row['week_start'],
-                        $row['host_id'],
+                        $row['host_user_id'],
                         $row['rooms'],
                         $row['duration_min'],
                         $row['participants_total'],
@@ -231,7 +233,7 @@ class ReportsController extends Controller
                 } else {
                     fputcsv($out, [
                         $row['date'],
-                        $row['host_id'],
+                        $row['host_user_id'],
                         $row['rooms'],
                         $row['duration_min'],
                         $row['participants_total'],

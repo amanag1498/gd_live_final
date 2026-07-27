@@ -22,7 +22,7 @@
           <select name="host_id" class="{{ $inputClass }}">
             <option value="">All hosts</option>
             @foreach($hosts as $h)
-              <option value="{{ $h->id }}" @selected($hostId == $h->id)>{{ $h->user?->name }} (ID {{ $h->id }})</option>
+              <option value="{{ $h->id }}" @selected($hostId == $h->id)>{{ $h->user?->name ?? $h->stage_name ?? 'Unknown host' }} (User ID {{ $h->user_id ?? '—' }})</option>
             @endforeach
           </select>
           <select name="range" class="{{ $inputClass }}">
@@ -60,9 +60,9 @@
             <td class="px-4 py-4 text-gray-600 dark:text-gray-300">{{ $range==='weekly' ? \Carbon\Carbon::parse($r['week_start'])->format('d M Y') : \Carbon\Carbon::parse($r['date'])->format('d M Y') }}</td>
             <td class="px-4 py-4">
               <a href="{{ route('admin.reports.hosts.show', ['host' => $r['host_id'], 'from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')]) }}" class="font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-300">
-                {{ $reportHost?->user?->name ?? 'Host #'.$r['host_id'] }}
+                {{ $reportHost?->user?->name ?? $reportHost?->stage_name ?? 'Unknown host' }}
               </a>
-              <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $reportHost?->agency?->name ?? 'Independent' }}</div>
+              <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">User ID: {{ $reportHost?->user_id ?? '—' }} · {{ $reportHost?->agency?->name ?? 'Independent' }}</div>
             </td>
             <td class="px-4 py-4 text-gray-600 dark:text-gray-300">
               {{ $r['rooms'] }}

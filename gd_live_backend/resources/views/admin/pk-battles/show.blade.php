@@ -46,6 +46,7 @@
         <div class="{{ $surfaceClass }}">
           <div class="text-xs uppercase tracking-[0.18em] text-gray-400">Host</div>
           <div class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">@if($pk_battle->hostA?->user)<a class="text-brand-600 hover:text-brand-700 dark:text-brand-300" href="{{ route('admin.users.show', $pk_battle->hostA->user) }}">{{ $pk_battle->hostA?->stage_name ?: $pk_battle->hostA->user->name }}</a>@else{{ $pk_battle->hostA?->stage_name ?: $pk_battle->hostA?->user?->name ?: '—' }}@endif</div>
+          <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">User ID: {{ $pk_battle->hostA?->user_id ?? '—' }}</div>
         </div>
         <div class="{{ $surfaceClass }}">
           <div class="text-xs uppercase tracking-[0.18em] text-gray-400">Score</div>
@@ -63,6 +64,7 @@
         <div class="{{ $surfaceClass }}">
           <div class="text-xs uppercase tracking-[0.18em] text-gray-400">Host</div>
           <div class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">@if($pk_battle->hostB?->user)<a class="text-brand-600 hover:text-brand-700 dark:text-brand-300" href="{{ route('admin.users.show', $pk_battle->hostB->user) }}">{{ $pk_battle->hostB?->stage_name ?: $pk_battle->hostB->user->name }}</a>@else{{ $pk_battle->hostB?->stage_name ?: $pk_battle->hostB?->user?->name ?: '—' }}@endif</div>
+          <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">User ID: {{ $pk_battle->hostB?->user_id ?? '—' }}</div>
         </div>
         <div class="{{ $surfaceClass }}">
           <div class="text-xs uppercase tracking-[0.18em] text-gray-400">Score</div>

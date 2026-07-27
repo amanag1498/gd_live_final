@@ -343,7 +343,7 @@
           <div class="grid gap-3 md:grid-cols-2">
             <div class="{{ $surfaceClass }}">
               <div class="text-xs uppercase tracking-[0.18em] text-gray-400">Host</div>
-              <div class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">#{{ $user->host->id }} · {{ $user->host->stage_name ?: $user->name }}</div>
+              <div class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">User #{{ $user->host->user_id }} · {{ $user->host->stage_name ?: $user->name }}</div>
               <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ trim(($user->host->city ?? '').' '.($user->host->country ?? '')) ?: '—' }}</div>
             </div>
             <div class="{{ $surfaceClass }}">

@@ -254,6 +254,7 @@ class HostPerformanceConsistencyTest extends TestCase
         $weeklyRow = collect($reportResponse->viewData('rows'))->firstWhere('host_id', $host->id);
 
         $this->assertCount(1, $reportResponse->viewData('rows'));
+        $this->assertSame($hostUser->id, $weeklyRow['host_user_id']);
         $this->assertSame(1_254, $weeklyRow['duration_min']);
         $this->assertSame(81_001, $weeklyRow['room_gift_coins']);
         $this->assertSame(5_500, $weeklyRow['pk_coins']);
@@ -320,9 +321,10 @@ class HostPerformanceConsistencyTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.agency-payout-reports.show', $payout))
             ->assertOk()
+            ->assertSee('User ID: '.$hostUser->id)
             ->assertSee('min-w-[160px]', false)
-            ->assertSee('md:sticky md:left-0', false)
-            ->assertSee('Swipe sideways to review and edit every settlement field.');
+            ->assertSee('payout-grid-scroll', false)
+            ->assertSee('payout-grid-sticky-left', false);
     }
 
     private function createGiftLedger(

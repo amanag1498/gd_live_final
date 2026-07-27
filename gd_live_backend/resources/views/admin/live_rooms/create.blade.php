@@ -45,7 +45,7 @@
         <select name="host_id" class="{{ $inputClass }}" required>
           <option value="">Select host</option>
           @foreach($hosts as $h)
-            <option value="{{ $h->id }}" @selected(old('host_id') == $h->id)>{{ $h->user?->name }} ({{ $h->stage_name ?? '—' }})</option>
+            <option value="{{ $h->id }}" @selected(old('host_id') == $h->id)>{{ $h->user?->name }} (User #{{ $h->user_id }} · {{ $h->stage_name ?? '—' }})</option>
           @endforeach
         </select>
       </div>

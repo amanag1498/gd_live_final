@@ -144,7 +144,7 @@
                 @if($u->host)
                   <div class="space-y-3 text-sm">
                     <div class="grid gap-2 sm:grid-cols-2">
-                      <div><span class="text-gray-500 dark:text-gray-400">Host ID:</span> <code>{{ $u->host->id }}</code></div>
+                      <div><span class="text-gray-500 dark:text-gray-400">Host User ID:</span> <code>{{ $u->host->user_id }}</code></div>
                       <div><span class="text-gray-500 dark:text-gray-400">Stage name:</span> {{ $u->host->stage_name ?? '—' }}</div>
                       <div><span class="text-gray-500 dark:text-gray-400">Contact:</span> {{ $u->host->contact_phone ?? '—' }}</div>
                       <div><span class="text-gray-500 dark:text-gray-400">Location:</span> {{ trim(($u->host->city ?? '').' '.($u->host->country ?? '')) ?: '—' }}</div>

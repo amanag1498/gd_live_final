@@ -1,5 +1,5 @@
 @extends('layouts.admin-tailadmin')
-@section('title', ($report['host']->user?->name ?? $report['host']->stage_name ?? ('Host #'.$report['host']->id)) . ' Report')
+@section('title', ($report['host']->user?->name ?? $report['host']->stage_name ?? ('User #'.$report['host']->user_id)) . ' Report')
 
 @php
   $host = $report['host'];
@@ -20,7 +20,8 @@
   <x-common.component-card>
     <x-slot:header>
       <div>
-        <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ $host->user?->name ?? $host->stage_name ?? ('Host #'.$host->id) }}</h3>
+        <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ $host->user?->name ?? $host->stage_name ?? 'Unknown host' }}</h3>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">User ID: {{ $host->user_id ?? '—' }}</p>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Agency: {{ $host->agency?->name ?? 'Independent' }} · Stage name: {{ $host->stage_name ?: '—' }} · Followers: {{ number_format($summary['followers']) }}</p>
       </div>
     </x-slot:header>

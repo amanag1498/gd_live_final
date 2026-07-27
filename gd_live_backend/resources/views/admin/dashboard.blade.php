@@ -155,7 +155,7 @@
                 <td class="px-4 py-3">{{ $r->id }}</td>
                 <td class="px-4 py-3">
                   <div class="font-medium text-gray-900 dark:text-white">{{ $r->user?->name ?? '—' }}</div>
-                  <div class="text-gray-500 dark:text-gray-400">{{ $r->user?->email ?? '' }}</div>
+                  <div class="text-gray-500 dark:text-gray-400">User #{{ $r->user_id }} · {{ $r->user?->email ?? '' }}</div>
                 </td>
                 <td class="px-4 py-3">{{ $r->agency_name }}</td>
                 <td class="px-4 py-3"><x-ui.badge :color="$r->status === 'pending' ? 'warning' : ($r->status === 'approved' ? 'success' : 'error')">{{ ucfirst($r->status) }}</x-ui.badge></td>

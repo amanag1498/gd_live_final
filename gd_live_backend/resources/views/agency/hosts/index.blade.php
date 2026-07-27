@@ -56,7 +56,7 @@
             <tr class="bg-white dark:bg-gray-900">
               <td class="px-4 py-3">
                 <div class="font-medium text-gray-900 dark:text-white">{{ $host->user?->name ?? '—' }}</div>
-                <div class="text-sm text-gray-500 dark:text-gray-400">{{ $host->stage_name ?: '—' }} · {{ $host->user?->email ?? '—' }}</div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">User #{{ $host->user_id }} · {{ $host->stage_name ?: '—' }} · {{ $host->user?->email ?? '—' }}</div>
               </td>
               <td class="px-4 py-3">
                 <x-ui.badge :color="$isOnline ? 'success' : 'dark'">{{ $isOnline ? 'Online' : 'Offline' }}</x-ui.badge>

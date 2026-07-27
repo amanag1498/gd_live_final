@@ -90,7 +90,12 @@ class CallReportApiController extends Controller
         return response()->json([
             'ok' => true,
             'data' => [
-                'items' => $calls->items(),
+                'items' => collect($calls->items())->map(function ($call) {
+                    $item = $call->toArray();
+                    $item['host_user_id'] = $call->host?->user_id;
+
+                    return $item;
+                })->all(),
                 'pagination' => [
                     'current_page' => $calls->currentPage(),
                     'last_page' => $calls->lastPage(),
@@ -105,13 +110,13 @@ class CallReportApiController extends Controller
     {
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['id', 'caller_id', 'receiver_id', 'host_id', 'agency_id', 'type', 'status', 'end_reason', 'duration_seconds', 'billable_minutes', 'total_coins_charged', 'created_at']);
+            fputcsv($out, ['id', 'caller_id', 'receiver_id', 'host_user_id', 'agency_id', 'type', 'status', 'end_reason', 'duration_seconds', 'billable_minutes', 'total_coins_charged', 'created_at']);
             foreach ($rows as $row) {
                 fputcsv($out, [
                     $row->id,
                     $row->caller_id,
                     $row->receiver_id,
-                    $row->host_id,
+                    $row->host?->user_id,
                     $row->agency_id,
                     $row->type,
                     $row->status,

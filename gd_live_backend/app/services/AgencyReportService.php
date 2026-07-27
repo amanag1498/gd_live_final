@@ -500,13 +500,18 @@ class AgencyReportService
 
                 return [
                     'name' => $host->user?->name,
+                    'user_id' => $host->user_id,
                     'gross_coins' => $this->grossCoins($videoCallCoins, $roomGiftCoins, $pkGiftCoins),
                 ];
             })
             ->sortByDesc('gross_coins')
             ->first();
 
-        return $topHost['name'] ?? null;
+        if (! $topHost) {
+            return null;
+        }
+
+        return ($topHost['name'] ?: 'Unknown host').' · User #'.$topHost['user_id'];
     }
 
     private function seriesFromDays(Carbon $from, Carbon $to, callable $resolver): array

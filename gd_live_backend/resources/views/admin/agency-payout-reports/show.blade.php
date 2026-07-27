@@ -218,7 +218,7 @@
                   @csrf
                 </form>
                 <div class="font-semibold text-gray-900 dark:text-white">{{ $item->host?->user?->name ?? $item->host?->stage_name ?? '—' }}</div>
-                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $item->host?->stage_name ?? '—' }}</div>
+                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">User ID: {{ $item->host?->user_id ?? '—' }} · {{ $item->host?->stage_name ?? '—' }}</div>
               </td>
               <td class="min-w-[190px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="video_room_minutes" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('video_room_minutes', $item->video_room_minutes) }}" @disabled($locked)></td>
               <td class="min-w-[190px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="video_gift_coins" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('video_gift_coins', $item->video_gift_coins) }}" @disabled($locked)></td>

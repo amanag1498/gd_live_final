@@ -109,7 +109,7 @@
                         {{ $row['host']->user?->name ?? $row['host']->stage_name }}
                       </a>
                     </div>
-                    <div class="text-sm text-gray-500 dark:text-gray-400">{{ $row['host']->stage_name ?: '—' }} · Calls: {{ number_format($row['call_count']) }} · PK {{ number_format($row['pk_event_count']) }}</div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">User #{{ $row['host']->user_id }} · {{ $row['host']->stage_name ?: '—' }} · Calls: {{ number_format($row['call_count']) }} · PK {{ number_format($row['pk_event_count']) }}</div>
                   </div>
                   <div class="text-right">
                     <div class="font-semibold text-gray-900 dark:text-white">{{ number_format($row['gross']) }}</div>
@@ -162,7 +162,7 @@
                       {{ $host->user?->name ?? '—' }}
                     </a>
                   </div>
-                  <div class="text-sm text-gray-500 dark:text-gray-400">{{ $host->stage_name ?: '—' }} · {{ $host->user?->email ?? '' }}</div>
+                  <div class="text-sm text-gray-500 dark:text-gray-400">User #{{ $host->user_id }} · {{ $host->stage_name ?: '—' }} · {{ $host->user?->email ?? '' }}</div>
                 </td>
                 <td class="px-4 py-3">
                   <x-ui.badge :color="$isOnline ? 'success' : 'dark'">{{ $isOnline ? 'Online' : 'Offline' }}</x-ui.badge>
@@ -241,7 +241,10 @@
                 @forelse($recentLiveRooms as $room)
                   <tr class="bg-white dark:bg-gray-900">
                     <td class="px-4 py-3">{{ $room->title ?: $room->room_id }}</td>
-                    <td class="px-4 py-3">{{ $room->host?->user?->name ?? '—' }}</td>
+                    <td class="px-4 py-3">
+                      <div>{{ $room->host?->user?->name ?? '—' }}</div>
+                      @if($room->host?->user_id)<div class="text-xs text-gray-500 dark:text-gray-400">User #{{ $room->host->user_id }}</div>@endif
+                    </td>
                     <td class="px-4 py-3"><x-ui.badge color="dark">{{ ucfirst($room->status) }}</x-ui.badge></td>
                     <td class="px-4 py-3">{{ optional($room->started_at)->format('d M Y H:i') ?: '—' }}</td>
                   </tr>

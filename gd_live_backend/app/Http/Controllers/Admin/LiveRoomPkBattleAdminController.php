@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Host;
 use App\Models\LiveRoomPkBattle;
 use App\Models\LiveRoomPkEvent;
 use Illuminate\Http\Request;
@@ -32,7 +33,7 @@ class LiveRoomPkBattleAdminController extends Controller
         ];
 
         $topHosts = LiveRoomPkBattle::query()
-            ->selectRaw('winner_room_id, host_a_id, host_b_id')
+            ->selectRaw('winner_room_id, room_a_id, room_b_id, host_a_id, host_b_id')
             ->whereHas('roomA', fn ($q) => $q->where('room_type', 'video'))
             ->whereHas('roomB', fn ($q) => $q->where('room_type', 'video'))
             ->where('status', 'completed')
@@ -47,8 +48,11 @@ class LiveRoomPkBattleAdminController extends Controller
             ->countBy()
             ->sortDesc()
             ->take(10);
+        $topHostUserIds = Host::query()
+            ->whereIn('id', $topHosts->keys())
+            ->pluck('user_id', 'id');
 
-        return view('admin.pk-battles.index', compact('battles', 'summary', 'topHosts'));
+        return view('admin.pk-battles.index', compact('battles', 'summary', 'topHosts', 'topHostUserIds'));
     }
 
     public function show(LiveRoomPkBattle $pk_battle)
@@ -110,7 +114,7 @@ class LiveRoomPkBattleAdminController extends Controller
         return response()->streamDownload(function () use ($query) {
             $out = fopen('php://output', 'w');
             fputcsv($out, [
-                'battle_id', 'room_a', 'host_a', 'room_b', 'host_b', 'status',
+                'battle_id', 'room_a', 'host_a', 'host_a_user_id', 'room_b', 'host_b', 'host_b_user_id', 'status',
                 'score_a', 'score_b', 'winner_room_id', 'duration_seconds',
                 'started_at', 'ended_at', 'end_reason',
             ]);
@@ -121,8 +125,10 @@ class LiveRoomPkBattleAdminController extends Controller
                         $battle->battle_id,
                         $battle->roomA?->room_id,
                         $battle->roomA?->host?->stage_name ?: $battle->roomA?->host?->user?->name,
+                        $battle->roomA?->host?->user_id,
                         $battle->roomB?->room_id,
                         $battle->roomB?->host?->stage_name ?: $battle->roomB?->host?->user?->name,
+                        $battle->roomB?->host?->user_id,
                         $battle->status,
                         $battle->score_a,
                         $battle->score_b,

@@ -332,7 +332,7 @@ class AgencyPayoutReportTest extends TestCase
 
     public function test_admin_and_agency_views_are_scoped(): void
     {
-        [$agency, $owner] = $this->seedAgencyFixture();
+        [$agency, $owner, $host] = $this->seedAgencyFixture();
         $otherOwner = User::factory()->create();
         $otherOwner->assignRole('agency');
         Agency::query()->create([
@@ -346,6 +346,8 @@ class AgencyPayoutReportTest extends TestCase
         $service = app(AgencyWeeklyPayoutReportService::class);
         [$start, $end] = $service->resolvePeriod('2026-04-21', '2026-04-27');
         $report = $service->generate($start, $end, $agency->id, false)['reports'][0];
+        $report = $service->approve($report, 0, 'Approved for agency visibility test', $admin);
+        $report = $service->publish($report, 'Published for agency visibility test', $admin);
 
         $this->actingAs($admin)
             ->get(route('admin.agency-payout-reports.index'))
@@ -357,7 +359,8 @@ class AgencyPayoutReportTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.agency-payout-reports.show', $report))
             ->assertOk()
-            ->assertSee('Per-Host Breakdown');
+            ->assertSee('Host Settlement Grid')
+            ->assertSee('User ID: '.$host->user_id);
 
         $this->actingAs($owner)
             ->get(route('agency.payout-reports.index'))
@@ -367,7 +370,8 @@ class AgencyPayoutReportTest extends TestCase
         $this->actingAs($owner)
             ->get(route('agency.payout-reports.show', $report))
             ->assertOk()
-            ->assertSee('Payout Report #' . $report->id);
+            ->assertSee('Payout Report #' . $report->id)
+            ->assertSee('User #'.$host->user_id);
 
         $this->actingAs($otherOwner)
             ->get(route('agency.payout-reports.show', $report))

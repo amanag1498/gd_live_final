@@ -78,7 +78,7 @@
                 <div class="text-xs font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Context</div>
                 <div class="mt-2 font-semibold text-gray-900 dark:text-white">{{ $row->room_id ?: 'No room attached' }}</div>
                 @if($row->hostUser)
-                  <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">Host: {{ $row->hostUser->name }}</div>
+                  <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">Host: {{ $row->hostUser->name }} · User ID: {{ $row->hostUser->id }}</div>
                 @endif
                 <div class="mt-2"><x-ui.badge :color="match($row->status){'pending' => 'warning','reviewed' => 'primary','action_taken' => 'success',default => 'error'}">{{ str_replace('_', ' ', $row->status) }}</x-ui.badge></div>
               </div>
