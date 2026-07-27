@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Agency;
 use App\Models\AgencyPayoutReport;
+use App\Models\CallEarningLedger;
 use App\Models\CallSession;
 use App\Models\Host;
 use App\Models\HostAvailability;
@@ -21,7 +22,7 @@ class AgencyDashboardService
         $hostUserIds = Host::query()->whereIn('id', $hostIds)->pluck('user_id');
         $allHosts = Host::query()->where('agency_id', $agency->id)->get(['id', 'agency_id']);
 
-        $callsBase = CallSession::query()->where('agency_id', $agency->id);
+        $callsBase = $this->agencyCallEarningsQuery($agency->id);
         $liveRoomsBase = LiveRoom::query()
             ->whereHas('host', fn ($query) => $query->where('agency_id', $agency->id));
         $giftBase = LiveRoomGiftEarningLedger::query()->where('agency_id', $agency->id);
@@ -37,29 +38,33 @@ class AgencyDashboardService
                     ->orWhere('manual_status', 'online');
             })->count();
 
-        $hostCallAgg = CallSession::query()
-            ->where('agency_id', $agency->id)
+        $hostCallAgg = $this->agencyCallEarningsQuery($agency->id)
             ->selectRaw("
-                host_id,
+                call_earning_ledgers.host_id as host_id,
                 COUNT(*) as call_count,
-                SUM(billable_minutes) as call_minutes,
-                SUM(total_coins_charged) as call_gross,
-                SUM(host_earning) as host_earning,
-                SUM(agency_earning) as agency_earning,
-                SUM(CASE WHEN type = 'video' THEN billable_minutes ELSE 0 END) as video_call_minutes,
-                SUM(CASE WHEN type = 'video' THEN total_coins_charged ELSE 0 END) as video_call_gross
+                SUM(call_earning_ledgers.billable_minutes) as call_minutes,
+                SUM(call_earning_ledgers.total_coins) as call_gross,
+                SUM(call_earning_ledgers.host_earning) as host_earning,
+                SUM(call_earning_ledgers.agency_earning) as agency_earning,
+                SUM(CASE WHEN call_sessions.type = 'video' THEN call_earning_ledgers.billable_minutes ELSE 0 END) as video_call_minutes,
+                SUM(CASE WHEN call_sessions.type = 'video' THEN call_earning_ledgers.total_coins ELSE 0 END) as video_call_gross
             ")
-            ->groupBy('host_id')
+            ->groupBy('call_earning_ledgers.host_id')
             ->get()
             ->keyBy('host_id');
 
         $hostGiftAgg = LiveRoomGiftEarningLedger::query()
             ->join('live_rooms', 'live_rooms.id', '=', 'live_room_gift_earning_ledgers.live_room_id')
+            ->join('live_room_gifts', 'live_room_gifts.id', '=', 'live_room_gift_earning_ledgers.live_room_gift_id')
+            ->leftJoin('live_room_pk_events', function ($join) {
+                $join->on('live_room_pk_events.wallet_transaction_id', '=', 'live_room_gifts.transaction_id')
+                    ->where('live_room_pk_events.event_type', '=', 'gift');
+            })
             ->where('live_room_gift_earning_ledgers.agency_id', $agency->id)
             ->selectRaw("
                 live_room_gift_earning_ledgers.host_id as host_id,
                 SUM(live_room_gift_earning_ledgers.total_coins) as live_gift_gross,
-                SUM(CASE WHEN live_rooms.room_type = 'video' THEN live_room_gift_earning_ledgers.total_coins ELSE 0 END) as video_gift_gross,
+                SUM(CASE WHEN live_room_pk_events.id IS NULL AND live_rooms.room_type = 'video' THEN live_room_gift_earning_ledgers.total_coins ELSE 0 END) as video_gift_gross,
                 SUM(live_room_gift_earning_ledgers.host_payout_coins) as host_earnings,
                 SUM(live_room_gift_earning_ledgers.agency_payout_coins) as agency_earnings
             ")
@@ -74,23 +79,23 @@ class AgencyDashboardService
                     ->where('live_room_pk_events.event_type', '=', 'gift');
             })
             ->where('live_room_gift_earning_ledgers.agency_id', $agency->id)
-            ->selectRaw("
+            ->selectRaw('
                 live_room_gift_earning_ledgers.host_id as host_id,
                 COUNT(live_room_pk_events.id) as pk_event_count,
                 SUM(live_room_gift_earning_ledgers.total_coins) as pk_gross,
                 SUM(live_room_gift_earning_ledgers.host_payout_coins) as pk_host_earnings,
                 SUM(live_room_gift_earning_ledgers.agency_payout_coins) as pk_agency_earnings
-            ")
+            ')
             ->groupBy('live_room_gift_earning_ledgers.host_id')
             ->get()
             ->keyBy('host_id');
 
         $hostRoomAgg = LiveRoom::query()
             ->whereHas('host', fn ($query) => $query->where('agency_id', $agency->id))
-            ->selectRaw("
+            ->selectRaw('
                 host_id,
-                " . $this->videoRoomMinutesSql() . "
-            ")
+                '.$this->videoRoomMinutesSql().'
+            ')
             ->groupBy('host_id')
             ->get()
             ->keyBy('host_id');
@@ -143,19 +148,23 @@ class AgencyDashboardService
             $summaryAgencyPayout += (int) (($callAgg->agency_earning ?? 0) + ($giftAgg->agency_earnings ?? 0));
         }
 
-        $summaryCalls = CallSession::query()
-            ->where('agency_id', $agency->id)
+        $summaryCalls = $this->agencyCallEarningsQuery($agency->id)
             ->selectRaw("
-                SUM(CASE WHEN type = 'video' THEN billable_minutes ELSE 0 END) as video_call_minutes,
-                SUM(CASE WHEN type = 'video' THEN total_coins_charged ELSE 0 END) as video_call_gross
+                SUM(CASE WHEN call_sessions.type = 'video' THEN call_earning_ledgers.billable_minutes ELSE 0 END) as video_call_minutes,
+                SUM(CASE WHEN call_sessions.type = 'video' THEN call_earning_ledgers.total_coins ELSE 0 END) as video_call_gross
             ")
             ->first();
 
         $summaryGifts = LiveRoomGiftEarningLedger::query()
             ->join('live_rooms', 'live_rooms.id', '=', 'live_room_gift_earning_ledgers.live_room_id')
+            ->join('live_room_gifts', 'live_room_gifts.id', '=', 'live_room_gift_earning_ledgers.live_room_gift_id')
+            ->leftJoin('live_room_pk_events', function ($join) {
+                $join->on('live_room_pk_events.wallet_transaction_id', '=', 'live_room_gifts.transaction_id')
+                    ->where('live_room_pk_events.event_type', '=', 'gift');
+            })
             ->where('live_room_gift_earning_ledgers.agency_id', $agency->id)
             ->selectRaw("
-                SUM(CASE WHEN live_rooms.room_type = 'video' THEN live_room_gift_earning_ledgers.total_coins ELSE 0 END) as video_gift_gross
+                SUM(CASE WHEN live_room_pk_events.id IS NULL AND live_rooms.room_type = 'video' THEN live_room_gift_earning_ledgers.total_coins ELSE 0 END) as video_gift_gross
             ")
             ->first();
 
@@ -166,19 +175,19 @@ class AgencyDashboardService
                     ->where('live_room_pk_events.event_type', '=', 'gift');
             })
             ->where('live_room_gift_earning_ledgers.agency_id', $agency->id)
-            ->selectRaw("
+            ->selectRaw('
                 COUNT(live_room_pk_events.id) as pk_event_count,
                 SUM(live_room_gift_earning_ledgers.total_coins) as pk_gross,
                 SUM(live_room_gift_earning_ledgers.host_payout_coins) as pk_host_earnings,
                 SUM(live_room_gift_earning_ledgers.agency_payout_coins) as pk_agency_earnings
-            ")
+            ')
             ->first();
 
         $summaryRooms = LiveRoom::query()
             ->whereHas('host', fn ($query) => $query->where('agency_id', $agency->id))
-            ->selectRaw("
-                " . $this->videoRoomMinutesSql() . "
-            ")
+            ->selectRaw('
+                '.$this->videoRoomMinutesSql().'
+            ')
             ->first();
 
         return [
@@ -188,9 +197,9 @@ class AgencyDashboardService
                 'blocked_host_count' => $agency->hosts()->where('is_blocked', true)->count(),
                 'live_host_count' => (clone $liveRoomsBase)->where('status', 'live')->distinct('host_id')->count('host_id'),
                 'total_calls' => (clone $callsBase)->count(),
-                'completed_calls' => (clone $callsBase)->where('status', 'ended')->count(),
-                'total_minutes' => (int) (clone $callsBase)->sum('billable_minutes'),
-                'call_agency_earnings' => (int) (clone $callsBase)->sum('agency_earning'),
+                'completed_calls' => (clone $callsBase)->count(),
+                'total_minutes' => (int) (clone $callsBase)->sum('call_earning_ledgers.billable_minutes'),
+                'call_agency_earnings' => (int) (clone $callsBase)->sum('call_earning_ledgers.agency_earning'),
                 'live_rooms' => (int) (clone $liveRoomsBase)->count(),
                 'live_gift_gross' => (int) (clone $giftBase)->sum('total_coins'),
                 'video_room_minutes' => (int) ($summaryRooms->video_room_minutes ?? 0),
@@ -201,7 +210,7 @@ class AgencyDashboardService
                 'pk_agency_earnings' => (int) ($summaryPk->pk_agency_earnings ?? 0),
                 'video_call_minutes' => (int) ($summaryCalls->video_call_minutes ?? 0),
                 'video_call_gross' => (int) ($summaryCalls->video_call_gross ?? 0),
-                'gross_total' => (int) ((clone $callsBase)->sum('total_coins_charged') + (clone $giftBase)->sum('total_coins')),
+                'gross_total' => (int) ((clone $callsBase)->sum('call_earning_ledgers.total_coins') + (clone $giftBase)->sum('total_coins')),
                 'host_payout_total' => $summaryHostPayout,
                 'agency_payout_total' => $summaryAgencyPayout,
                 'combined_payout_total' => $summaryHostPayout + $summaryAgencyPayout,
@@ -251,12 +260,18 @@ class AgencyDashboardService
     {
         abort_unless((int) $host->agency_id === (int) $agency->id, 404);
 
-        $callsBase = CallSession::query()
+        $callSessionsBase = CallSession::query()
             ->where('agency_id', $agency->id)
             ->where('host_id', $host->id);
+        $callsBase = $this->hostCallEarningsQuery($agency->id, $host->id);
 
         $giftBase = LiveRoomGiftEarningLedger::query()
             ->join('live_rooms', 'live_rooms.id', '=', 'live_room_gift_earning_ledgers.live_room_id')
+            ->join('live_room_gifts', 'live_room_gifts.id', '=', 'live_room_gift_earning_ledgers.live_room_gift_id')
+            ->leftJoin('live_room_pk_events', function ($join) {
+                $join->on('live_room_pk_events.wallet_transaction_id', '=', 'live_room_gifts.transaction_id')
+                    ->where('live_room_pk_events.event_type', '=', 'gift');
+            })
             ->where('live_room_gift_earning_ledgers.agency_id', $agency->id)
             ->where('live_room_gift_earning_ledgers.host_id', $host->id);
 
@@ -268,14 +283,14 @@ class AgencyDashboardService
 
         $summaryCalls = (clone $callsBase)
             ->selectRaw("
-                SUM(CASE WHEN type = 'video' THEN billable_minutes ELSE 0 END) as video_call_minutes,
-                SUM(CASE WHEN type = 'video' THEN total_coins_charged ELSE 0 END) as video_call_gross
+                SUM(CASE WHEN call_sessions.type = 'video' THEN call_earning_ledgers.billable_minutes ELSE 0 END) as video_call_minutes,
+                SUM(CASE WHEN call_sessions.type = 'video' THEN call_earning_ledgers.total_coins ELSE 0 END) as video_call_gross
             ")
             ->first();
 
         $summaryGifts = (clone $giftBase)
             ->selectRaw("
-                SUM(CASE WHEN live_rooms.room_type = 'video' THEN live_room_gift_earning_ledgers.total_coins ELSE 0 END) as video_gift_gross
+                SUM(CASE WHEN live_room_pk_events.id IS NULL AND live_rooms.room_type = 'video' THEN live_room_gift_earning_ledgers.total_coins ELSE 0 END) as video_gift_gross
             ")
             ->first();
 
@@ -287,31 +302,31 @@ class AgencyDashboardService
             })
             ->where('live_room_gift_earning_ledgers.agency_id', $agency->id)
             ->where('live_room_gift_earning_ledgers.host_id', $host->id)
-            ->selectRaw("
+            ->selectRaw('
                 COUNT(live_room_pk_events.id) as pk_event_count,
                 SUM(live_room_gift_earning_ledgers.total_coins) as pk_gross,
                 SUM(live_room_gift_earning_ledgers.host_payout_coins) as pk_host_earnings,
                 SUM(live_room_gift_earning_ledgers.agency_payout_coins) as pk_agency_earnings
-            ")
+            ')
             ->first();
 
         $summaryRooms = (clone $liveRoomsBase)
-            ->selectRaw("
-                " . $this->videoRoomMinutesSql() . "
-            ")
+            ->selectRaw('
+                '.$this->videoRoomMinutesSql().'
+            ')
             ->first();
 
-        $totalGross = (int) ((clone $callsBase)->sum('total_coins_charged') + LiveRoomGiftEarningLedger::query()->where('agency_id', $agency->id)->where('host_id', $host->id)->sum('total_coins'));
-        $hostPayout = (int) ((clone $callsBase)->sum('host_earning') + (clone $giftBase)->sum('host_payout_coins'));
-        $agencyPayout = (int) ((clone $callsBase)->sum('agency_earning') + (clone $giftBase)->sum('agency_payout_coins'));
+        $totalGross = (int) ((clone $callsBase)->sum('call_earning_ledgers.total_coins') + LiveRoomGiftEarningLedger::query()->where('agency_id', $agency->id)->where('host_id', $host->id)->sum('total_coins'));
+        $hostPayout = (int) ((clone $callsBase)->sum('call_earning_ledgers.host_earning') + (clone $giftBase)->sum('live_room_gift_earning_ledgers.host_payout_coins'));
+        $agencyPayout = (int) ((clone $callsBase)->sum('call_earning_ledgers.agency_earning') + (clone $giftBase)->sum('live_room_gift_earning_ledgers.agency_payout_coins'));
 
         return [
             'summary' => [
                 'call_count' => (int) (clone $callsBase)->count(),
-                'completed_calls' => (int) (clone $callsBase)->where('status', 'ended')->count(),
-                'active_calls' => (int) (clone $callsBase)->where('status', 'active')->count(),
-                'total_minutes' => (int) (clone $callsBase)->sum('billable_minutes'),
-                'call_gross' => (int) (clone $callsBase)->sum('total_coins_charged'),
+                'completed_calls' => (int) (clone $callsBase)->count(),
+                'active_calls' => (int) (clone $callSessionsBase)->where('status', 'active')->count(),
+                'total_minutes' => (int) (clone $callsBase)->sum('call_earning_ledgers.billable_minutes'),
+                'call_gross' => (int) (clone $callsBase)->sum('call_earning_ledgers.total_coins'),
                 'video_call_minutes' => (int) ($summaryCalls->video_call_minutes ?? 0),
                 'video_call_gross' => (int) ($summaryCalls->video_call_gross ?? 0),
                 'live_rooms' => (int) (clone $liveRoomsBase)->count(),
@@ -329,7 +344,7 @@ class AgencyDashboardService
                 'total_payout' => $hostPayout + $agencyPayout,
                 'followers' => $followerCount,
             ],
-            'recentCalls' => (clone $callsBase)
+            'recentCalls' => (clone $callSessionsBase)
                 ->with(['caller', 'receiver'])
                 ->latest('created_at')
                 ->limit(10)
@@ -366,6 +381,33 @@ class AgencyDashboardService
                 'payout_reports' => $agency->payoutReports()->count(),
             ],
         ];
+    }
+
+    private function agencyCallEarningsQuery(int $agencyId)
+    {
+        return CallEarningLedger::query()
+            ->join('call_sessions', 'call_sessions.id', '=', 'call_earning_ledgers.call_session_id')
+            ->join('hosts', 'hosts.id', '=', 'call_earning_ledgers.host_id')
+            ->where(function ($query) use ($agencyId) {
+                $query->where('call_earning_ledgers.agency_id', $agencyId)
+                    ->orWhere(function ($fallback) use ($agencyId) {
+                        $fallback->whereNull('call_earning_ledgers.agency_id')
+                            ->where('call_sessions.agency_id', $agencyId);
+                    })
+                    ->orWhere(function ($hostFallback) use ($agencyId) {
+                        $hostFallback->whereNull('call_earning_ledgers.agency_id')
+                            ->whereNull('call_sessions.agency_id')
+                            ->where('hosts.agency_id', $agencyId);
+                    });
+            })
+            ->where('call_sessions.status', 'ended')
+            ->where('call_earning_ledgers.total_coins', '>', 0);
+    }
+
+    private function hostCallEarningsQuery(int $agencyId, int $hostId)
+    {
+        return $this->agencyCallEarningsQuery($agencyId)
+            ->where('call_earning_ledgers.host_id', $hostId);
     }
 
     private function videoRoomMinutesSql(): string

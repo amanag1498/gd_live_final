@@ -14,9 +14,13 @@ use App\Models\LiveRoomPkBattle;
 use App\Models\LiveRoomPkEvent;
 use App\Models\User;
 use App\Models\WalletTransaction;
+use App\Services\AgencyDashboardService;
+use App\Services\AgencyReportService;
 use App\Services\AgencyWeeklyPayoutReportService;
+use App\Services\CallReportService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -186,6 +190,10 @@ class HostPerformanceConsistencyTest extends TestCase
             'agency_earning' => 0,
             'platform_earning' => 0,
         ]);
+        $call->forceFill([
+            'created_at' => '2026-07-22 10:00:00',
+            'updated_at' => '2026-07-22 11:33:00',
+        ])->save();
         $callLedger = CallEarningLedger::query()->create([
             'call_session_id' => $call->id,
             'caller_id' => $caller->id,
@@ -201,6 +209,28 @@ class HostPerformanceConsistencyTest extends TestCase
         $callLedger->forceFill([
             'created_at' => '2026-07-22 11:33:00',
             'updated_at' => '2026-07-22 11:33:00',
+        ])->save();
+
+        $unpaidSession = CallSession::query()->create([
+            'caller_id' => $caller->id,
+            'receiver_id' => $hostUser->id,
+            'host_id' => $host->id,
+            'agency_id' => $agency->id,
+            'type' => 'video',
+            'status' => 'ended',
+            'started_at' => '2026-07-23 10:00:00',
+            'ended_at' => '2026-07-23 10:10:00',
+            'duration_seconds' => 600,
+            'billable_minutes' => 10,
+            'coin_rate_per_minute' => 100,
+            'total_coins_charged' => 1_000,
+            'host_earning' => 1_000,
+            'agency_earning' => 0,
+            'platform_earning' => 0,
+        ]);
+        $unpaidSession->forceFill([
+            'created_at' => '2026-07-23 10:00:00',
+            'updated_at' => '2026-07-23 10:10:00',
         ])->save();
 
         Sanctum::actingAs($hostUser);
@@ -228,6 +258,52 @@ class HostPerformanceConsistencyTest extends TestCase
         $this->assertSame(5_500, $weeklyRow['pk_coins']);
         $this->assertSame(18_600, $weeklyRow['video_call_coins']);
         $this->assertSame(105_101, $weeklyRow['gross_coins']);
+
+        $hostDetailResponse = $this->actingAs($admin)->get(route('admin.reports.hosts.show', [
+            'host' => $host,
+            'from' => '2026-07-20',
+            'to' => '2026-07-26',
+        ]))->assertOk();
+        $hostDetail = $hostDetailResponse->viewData('report')['summary'];
+        $this->assertSame(1, $hostDetail['calls']);
+        $this->assertSame(93, $hostDetail['minutes']);
+        $this->assertSame(18_600, $hostDetail['call_coins']);
+        $this->assertSame(81_001, $hostDetail['live_gift_coins']);
+        $this->assertSame(5_500, $hostDetail['pk_gift_coins']);
+
+        $rangeRequest = Request::create('/', 'GET', [
+            'from' => '2026-07-20',
+            'to' => '2026-07-26',
+        ]);
+        $agencyReport = app(AgencyReportService::class)->detail($agency, $rangeRequest);
+        $this->assertSame(93, $agencyReport['summary']['video_call_minutes']);
+        $this->assertSame(18_600, $agencyReport['summary']['video_call_coins']);
+        $this->assertSame(81_001, $agencyReport['summary']['room_gift_coins']);
+        $this->assertSame(5_500, $agencyReport['summary']['pk_gift_coins']);
+        $this->assertSame(105_101, $agencyReport['summary']['gross_coins']);
+
+        $agencyDashboard = app(AgencyDashboardService::class)->build($agency);
+        $this->assertSame(1, $agencyDashboard['summary']['total_calls']);
+        $this->assertSame(93, $agencyDashboard['summary']['video_call_minutes']);
+        $this->assertSame(18_600, $agencyDashboard['summary']['video_call_gross']);
+        $this->assertSame(81_001, $agencyDashboard['summary']['video_gift_gross']);
+        $this->assertSame(5_500, $agencyDashboard['summary']['pk_gross']);
+        $this->assertSame(105_101, $agencyDashboard['summary']['gross_total']);
+
+        $agencyHostDetail = app(AgencyDashboardService::class)->hostDetail($agency, $host);
+        $this->assertSame(1, $agencyHostDetail['summary']['call_count']);
+        $this->assertSame(18_600, $agencyHostDetail['summary']['call_gross']);
+        $this->assertSame(81_001, $agencyHostDetail['summary']['video_gift_gross']);
+        $this->assertSame(5_500, $agencyHostDetail['summary']['pk_gross']);
+        $this->assertSame(105_101, $agencyHostDetail['summary']['gross_total']);
+
+        $callReport = app(CallReportService::class)->forHost(Request::create('/', 'GET', [
+            'date_from' => '2026-07-20',
+            'date_to' => '2026-07-26',
+        ]), $host);
+        $this->assertSame(2, $callReport['summary']['total_calls']);
+        $this->assertSame(93, $callReport['summary']['total_minutes']);
+        $this->assertSame(18_600, $callReport['summary']['total_coins_charged']);
 
         $payoutService = app(AgencyWeeklyPayoutReportService::class);
         [$periodStart, $periodEnd] = $payoutService->resolvePeriod('2026-07-20', '2026-07-26');

@@ -3,12 +3,13 @@
 namespace App\Services;
 
 use App\Models\Agency;
+use App\Models\CallEarningLedger;
 use App\Models\CallSession;
 use App\Models\Host;
 use App\Models\User;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Schema;
 
 class CallReportService
@@ -31,37 +32,40 @@ class CallReportService
 
     public function forAdmin(Request $request): array
     {
-        if (!$this->schemaReady()) {
+        if (! $this->schemaReady()) {
             return $this->emptyResponse(true);
         }
 
         $query = $this->baseQuery($request);
-        return $this->buildResponse($query, true);
+
+        return $this->buildResponse($query, true, $request);
     }
 
     public function forAgency(Request $request, Agency $agency): array
     {
-        if (!$this->schemaReady()) {
+        if (! $this->schemaReady()) {
             return $this->emptyResponse(false);
         }
 
         $query = $this->baseQuery($request)->where('agency_id', $agency->id);
-        return $this->buildResponse($query, false);
+
+        return $this->buildResponse($query, false, $request, agencyId: $agency->id);
     }
 
     public function forHost(Request $request, Host $host): array
     {
-        if (!$this->schemaReady()) {
+        if (! $this->schemaReady()) {
             return $this->emptyResponse(false);
         }
 
         $query = $this->baseQuery($request)->where('host_id', $host->id);
-        return $this->buildResponse($query, false);
+
+        return $this->buildResponse($query, false, $request, hostId: $host->id);
     }
 
     public function forUserHistory(Request $request, User $user): array
     {
-        if (!$this->schemaReady()) {
+        if (! $this->schemaReady()) {
             return $this->emptyResponse(false);
         }
 
@@ -70,20 +74,27 @@ class CallReportService
                 $builder->where('caller_id', $user->id)->orWhere('receiver_id', $user->id);
             });
 
-        return $this->buildResponse($query, false);
+        return $this->buildResponse($query, false, $request, userId: $user->id);
     }
 
-    private function buildResponse(Builder $query, bool $includeFilters): array
-    {
+    private function buildResponse(
+        Builder $query,
+        bool $includeFilters,
+        Request $request,
+        ?int $agencyId = null,
+        ?int $hostId = null,
+        ?int $userId = null,
+    ): array {
         $summaryBase = clone $query;
+        $earningBase = $this->earningQuery($request, $agencyId, $hostId, $userId);
         $calls = $query->paginate(20)->withQueryString();
         $summary = [
             'total_calls' => (clone $summaryBase)->count(),
             'active_calls' => (clone $summaryBase)->where('status', 'accepted')->count(),
             'completed_calls' => (clone $summaryBase)->where('status', 'ended')->count(),
             'missed_rejected_calls' => (clone $summaryBase)->whereIn('status', ['missed', 'rejected', 'failed'])->count(),
-            'total_minutes' => (int) (clone $summaryBase)->sum('billable_minutes'),
-            'total_coins_charged' => (int) (clone $summaryBase)->sum('total_coins_charged'),
+            'total_minutes' => (int) (clone $earningBase)->sum('call_earning_ledgers.billable_minutes'),
+            'total_coins_charged' => (int) (clone $earningBase)->sum('call_earning_ledgers.total_coins'),
         ];
 
         return [
@@ -96,6 +107,37 @@ class CallReportService
                 'agencies' => Agency::orderBy('id', 'desc')->get(),
             ] : null,
         ];
+    }
+
+    private function earningQuery(
+        Request $request,
+        ?int $agencyId,
+        ?int $hostId,
+        ?int $userId,
+    ): Builder {
+        return CallEarningLedger::query()
+            ->join('call_sessions', 'call_sessions.id', '=', 'call_earning_ledgers.call_session_id')
+            ->where('call_earning_ledgers.total_coins', '>', 0)
+            ->where('call_sessions.status', 'ended')
+            ->when($request->string('tab')->toString() === 'active', fn ($query) => $query->whereRaw('1 = 0'))
+            ->when($request->string('tab')->toString() === 'missed_rejected', fn ($query) => $query->whereRaw('1 = 0'))
+            ->when(
+                $request->filled('status') && $request->string('status')->toString() !== 'ended',
+                fn ($query) => $query->whereRaw('1 = 0')
+            )
+            ->when($request->filled('type'), fn ($query) => $query->where('call_sessions.type', $request->string('type')))
+            ->when($request->filled('host_id'), fn ($query) => $query->where('call_earning_ledgers.host_id', $request->integer('host_id')))
+            ->when($request->filled('agency_id'), fn ($query) => $query->where('call_earning_ledgers.agency_id', $request->integer('agency_id')))
+            ->when($request->filled('date_from'), fn ($query) => $query->whereDate('call_earning_ledgers.created_at', '>=', $request->string('date_from')))
+            ->when($request->filled('date_to'), fn ($query) => $query->whereDate('call_earning_ledgers.created_at', '<=', $request->string('date_to')))
+            ->when($agencyId !== null, fn ($query) => $query->where('call_earning_ledgers.agency_id', $agencyId))
+            ->when($hostId !== null, fn ($query) => $query->where('call_earning_ledgers.host_id', $hostId))
+            ->when($userId !== null, function ($query) use ($userId) {
+                $query->where(function ($participant) use ($userId) {
+                    $participant->where('call_sessions.caller_id', $userId)
+                        ->orWhere('call_sessions.receiver_id', $userId);
+                });
+            });
     }
 
     public function schemaReady(): bool
