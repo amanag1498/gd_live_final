@@ -128,6 +128,11 @@ class SettingsController extends Controller
     {
         $rules = [];
         foreach (AppSettingsService::LIVE_ROOM_DEFINITIONS as $key => $definition) {
+            if (($definition['type'] ?? 'integer') === 'boolean') {
+                $rules[$key] = 'required|boolean';
+                continue;
+            }
+
             $parts = ['required', 'integer'];
             if (array_key_exists('min', $definition)) {
                 $parts[] = 'min:' . $definition['min'];
@@ -144,6 +149,12 @@ class SettingsController extends Controller
         if ((int) data_get($roomSettings, 'video.max_speakers') >= (int) data_get($roomSettings, 'video.max_participants')) {
             throw ValidationException::withMessages([
                 'live_rooms.video.max_speakers' => 'Video max speakers must be less than video max participants.',
+            ]);
+        }
+
+        if ((int) data_get($roomSettings, 'audio.max_speakers') >= (int) data_get($roomSettings, 'audio.max_participants')) {
+            throw ValidationException::withMessages([
+                'live_rooms.audio.max_speakers' => 'Audio max speakers must be less than audio max participants.',
             ]);
         }
 

@@ -22,7 +22,7 @@ class AdminLiveRoomSettingsTest extends TestCase
         }
     }
 
-    public function test_admin_can_view_live_room_settings_page_with_pk_duration(): void
+    public function test_admin_can_view_live_room_settings_page_with_independent_speaker_request_toggles(): void
     {
         $admin = User::factory()->create();
         $admin->assignRole('admin');
@@ -31,10 +31,12 @@ class AdminLiveRoomSettingsTest extends TestCase
             ->get(route('admin.settings.live-rooms.edit'))
             ->assertOk()
             ->assertSee('Live Room Settings')
+            ->assertSee('Automatically Approve Video Speaker Requests')
+            ->assertSee('Automatically Approve Audio Speaker Requests')
             ->assertSee('PK Battle Duration Seconds');
     }
 
-    public function test_admin_can_update_live_room_pk_duration_setting(): void
+    public function test_admin_can_update_live_room_settings_and_independent_speaker_request_toggles(): void
     {
         $admin = User::factory()->create();
         $admin->assignRole('admin');
@@ -44,6 +46,14 @@ class AdminLiveRoomSettingsTest extends TestCase
                 'video' => [
                     'max_participants' => 12,
                     'max_speakers' => 4,
+                ],
+                'audio' => [
+                    'max_participants' => 50,
+                    'max_speakers' => 8,
+                ],
+                'speaker_requests' => [
+                    'video_auto_approve' => 1,
+                    'audio_auto_approve' => 0,
                 ],
                 'pk' => [
                     'default_duration_seconds' => 180,
@@ -59,6 +69,16 @@ class AdminLiveRoomSettingsTest extends TestCase
             'key' => 'live_rooms.pk.default_duration_seconds',
             'value' => '180',
         ]);
+        $this->assertDatabaseHas('app_settings', [
+            'key' => 'live_rooms.speaker_requests.video_auto_approve',
+            'value' => '1',
+        ]);
+        $this->assertDatabaseHas('app_settings', [
+            'key' => 'live_rooms.speaker_requests.audio_auto_approve',
+            'value' => '0',
+        ]);
+        $this->assertTrue(config('live_rooms.speaker_requests.video_auto_approve'));
+        $this->assertFalse(config('live_rooms.speaker_requests.audio_auto_approve'));
     }
 
     public function test_live_room_settings_are_loaded_into_config_from_database(): void
@@ -67,9 +87,14 @@ class AdminLiveRoomSettingsTest extends TestCase
             'key' => 'live_rooms.pk.default_duration_seconds',
             'value' => '240',
         ]);
+        AppSetting::query()->create([
+            'key' => 'live_rooms.speaker_requests.audio_auto_approve',
+            'value' => '1',
+        ]);
 
         app(AppSettingsService::class)->loadLiveRoomSettingsIntoConfig();
 
         $this->assertSame(240, config('live_rooms.pk.default_duration_seconds'));
+        $this->assertTrue(config('live_rooms.speaker_requests.audio_auto_approve'));
     }
 }

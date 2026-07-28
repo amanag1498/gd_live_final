@@ -134,6 +134,17 @@ class LiveRoomSeatService
             ]);
         });
 
+        if ($this->speakerRequestsAutoApprove($room)) {
+            Log::info('LIVE_ROOM_SEAT_REQUEST_AUTO_APPROVING', [
+                'room_id' => $room->room_id,
+                'room_type' => $room->room_type,
+                'request_id' => $request->id,
+                'user_id' => $user->id,
+            ]);
+
+            return $this->acceptRequest($room, $request, $user, automatic: true);
+        }
+
         $this->state->touchRoom($room->fresh());
         $this->publishSeatEvent('seat:request_created', $room, $request, $this->audienceRole($room));
 
@@ -267,14 +278,19 @@ class LiveRoomSeatService
         return $request;
     }
 
-    public function acceptRequest(LiveRoom $room, LiveRoomSeatRequest $seatRequest, User $actor): LiveRoomSeatRequest
+    public function acceptRequest(
+        LiveRoom $room,
+        LiveRoomSeatRequest $seatRequest,
+        User $actor,
+        bool $automatic = false,
+    ): LiveRoomSeatRequest
     {
         $this->assertRoomJoinable($room);
         if ($this->pk->activeForRoom($room)) {
             throw new HttpException(409, 'Speaker promotions are locked during an active PK battle.');
         }
 
-        $state = DB::transaction(function () use ($room, $seatRequest, $actor) {
+        $state = DB::transaction(function () use ($room, $seatRequest, $actor, $automatic) {
             $lockedRoom = LiveRoom::query()->whereKey($room->id)->lockForUpdate()->firstOrFail();
             $request = LiveRoomSeatRequest::query()
                 ->whereKey($seatRequest->id)
@@ -298,7 +314,9 @@ class LiveRoomSeatService
                 throw new HttpException(409, 'Only pending requests can be accepted.');
             }
 
-            $this->assertCanRespondToRequest($lockedRoom, $request, $actor);
+            if (!$automatic) {
+                $this->assertCanRespondToRequest($lockedRoom, $request, $actor);
+            }
 
             if ($participant->role !== $this->audienceRole($lockedRoom)) {
                 throw new HttpException(409, 'Only active audience participants can be promoted to speaker.');
@@ -323,7 +341,7 @@ class LiveRoomSeatService
             $request->update([
                 'status' => 'accepted',
                 'responded_at' => now(),
-                'responded_by' => $actor->id,
+                'responded_by' => $automatic ? null : $actor->id,
             ]);
 
             return ['request' => $request->fresh(), 'participant' => $participant->fresh()];
@@ -355,7 +373,9 @@ class LiveRoomSeatService
         $this->publishSeatEvent('seat:request_accepted', $room, $request, 'speaker');
         $this->publishSeatEvent('speaker:added', $room, $request, 'speaker');
         $this->publishSpeakersUpdated($room, $request->user_id, 'speaker');
-        $this->audit($room, $actor, $request->user_id, 'seat_request_accepted', 'pending', 'accepted');
+        if (!$automatic) {
+            $this->audit($room, $actor, $request->user_id, 'seat_request_accepted', 'pending', 'accepted');
+        }
 
         return $request;
     }
@@ -586,6 +606,7 @@ class LiveRoomSeatService
         return [
             'room_id' => $room->room_id,
             'room_type' => (string) ($room->room_type ?? 'video'),
+            'speaker_request_approval_mode' => $this->speakerRequestsAutoApprove($room) ? 'automatic' : 'host',
             'requests' => $requests->values()->all(),
             'speakers' => $speakers->all(),
             'pending_count' => $requests->where('status', 'pending')->count(),
@@ -816,6 +837,7 @@ class LiveRoomSeatService
             'viewer_count' => $this->activeAudienceCount($freshRoom),
             'participant_count' => $this->activeParticipantCount($freshRoom),
             'max_speakers' => $this->maxSpeakers($freshRoom),
+            'speaker_request_approval_mode' => $this->speakerRequestsAutoApprove($freshRoom) ? 'automatic' : 'host',
             'updated_at' => optional($request->updated_at)?->toIso8601String() ?? now()->toIso8601String(),
         ]));
     }
@@ -833,6 +855,7 @@ class LiveRoomSeatService
             'viewer_count' => $this->activeAudienceCount($freshRoom),
             'participant_count' => $this->activeParticipantCount($freshRoom),
             'max_speakers' => $this->maxSpeakers($freshRoom),
+            'speaker_request_approval_mode' => $this->speakerRequestsAutoApprove($freshRoom) ? 'automatic' : 'host',
             'updated_at' => now()->toIso8601String(),
         ]));
     }
@@ -1041,6 +1064,13 @@ class LiveRoomSeatService
     private function audienceRole(LiveRoom $room): string
     {
         return 'viewer';
+    }
+
+    private function speakerRequestsAutoApprove(LiveRoom $room): bool
+    {
+        $roomType = ($room->room_type ?? 'video') === 'audio' ? 'audio' : 'video';
+
+        return (bool) config("live_rooms.speaker_requests.{$roomType}_auto_approve", false);
     }
 
     private function publishSourcesForRoom(LiveRoom $room): array

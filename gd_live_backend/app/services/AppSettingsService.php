@@ -236,6 +236,32 @@ class AppSettingsService
             'max' => 100,
             'hint' => 'Default speaker cap for video rooms. Must stay lower than video max participants.',
         ],
+        'live_rooms.audio.max_participants' => [
+            'label' => 'Audio Max Participants',
+            'type' => 'integer',
+            'min' => 2,
+            'max' => 500,
+            'hint' => 'Default participant cap applied when an audio room is created without an explicit override.',
+        ],
+        'live_rooms.audio.max_speakers' => [
+            'label' => 'Audio Max Speakers',
+            'type' => 'integer',
+            'min' => 1,
+            'max' => 100,
+            'hint' => 'Default speaker cap for audio rooms. Must stay lower than audio max participants.',
+        ],
+        'live_rooms.speaker_requests.video_auto_approve' => [
+            'label' => 'Automatically Approve Video Speaker Requests',
+            'type' => 'boolean',
+            'default' => false,
+            'hint' => 'When enabled, eligible video-room viewers become speakers immediately. When disabled, the video-room host must approve each request.',
+        ],
+        'live_rooms.speaker_requests.audio_auto_approve' => [
+            'label' => 'Automatically Approve Audio Speaker Requests',
+            'type' => 'boolean',
+            'default' => false,
+            'hint' => 'When enabled, eligible audio-room viewers become speakers immediately. When disabled, the audio-room host must approve each request.',
+        ],
         'live_rooms.pk.default_duration_seconds' => [
             'label' => 'PK Battle Duration Seconds',
             'type' => 'integer',
