@@ -61,86 +61,46 @@ class LiveRoomSeatRequestTest extends TestCase
         $this->assertSame(1, LiveRoomSeatRequest::query()->where('live_room_id', $room->id)->where('user_id', $viewer->id)->where('status', 'pending')->count());
     }
 
-    public function test_video_auto_approval_does_not_enable_audio_auto_approval(): void
+    public function test_video_request_is_automatically_approved_when_enabled(): void
     {
-        config([
-            'live_rooms.speaker_requests.video_auto_approve' => true,
-            'live_rooms.speaker_requests.audio_auto_approve' => false,
-        ]);
+        config(['live_rooms.speaker_requests.video_auto_approve' => true]);
 
-        [, $videoRoom] = $this->makeLiveRoom(roomType: 'video');
-        $videoViewer = $this->makeViewerParticipant($videoRoom, suffix: 'video-auto');
-        Sanctum::actingAs($videoViewer);
+        [, $room] = $this->makeLiveRoom();
+        $viewer = $this->makeViewerParticipant($room, suffix: 'video-auto');
+        Sanctum::actingAs($viewer);
 
-        $this->postJson("/api/live/rooms/{$videoRoom->room_id}/seat-requests")
+        $this->postJson("/api/live/rooms/{$room->room_id}/seat-requests")
             ->assertOk()
             ->assertJsonPath('snapshot.speaker_request_approval_mode', 'automatic');
 
         $this->assertDatabaseHas('live_room_seat_requests', [
-            'live_room_id' => $videoRoom->id,
-            'user_id' => $videoViewer->id,
+            'live_room_id' => $room->id,
+            'user_id' => $viewer->id,
             'status' => 'accepted',
             'responded_by' => null,
         ]);
         $this->assertDatabaseHas('live_room_participants', [
-            'live_room_id' => $videoRoom->id,
-            'user_id' => $videoViewer->id,
+            'live_room_id' => $room->id,
+            'user_id' => $viewer->id,
             'role' => 'speaker',
-        ]);
-
-        [, $audioRoom] = $this->makeLiveRoom(roomType: 'audio');
-        $audioViewer = $this->makeViewerParticipant($audioRoom, suffix: 'audio-manual');
-        Sanctum::actingAs($audioViewer);
-
-        $this->postJson("/api/live/rooms/{$audioRoom->room_id}/seat-requests")
-            ->assertOk()
-            ->assertJsonPath('snapshot.speaker_request_approval_mode', 'host');
-
-        $this->assertDatabaseHas('live_room_seat_requests', [
-            'live_room_id' => $audioRoom->id,
-            'user_id' => $audioViewer->id,
-            'status' => 'pending',
-        ]);
-        $this->assertDatabaseHas('live_room_participants', [
-            'live_room_id' => $audioRoom->id,
-            'user_id' => $audioViewer->id,
-            'role' => 'viewer',
         ]);
     }
 
-    public function test_audio_auto_approval_does_not_enable_video_auto_approval(): void
+    public function test_video_request_remains_pending_for_host_approval_when_disabled(): void
     {
-        config([
-            'live_rooms.speaker_requests.video_auto_approve' => false,
-            'live_rooms.speaker_requests.audio_auto_approve' => true,
-        ]);
+        config(['live_rooms.speaker_requests.video_auto_approve' => false]);
 
-        [, $audioRoom] = $this->makeLiveRoom(roomType: 'audio');
-        $audioViewer = $this->makeViewerParticipant($audioRoom, suffix: 'audio-auto');
-        Sanctum::actingAs($audioViewer);
+        [, $room] = $this->makeLiveRoom();
+        $viewer = $this->makeViewerParticipant($room, suffix: 'video-manual');
+        Sanctum::actingAs($viewer);
 
-        $this->postJson("/api/live/rooms/{$audioRoom->room_id}/seat-requests")
-            ->assertOk()
-            ->assertJsonPath('snapshot.speaker_request_approval_mode', 'automatic');
-
-        $this->assertDatabaseHas('live_room_seat_requests', [
-            'live_room_id' => $audioRoom->id,
-            'user_id' => $audioViewer->id,
-            'status' => 'accepted',
-            'responded_by' => null,
-        ]);
-
-        [, $videoRoom] = $this->makeLiveRoom(roomType: 'video');
-        $videoViewer = $this->makeViewerParticipant($videoRoom, suffix: 'video-manual');
-        Sanctum::actingAs($videoViewer);
-
-        $this->postJson("/api/live/rooms/{$videoRoom->room_id}/seat-requests")
+        $this->postJson("/api/live/rooms/{$room->room_id}/seat-requests")
             ->assertOk()
             ->assertJsonPath('snapshot.speaker_request_approval_mode', 'host');
 
         $this->assertDatabaseHas('live_room_seat_requests', [
-            'live_room_id' => $videoRoom->id,
-            'user_id' => $videoViewer->id,
+            'live_room_id' => $room->id,
+            'user_id' => $viewer->id,
             'status' => 'pending',
         ]);
     }
@@ -149,7 +109,7 @@ class LiveRoomSeatRequestTest extends TestCase
     {
         config(['live_rooms.speaker_requests.video_auto_approve' => true]);
 
-        [$hostUser, $room] = $this->makeLiveRoom(roomType: 'video');
+        [$hostUser, $room] = $this->makeLiveRoom();
         $viewer = $this->makeViewerParticipant($room, suffix: 'host-invite');
         Sanctum::actingAs($hostUser);
 
@@ -318,7 +278,7 @@ class LiveRoomSeatRequestTest extends TestCase
         $this->assertDatabaseHas('live_room_participants', ['live_room_id' => $room->id, 'user_id' => $viewer->id, 'role' => 'viewer']);
     }
 
-    private function makeLiveRoom(string $status = 'live', string $roomType = 'video'): array
+    private function makeLiveRoom(string $status = 'live'): array
     {
         $hostUser = User::factory()->create();
         $hostUser->assignRole('host');
@@ -330,9 +290,9 @@ class LiveRoomSeatRequestTest extends TestCase
 
         $room = LiveRoom::query()->create([
             'host_id' => $host->id,
-            'room_id' => 'room-'.$host->id.'-'.$roomType.'-'.$status,
+            'room_id' => 'room-'.$host->id.'-'.$status,
             'title' => 'Live Room',
-            'room_type' => $roomType,
+            'room_type' => 'video',
             'status' => $status,
             'started_at' => now()->subMinutes(5),
             'last_activity_at' => now()->subMinute(),

@@ -152,12 +152,6 @@ class SettingsController extends Controller
             ]);
         }
 
-        if ((int) data_get($roomSettings, 'audio.max_speakers') >= (int) data_get($roomSettings, 'audio.max_participants')) {
-            throw ValidationException::withMessages([
-                'live_rooms.audio.max_speakers' => 'Audio max speakers must be less than audio max participants.',
-            ]);
-        }
-
         $this->settings->updateLiveRoomSettings($roomSettings);
 
         return redirect()

@@ -16,7 +16,7 @@
             <x-ui.badge color="brand">Live Rooms</x-ui.badge>
           </div>
           <h2 class="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">Live Room Settings</h2>
-          <p class="mt-3 text-sm text-gray-600 dark:text-gray-300">Define room capacity and independently choose automatic or host approval for audio and video speaker requests.</p>
+          <p class="mt-3 text-sm text-gray-600 dark:text-gray-300">Define video-room capacity and choose automatic or host approval for speaker requests.</p>
         </div>
       </div>
     </div>
@@ -52,32 +52,7 @@
         </div>
       </x-common.component-card>
 
-      <x-common.component-card title="Audio Rooms" desc="Default audio room capacity and validation ceiling.">
-        <div class="grid gap-4">
-          @foreach ($definitions as $key => $definition)
-            @continue(!str_starts_with($key, 'live_rooms.audio.'))
-            @php($field = str_replace('live_rooms.audio.', '', $key))
-            <div>
-              <label class="mb-2 block font-semibold text-gray-900 dark:text-white">{{ $definition['label'] }}</label>
-              <input
-                type="number"
-                name="live_rooms[audio][{{ $field }}]"
-                class="{{ $inputClass }}"
-                value="{{ old("live_rooms.audio.{$field}", $values[$key]) }}"
-                min="{{ $definition['min'] ?? 0 }}"
-                @if(isset($definition['max'])) max="{{ $definition['max'] }}" @endif
-                step="1"
-              >
-              @error("live_rooms.audio.{$field}")
-                <div class="mt-2 text-sm text-error-600 dark:text-error-300">{{ $message }}</div>
-              @enderror
-              <div class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ $definition['hint'] }}</div>
-            </div>
-          @endforeach
-        </div>
-      </x-common.component-card>
-
-      <x-common.component-card title="Speaker Request Approval" desc="Server-side policy applied independently by room type.">
+      <x-common.component-card title="Speaker Request Approval" desc="Server-side policy for video rooms.">
         <div class="grid gap-4">
           @foreach ($definitions as $key => $definition)
             @continue(!str_starts_with($key, 'live_rooms.speaker_requests.'))

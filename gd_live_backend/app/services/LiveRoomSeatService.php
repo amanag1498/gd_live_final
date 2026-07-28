@@ -1068,9 +1068,11 @@ class LiveRoomSeatService
 
     private function speakerRequestsAutoApprove(LiveRoom $room): bool
     {
-        $roomType = ($room->room_type ?? 'video') === 'audio' ? 'audio' : 'video';
+        if (($room->room_type ?? 'video') !== 'video') {
+            return false;
+        }
 
-        return (bool) config("live_rooms.speaker_requests.{$roomType}_auto_approve", false);
+        return (bool) config('live_rooms.speaker_requests.video_auto_approve', false);
     }
 
     private function publishSourcesForRoom(LiveRoom $room): array
