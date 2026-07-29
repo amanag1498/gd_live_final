@@ -6,14 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Models\Agency;
 use App\Models\User;
 use App\Services\AgencyWalletService;
+use App\Services\RechargePlanService;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
 
 class AgencyWalletAdminController extends Controller
 {
-    public function __construct(private AgencyWalletService $wallets)
-    {
-    }
+    public function __construct(
+        private AgencyWalletService $wallets,
+        private RechargePlanService $rechargePlans,
+    ) {}
 
     public function show(Agency $agency)
     {
@@ -27,6 +29,7 @@ class AgencyWalletAdminController extends Controller
             'walletAudits' => $this->wallets->recentAudits($agency),
             'canLoadWallet' => true,
             'canCreditUsers' => true,
+            'rechargePlans' => $this->rechargePlans->activePlans(),
             'walletRoute' => route('admin.agencies.wallet.show', $agency),
         ]);
     }
@@ -60,7 +63,7 @@ class AgencyWalletAdminController extends Controller
     {
         $data = $request->validate([
             'target_user_id' => ['required', 'integer', 'exists:users,id'],
-            'coins' => ['required', 'integer', 'min:1'],
+            'recharge_plan_id' => ['required', 'integer', 'exists:recharge_plans,id'],
             'reference' => ['nullable', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:1000'],
         ]);
@@ -71,7 +74,7 @@ class AgencyWalletAdminController extends Controller
             $this->wallets->transferToUser(
                 $agency,
                 $targetUser,
-                (int) $data['coins'],
+                (int) $data['recharge_plan_id'],
                 $request->user(),
                 null,
                 $data['note'] ?? null,
@@ -102,6 +105,7 @@ class AgencyWalletAdminController extends Controller
             'total_rows' => (clone $query)->count(),
             'total_loaded' => (int) (clone $query)->where('direction', 'admin_to_agency')->sum('coins'),
             'total_distributed' => (int) (clone $query)->where('direction', 'agency_to_user')->sum('coins'),
+            'total_bonus_credited' => (int) (clone $query)->where('direction', 'agency_to_user')->sum('bonus_coins'),
         ];
 
         return view('admin.reports.agency-wallets.index', [

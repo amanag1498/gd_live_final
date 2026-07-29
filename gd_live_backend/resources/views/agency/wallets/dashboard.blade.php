@@ -1,6 +1,6 @@
 @extends('layouts.agency-tailadmin')
 @section('title', 'Agency Wallet')
-@section('page_intro', 'Separate treasury balance for agency loads and user coin credits with linked wallet ledger visibility.')
+@section('page_intro', 'Use active recharge plans to credit users while keeping agency treasury deductions fully traceable.')
 
 @php
   $inputClass = 'block w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white';
@@ -18,7 +18,7 @@
     <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <x-admin.stat-card label="Treasury Balance" :value="number_format($walletSummary['balance'] ?? 0)" meta="Current agency coin balance" />
       <x-admin.stat-card label="Admin Loaded" :value="number_format($walletSummary['total_loaded'] ?? 0)" :meta="number_format($walletSummary['loads_recorded'] ?? 0).' load events'" tone="brand" />
-      <x-admin.stat-card label="Distributed" :value="number_format($walletSummary['total_distributed'] ?? 0)" meta="Coins moved to users" tone="warning" />
+      <x-admin.stat-card label="Distributed" :value="number_format($walletSummary['total_distributed'] ?? 0)" meta="Base coins deducted for user recharges" tone="warning" />
       <x-admin.stat-card label="User Credits" :value="number_format($walletSummary['credits_issued'] ?? 0)" meta="Completed transfer records" tone="dark" />
     </section>
 
@@ -46,7 +46,7 @@
         @endif
 
         @if($canCreditUsers ?? false)
-          <x-common.component-card title="Credit User From Agency Wallet" desc="Move treasury balance into a user wallet and keep the transfer linked.">
+          <x-common.component-card title="Recharge User From Agency Wallet" desc="Select an active recharge plan. The plan's base coins are deducted from this treasury.">
             <form method="post" action="{{ request()->routeIs('admin.*') ? route('admin.agencies.wallet.credit-user', $agency) : route('agency.wallet.credit-user') }}" class="space-y-4">
               @csrf
               <div>
@@ -54,8 +54,22 @@
                 <input type="number" name="target_user_id" min="1" class="{{ $inputClass }}" required>
               </div>
               <div>
-                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Coins</label>
-                <input type="number" name="coins" min="1" class="{{ $inputClass }}" required>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Recharge Plan</label>
+                <select name="recharge_plan_id" class="{{ $inputClass }}" required>
+                  <option value="">Select a recharge plan</option>
+                  @foreach($rechargePlans ?? [] as $plan)
+                    <option value="{{ $plan['id'] }}" @selected(old('recharge_plan_id') == $plan['id'])>
+                      @if(request()->routeIs('admin.*'))
+                        {{ $plan['title'] }} — {{ number_format($plan['coins']) }} base + {{ number_format($plan['bonus_coins']) }} bonus = {{ number_format($plan['total_coins']) }}
+                      @else
+                        {{ $plan['title'] }} — {{ number_format($plan['coins']) }} coins
+                      @endif
+                    </option>
+                  @endforeach
+                </select>
+                @if(empty($rechargePlans))
+                  <p class="mt-2 text-sm text-error-500">No active recharge plans are available.</p>
+                @endif
               </div>
               <div>
                 <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Reference</label>
@@ -65,7 +79,7 @@
                 <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Note</label>
                 <textarea name="note" rows="4" class="{{ $inputClass }}" placeholder="Why this user is being credited"></textarea>
               </div>
-              <button class="inline-flex w-full items-center justify-center rounded-2xl bg-success-500 px-4 py-3 text-sm font-semibold text-white hover:bg-success-600">Credit User</button>
+              <button @disabled(empty($rechargePlans)) class="inline-flex w-full items-center justify-center rounded-2xl bg-success-500 px-4 py-3 text-sm font-semibold text-white hover:bg-success-600 disabled:cursor-not-allowed disabled:opacity-50">Recharge User</button>
             </form>
           </x-common.component-card>
         @endif
@@ -148,7 +162,11 @@
                 <tr>
                   <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">#</th>
                   <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Direction</th>
-                  <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Coins</th>
+                  <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Base Coins</th>
+                  @if(request()->routeIs('admin.*'))
+                    <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Bonus Coins</th>
+                    <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">User Received</th>
+                  @endif
                   <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">User</th>
                   <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Actor</th>
                   <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Linked Wallet Tx</th>
@@ -161,6 +179,10 @@
                     <td class="px-4 py-3">{{ $transfer->id }}</td>
                     <td class="px-4 py-3">{{ str_replace('_', ' ', ucfirst($transfer->direction)) }}</td>
                     <td class="px-4 py-3">{{ number_format($transfer->coins) }}</td>
+                    @if(request()->routeIs('admin.*'))
+                      <td class="px-4 py-3">{{ $transfer->direction === 'agency_to_user' ? number_format($transfer->bonus_coins) : '—' }}</td>
+                      <td class="px-4 py-3">{{ $transfer->direction === 'agency_to_user' ? number_format($transfer->total_coins) : '—' }}</td>
+                    @endif
                     <td class="px-4 py-3">
                       @if($transfer->targetUser)
                         <div class="font-semibold text-gray-900 dark:text-white">{{ $transfer->targetUser->name }}</div>
@@ -189,7 +211,7 @@
                     <td class="px-4 py-3">{{ optional($transfer->created_at)->format('d M Y, h:i A') }}</td>
                   </tr>
                 @empty
-                  <tr class="bg-white dark:bg-gray-900"><td colspan="7" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No agency wallet transfers yet.</td></tr>
+                  <tr class="bg-white dark:bg-gray-900"><td colspan="{{ request()->routeIs('admin.*') ? 9 : 7 }}" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No agency wallet transfers yet.</td></tr>
                 @endforelse
               </tbody>
             </table>

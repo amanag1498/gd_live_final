@@ -7,10 +7,11 @@
 
 @section('content')
 <div class="space-y-6">
-  <section class="grid gap-4 md:grid-cols-3">
+  <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
     <x-admin.stat-card label="Rows" :value="number_format($summary['total_rows'] ?? 0)" tone="brand" />
     <x-admin.stat-card label="Total Loaded" :value="number_format($summary['total_loaded'] ?? 0)" tone="success" />
-    <x-admin.stat-card label="Total Distributed" :value="number_format($summary['total_distributed'] ?? 0)" tone="warning" />
+    <x-admin.stat-card label="Base Coins Deducted" :value="number_format($summary['total_distributed'] ?? 0)" tone="warning" />
+    <x-admin.stat-card label="Bonus Coins Credited" :value="number_format($summary['total_bonus_credited'] ?? 0)" tone="dark" />
   </section>
 
   <x-common.component-card>
@@ -50,7 +51,10 @@
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Transfer</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Agency</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Direction</th>
-            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Coins</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Plan</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Base</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Bonus</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">User Received</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Actor</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Note</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Time</th>
@@ -65,7 +69,10 @@
                 <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">#{{ $transfer->agency_id }}</div>
               </td>
               <td class="px-4 py-4 text-gray-600 dark:text-gray-300">{{ str_replace('_', ' ', ucfirst($transfer->direction)) }}</td>
+              <td class="px-4 py-4 text-gray-600 dark:text-gray-300">{{ $transfer->rechargePlan?->title ?? data_get($transfer->meta, 'recharge_plan_title', '—') }}</td>
               <td class="px-4 py-4 text-gray-900 dark:text-white">{{ number_format($transfer->coins) }}</td>
+              <td class="px-4 py-4 text-gray-900 dark:text-white">{{ $transfer->direction === 'agency_to_user' ? number_format($transfer->bonus_coins) : '—' }}</td>
+              <td class="px-4 py-4 text-gray-900 dark:text-white">{{ $transfer->direction === 'agency_to_user' ? number_format($transfer->total_coins) : '—' }}</td>
               <td class="px-4 py-4 text-gray-600 dark:text-gray-300">
                 @if($transfer->admin)
                   {{ $transfer->admin->name }} <span class="text-xs text-gray-500 dark:text-gray-400">(Admin)</span>
@@ -82,7 +89,7 @@
               <td class="px-4 py-4 text-gray-600 dark:text-gray-300">{{ optional($transfer->created_at)->format('d M Y, h:i A') }}</td>
             </tr>
           @empty
-            <tr class="bg-white dark:bg-gray-900"><td colspan="7" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No agency wallet transfers found.</td></tr>
+            <tr class="bg-white dark:bg-gray-900"><td colspan="10" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No agency wallet transfers found.</td></tr>
           @endforelse
         </tbody>
       </table>
