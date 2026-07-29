@@ -50,6 +50,8 @@
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Coins</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Bonus</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Agency Bonus</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Agency Total</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Status</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Sort</th>
             <th class="px-4 py-3 text-right font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Actions</th>
@@ -63,6 +65,8 @@
               <td class="px-4 py-3">{{ number_format($plan->coins) }}</td>
               <td class="px-4 py-3">{{ number_format($plan->bonus_coins) }}</td>
               <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">{{ number_format($plan->total_coins) }}</td>
+              <td class="px-4 py-3">{{ number_format($plan->agency_bonus_coins) }}</td>
+              <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">{{ number_format($plan->total_coins + $plan->agency_bonus_coins) }}</td>
               <td class="px-4 py-3"><x-ui.badge :color="$plan->is_active ? 'success' : 'dark'">{{ $plan->is_active ? 'Active' : 'Inactive' }}</x-ui.badge></td>
               <td class="px-4 py-3">{{ $plan->sort_order }}</td>
               <td class="px-4 py-3">
@@ -78,7 +82,7 @@
             </tr>
           @empty
             <tr class="bg-white dark:bg-gray-900">
-              <td colspan="8" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No recharge plans configured.</td>
+              <td colspan="10" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No recharge plans configured.</td>
             </tr>
           @endforelse
         </tbody>

@@ -7,7 +7,7 @@
     <div class="flex items-center justify-between gap-3">
       <div>
         <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ $mode === 'create' ? 'Create Recharge Plan' : 'Edit Recharge Plan' }}</h3>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Define price, base coins, bonus coins, and display order for this top-up pack.</p>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Define the normal recharge value and an optional extra bonus used only for agency wallet recharges.</p>
       </div>
       <x-ui.button variant="outline" size="sm" href="{{ route('admin.recharge-plans.index') }}">Back</x-ui.button>
     </div>
@@ -38,20 +38,26 @@
       </label>
     </div>
 
-    <div class="lg:col-span-4">
+    <div class="lg:col-span-3">
       <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Base Coins</label>
       <input type="number" min="1" name="coins" class="{{ $inputClass }}" value="{{ old('coins', $plan->coins) }}" required>
       @error('coins')<div class="mt-2 text-sm text-error-600 dark:text-error-300">{{ $message }}</div>@enderror
     </div>
-    <div class="lg:col-span-4">
+    <div class="lg:col-span-3">
       <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Bonus Coins</label>
       <input type="number" min="0" name="bonus_coins" class="{{ $inputClass }}" value="{{ old('bonus_coins', $plan->bonus_coins) }}">
       @error('bonus_coins')<div class="mt-2 text-sm text-error-600 dark:text-error-300">{{ $message }}</div>@enderror
     </div>
-    <div class="lg:col-span-4">
-      <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Computed Total</label>
+    <div class="lg:col-span-3">
+      <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Agency Extra Bonus</label>
+      <input type="number" min="0" name="agency_bonus_coins" class="{{ $inputClass }}" value="{{ old('agency_bonus_coins', $plan->agency_bonus_coins ?? 0) }}">
+      @error('agency_bonus_coins')<div class="mt-2 text-sm text-error-600 dark:text-error-300">{{ $message }}</div>@enderror
+      <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Added only when an agency recharges a user.</p>
+    </div>
+    <div class="lg:col-span-3">
+      <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">App Recharge Total</label>
       <input type="text" class="{{ $inputClass }}" value="{{ number_format((int) ($plan->total_coins ?? (($plan->coins ?? 0) + ($plan->bonus_coins ?? 0)))) }}" disabled>
-      <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Saved automatically as base coins plus bonus coins.</p>
+      <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Normal total remains base plus bonus. Agency user total: {{ number_format((int) ($plan->total_coins ?? (($plan->coins ?? 0) + ($plan->bonus_coins ?? 0))) + (int) ($plan->agency_bonus_coins ?? 0)) }}.</p>
     </div>
   </div>
 

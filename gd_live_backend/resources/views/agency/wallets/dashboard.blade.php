@@ -60,7 +60,7 @@
                   @foreach($rechargePlans ?? [] as $plan)
                     <option value="{{ $plan['id'] }}" @selected(old('recharge_plan_id') == $plan['id'])>
                       @if(request()->routeIs('admin.*'))
-                        {{ $plan['title'] }} — {{ number_format($plan['coins']) }} base + {{ number_format($plan['bonus_coins']) }} bonus = {{ number_format($plan['total_coins']) }}
+                        {{ $plan['title'] }} — {{ number_format($plan['coins']) }} base + {{ number_format($plan['bonus_coins']) }} plan bonus + {{ number_format($plan['agency_bonus_coins']) }} agency bonus = {{ number_format($plan['agency_total_coins']) }}
                       @else
                         {{ $plan['title'] }} — {{ number_format($plan['coins']) }} coins
                       @endif
@@ -165,6 +165,7 @@
                   <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Base Coins</th>
                   @if(request()->routeIs('admin.*'))
                     <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Bonus Coins</th>
+                    <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Agency Extra Bonus</th>
                     <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">User Received</th>
                   @endif
                   <th class="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">User</th>
@@ -181,6 +182,7 @@
                     <td class="px-4 py-3">{{ number_format($transfer->coins) }}</td>
                     @if(request()->routeIs('admin.*'))
                       <td class="px-4 py-3">{{ $transfer->direction === 'agency_to_user' ? number_format($transfer->bonus_coins) : '—' }}</td>
+                      <td class="px-4 py-3">{{ $transfer->direction === 'agency_to_user' ? number_format($transfer->agency_bonus_coins) : '—' }}</td>
                       <td class="px-4 py-3">{{ $transfer->direction === 'agency_to_user' ? number_format($transfer->total_coins) : '—' }}</td>
                     @endif
                     <td class="px-4 py-3">
@@ -211,7 +213,7 @@
                     <td class="px-4 py-3">{{ optional($transfer->created_at)->format('d M Y, h:i A') }}</td>
                   </tr>
                 @empty
-                  <tr class="bg-white dark:bg-gray-900"><td colspan="{{ request()->routeIs('admin.*') ? 9 : 7 }}" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No agency wallet transfers yet.</td></tr>
+                  <tr class="bg-white dark:bg-gray-900"><td colspan="{{ request()->routeIs('admin.*') ? 10 : 7 }}" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No agency wallet transfers yet.</td></tr>
                 @endforelse
               </tbody>
             </table>

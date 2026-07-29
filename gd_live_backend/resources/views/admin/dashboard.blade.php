@@ -70,6 +70,11 @@
         <i class="ti ti-gift text-lg"></i>
       @endslot
     </x-admin.stat-card>
+    <x-admin.stat-card label="Extra Agency Bonuses" :value="number_format($stats['agencyExtraBonusCoinsIssued'])" meta="Agency-only extra bonus coins issued to users" tone="brand">
+      @slot('icon')
+        <i class="ti ti-sparkles text-lg"></i>
+      @endslot
+    </x-admin.stat-card>
     <x-admin.stat-card label="Blocked Users" :value="number_format($stats['blockedUsers'])" meta="Accounts under restriction" tone="danger">
       @slot('icon')
         <i class="ti ti-ban text-lg"></i>

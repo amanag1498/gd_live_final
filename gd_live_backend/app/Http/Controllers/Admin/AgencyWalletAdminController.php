@@ -29,7 +29,7 @@ class AgencyWalletAdminController extends Controller
             'walletAudits' => $this->wallets->recentAudits($agency),
             'canLoadWallet' => true,
             'canCreditUsers' => true,
-            'rechargePlans' => $this->rechargePlans->activePlans(),
+            'rechargePlans' => $this->rechargePlans->activeAgencyPlans(),
             'walletRoute' => route('admin.agencies.wallet.show', $agency),
         ]);
     }
@@ -106,6 +106,7 @@ class AgencyWalletAdminController extends Controller
             'total_loaded' => (int) (clone $query)->where('direction', 'admin_to_agency')->sum('coins'),
             'total_distributed' => (int) (clone $query)->where('direction', 'agency_to_user')->sum('coins'),
             'total_bonus_credited' => (int) (clone $query)->where('direction', 'agency_to_user')->sum('bonus_coins'),
+            'total_agency_bonus_credited' => (int) (clone $query)->where('direction', 'agency_to_user')->sum('agency_bonus_coins'),
         ];
 
         return view('admin.reports.agency-wallets.index', [

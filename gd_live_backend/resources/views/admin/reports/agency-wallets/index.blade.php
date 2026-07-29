@@ -7,11 +7,12 @@
 
 @section('content')
 <div class="space-y-6">
-  <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+  <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
     <x-admin.stat-card label="Rows" :value="number_format($summary['total_rows'] ?? 0)" tone="brand" />
     <x-admin.stat-card label="Total Loaded" :value="number_format($summary['total_loaded'] ?? 0)" tone="success" />
     <x-admin.stat-card label="Base Coins Deducted" :value="number_format($summary['total_distributed'] ?? 0)" tone="warning" />
     <x-admin.stat-card label="Bonus Coins Credited" :value="number_format($summary['total_bonus_credited'] ?? 0)" tone="dark" />
+    <x-admin.stat-card label="Agency Extra Bonus" :value="number_format($summary['total_agency_bonus_credited'] ?? 0)" tone="brand" />
   </section>
 
   <x-common.component-card>
@@ -54,6 +55,7 @@
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Plan</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Base</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Bonus</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Agency Bonus</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">User Received</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Actor</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Note</th>
@@ -72,6 +74,7 @@
               <td class="px-4 py-4 text-gray-600 dark:text-gray-300">{{ $transfer->rechargePlan?->title ?? data_get($transfer->meta, 'recharge_plan_title', '—') }}</td>
               <td class="px-4 py-4 text-gray-900 dark:text-white">{{ number_format($transfer->coins) }}</td>
               <td class="px-4 py-4 text-gray-900 dark:text-white">{{ $transfer->direction === 'agency_to_user' ? number_format($transfer->bonus_coins) : '—' }}</td>
+              <td class="px-4 py-4 text-gray-900 dark:text-white">{{ $transfer->direction === 'agency_to_user' ? number_format($transfer->agency_bonus_coins) : '—' }}</td>
               <td class="px-4 py-4 text-gray-900 dark:text-white">{{ $transfer->direction === 'agency_to_user' ? number_format($transfer->total_coins) : '—' }}</td>
               <td class="px-4 py-4 text-gray-600 dark:text-gray-300">
                 @if($transfer->admin)
@@ -89,7 +92,7 @@
               <td class="px-4 py-4 text-gray-600 dark:text-gray-300">{{ optional($transfer->created_at)->format('d M Y, h:i A') }}</td>
             </tr>
           @empty
-            <tr class="bg-white dark:bg-gray-900"><td colspan="10" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No agency wallet transfers found.</td></tr>
+            <tr class="bg-white dark:bg-gray-900"><td colspan="11" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No agency wallet transfers found.</td></tr>
           @endforelse
         </tbody>
       </table>
