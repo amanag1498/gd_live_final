@@ -6,6 +6,9 @@ class PaymentOrderDto {
   final num amountRupees;
   final String status;
   final String gateway;
+  final num? storePrice;
+  final String? storeCurrency;
+  final String? storeProductId;
   final String? gatewayOrderId;
   final PaymentCheckoutDto? checkout;
   final String? rechargePlanTitle;
@@ -19,6 +22,9 @@ class PaymentOrderDto {
     required this.amountRupees,
     required this.status,
     required this.gateway,
+    this.storePrice,
+    this.storeCurrency,
+    this.storeProductId,
     this.gatewayOrderId,
     this.checkout,
     this.rechargePlanTitle,
@@ -26,9 +32,10 @@ class PaymentOrderDto {
   });
 
   factory PaymentOrderDto.fromJson(Map<String, dynamic> json) {
-    final rechargePlan = json['recharge_plan'] is Map
-        ? Map<String, dynamic>.from(json['recharge_plan'] as Map)
-        : const <String, dynamic>{};
+    final rechargePlan =
+        json['recharge_plan'] is Map
+            ? Map<String, dynamic>.from(json['recharge_plan'] as Map)
+            : const <String, dynamic>{};
     final checkout =
         json['checkout'] is Map
             ? Map<String, dynamic>.from(json['checkout'] as Map)
@@ -42,9 +49,11 @@ class PaymentOrderDto {
       amountRupees: _asNum(json['amount_rupees']) ?? 0,
       status: (json['status'] ?? 'created').toString(),
       gateway: (json['gateway'] ?? 'mock').toString(),
+      storePrice: _asNum(json['store_price']),
+      storeCurrency: json['store_currency']?.toString(),
+      storeProductId: json['store_product_id']?.toString(),
       gatewayOrderId: json['gateway_order_id']?.toString(),
-      checkout:
-          checkout.isEmpty ? null : PaymentCheckoutDto.fromJson(checkout),
+      checkout: checkout.isEmpty ? null : PaymentCheckoutDto.fromJson(checkout),
       rechargePlanTitle: rechargePlan['title']?.toString(),
       createdAt: DateTime.tryParse((json['created_at'] ?? '').toString()),
     );

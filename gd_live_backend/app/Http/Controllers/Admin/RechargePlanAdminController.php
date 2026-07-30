@@ -75,6 +75,13 @@ class RechargePlanAdminController extends Controller
                 'min:1',
                 Rule::unique('recharge_plans', 'amount_rupees')->ignore($plan?->id),
             ],
+            'apple_product_id' => [
+                'nullable',
+                'string',
+                'max:100',
+                'regex:/^[A-Za-z0-9._-]+$/',
+                Rule::unique('recharge_plans', 'apple_product_id')->ignore($plan?->id),
+            ],
             'coins' => ['required', 'integer', 'min:1'],
             'bonus_coins' => ['nullable', 'integer', 'min:0'],
             'agency_bonus_coins' => ['nullable', 'integer', 'min:0'],
@@ -88,14 +95,20 @@ class RechargePlanAdminController extends Controller
         $coins = (int) $data['coins'];
         $bonusCoins = (int) ($data['bonus_coins'] ?? 0);
         $agencyBonusCoins = (int) ($data['agency_bonus_coins'] ?? 0);
+        $totalCoins = $coins + $bonusCoins;
+        $appleProductId = trim((string) ($data['apple_product_id'] ?? ''));
+        if ($appleProductId === '') {
+            $appleProductId = 'com.techybugs.gdlive.coins.'.$totalCoins;
+        }
 
         return [
             'title' => trim($data['title']),
             'amount_rupees' => (float) $data['amount_rupees'],
+            'apple_product_id' => $appleProductId,
             'coins' => $coins,
             'bonus_coins' => $bonusCoins,
             'agency_bonus_coins' => $agencyBonusCoins,
-            'total_coins' => $coins + $bonusCoins,
+            'total_coins' => $totalCoins,
             'sort_order' => (int) $data['sort_order'],
             'is_active' => (bool) ($data['is_active'] ?? false),
         ];

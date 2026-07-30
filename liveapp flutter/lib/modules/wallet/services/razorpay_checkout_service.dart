@@ -5,11 +5,7 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../data/models/user_model.dart';
 import '../models/payment_order_dto.dart';
 
-enum RechargeCheckoutResultType {
-  success,
-  failed,
-  cancelled,
-}
+enum RechargeCheckoutResultType { success, failed, cancelled }
 
 class RechargeCheckoutResult {
   final RechargeCheckoutResultType type;
@@ -55,22 +51,11 @@ class RazorpayCheckoutService {
     final completer = Completer<RechargeCheckoutResult>();
     _completer = completer;
 
-    _razorpay.on(
-      Razorpay.EVENT_PAYMENT_SUCCESS,
-      _handlePaymentSuccess,
-    );
-    _razorpay.on(
-      Razorpay.EVENT_PAYMENT_ERROR,
-      _handlePaymentError,
-    );
-    _razorpay.on(
-      Razorpay.EVENT_EXTERNAL_WALLET,
-      _handleExternalWallet,
-    );
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
 
-    final prefill = <String, dynamic>{
-      ...checkout.prefill,
-    };
+    final prefill = <String, dynamic>{...checkout.prefill};
     final phone = user?.hostProfile?.contactPhone?.trim();
     if (phone != null && phone.isNotEmpty && prefill['contact'] == null) {
       prefill['contact'] = phone;
@@ -92,14 +77,9 @@ class RazorpayCheckoutService {
       'description': checkout.description,
       'order_id': checkout.gatewayOrderId,
       'method': method,
-      'retry': {
-        'enabled': true,
-        'max_count': 1,
-      },
+      'retry': {'enabled': true, 'max_count': 1},
       'send_sms_hash': true,
-      'theme': {
-        'color': '#5B7CFF',
-      },
+      'theme': {'color': '#5B7CFF'},
       'prefill': prefill,
       'notes': {
         'app_order_id': order.orderId,
@@ -112,10 +92,11 @@ class RazorpayCheckoutService {
     try {
       return await completer.future.timeout(
         const Duration(minutes: 5),
-        onTimeout: () => const RechargeCheckoutResult(
-          type: RechargeCheckoutResultType.cancelled,
-          message: 'Payment session timed out.',
-        ),
+        onTimeout:
+            () => const RechargeCheckoutResult(
+              type: RechargeCheckoutResultType.cancelled,
+              message: 'Payment session timed out.',
+            ),
       );
     } finally {
       _clearListeners();
@@ -195,9 +176,7 @@ class RazorpayCheckoutService {
       RechargeCheckoutResult(
         type: RechargeCheckoutResultType.failed,
         message: 'External wallet is not supported for this recharge.',
-        raw: <String, dynamic>{
-          'external_wallet': response.walletName,
-        },
+        raw: <String, dynamic>{'external_wallet': response.walletName},
       ),
     );
   }

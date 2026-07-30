@@ -238,7 +238,7 @@ class FirebaseAuthApiController extends Controller
         $provider = match ($signInProvider) {
             'apple.com' => 'apple',
             'google.com' => 'google',
-            default => 'google',
+            default => 'firebase',
         };
 
         if (!$email) {
@@ -246,7 +246,7 @@ class FirebaseAuthApiController extends Controller
             return response()->json([
                 'ok' => false,
                 'code' => 'firebase_email_missing',
-                'msg' => 'Google did not provide an email address for this account.',
+                'msg' => 'The sign-in provider did not provide an email address for this account.',
             ], 422);
         }
 

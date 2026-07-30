@@ -47,6 +47,7 @@
           <tr>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Title</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Amount</th>
+            <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Apple Product</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Coins</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Bonus</th>
             <th class="px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total</th>
@@ -62,6 +63,7 @@
             <tr class="bg-white dark:bg-gray-900">
               <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ $plan->title }}</td>
               <td class="px-4 py-3">₹{{ number_format((float) $plan->amount_rupees, 2) }}</td>
+              <td class="px-4 py-3 font-mono text-xs">{{ $plan->apple_product_id ?: '—' }}</td>
               <td class="px-4 py-3">{{ number_format($plan->coins) }}</td>
               <td class="px-4 py-3">{{ number_format($plan->bonus_coins) }}</td>
               <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">{{ number_format($plan->total_coins) }}</td>
@@ -82,7 +84,7 @@
             </tr>
           @empty
             <tr class="bg-white dark:bg-gray-900">
-              <td colspan="10" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No recharge plans configured.</td>
+              <td colspan="11" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No recharge plans configured.</td>
             </tr>
           @endforelse
         </tbody>

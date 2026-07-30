@@ -1,4 +1,3 @@
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
@@ -24,7 +23,7 @@ class AuthService {
   AuthService({required this.api, required this.storage, this.iosClientId}) {
     _gsi = GoogleSignIn(
       scopes: const ['email', 'profile'],
-      clientId: (Platform.isIOS || Platform.isMacOS) ? iosClientId : null,
+      clientId: isApplePlatform ? iosClientId : null,
     );
   }
 
@@ -113,7 +112,7 @@ class AuthService {
     final GoogleSignInAccount? gUser = await _gsi.signIn();
     if (gUser == null) {
       debugPrint('[auth] Google sign-in aborted by user');
-      throw Exception('Sign-in aborted');
+      throw const AuthSignInCancelledException();
     }
     debugPrint('[auth] Google account selected: ${gUser.email}');
 
@@ -156,7 +155,7 @@ class AuthService {
   }
 
   Future<UserModel> signInWithAppleAndBackend() async {
-    if (!Platform.isIOS && !Platform.isMacOS) {
+    if (!isApplePlatform) {
       throw Exception('Sign in with Apple is only available on Apple devices.');
     }
 
@@ -180,6 +179,9 @@ class AuthService {
         '[auth] Apple FirebaseAuthException '
         'code=${e.code} message=${e.message}',
       );
+      if (isAppleSignInCancellation(e.code, e.message)) {
+        throw const AuthSignInCancelledException();
+      }
       throw Exception('Apple sign-in failed: ${e.message ?? e.code}');
     } on DioException catch (e) {
       await _throwFriendlyBackendError(e);
@@ -316,13 +318,37 @@ class AuthService {
       return 'Server login is not configured correctly. Firebase project id is missing.';
     }
     if (status == 401 && code == 'firebase_token_invalid') {
-      return 'Google sign-in expired or is invalid. Please sign in again.';
+      return 'Your sign-in expired or is invalid. Please sign in again.';
     }
     if (status == 422 && code == 'firebase_email_missing') {
-      return 'This Google account did not provide an email address.';
+      return 'This sign-in account did not provide an email address.';
     }
     return msg;
   }
+}
+
+class AuthSignInCancelledException implements Exception {
+  const AuthSignInCancelledException();
+}
+
+@visibleForTesting
+bool get isApplePlatform =>
+    !kIsWeb &&
+    (defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS);
+
+@visibleForTesting
+bool isAppleSignInCancellation(String code, String? message) {
+  final normalizedCode = code.toLowerCase();
+  final normalizedMessage = (message ?? '').toLowerCase();
+  return normalizedCode == 'web-context-canceled' ||
+      normalizedCode == 'canceled' ||
+      normalizedCode == 'cancelled' ||
+      normalizedCode == 'popup-closed-by-user' ||
+      normalizedMessage.contains('user canceled') ||
+      normalizedMessage.contains('user cancelled') ||
+      normalizedMessage.contains('canceled by the user') ||
+      normalizedMessage.contains('cancelled by the user');
 }
 
 @visibleForTesting

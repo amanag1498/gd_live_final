@@ -1,16 +1,47 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\{PlanController, SubscriptionController, LiveRoomController, LiveRoomSeatRequestController, LiveRoomGiftController, ProfileController, ApplicationApiController, WalletApiController, RechargePlanController, RechargeOrderController, NotificationApiController, PushTokenController, LiveRoomIngestController, OpsController, BannerController, BannerTrackingController, PresenceController, CallController, CallReportApiController, LevelController, HostFollowController, EntryPackController, LiveRoomPkController, HostModerationController, UserReportController, UnblockRequestController, AdminModerationController, WsModerationController, DashboardLeaderboardController, RazorpayWebhookController, MetaAppEventController};
-use App\Http\Controllers\Api\TeenPattiController;
+use App\Http\Controllers\Api\AdminModerationController;
+use App\Http\Controllers\Api\AppleIapNotificationController;
+use App\Http\Controllers\Api\ApplicationApiController;
+use App\Http\Controllers\Api\BannerController;
+use App\Http\Controllers\Api\BannerTrackingController;
+use App\Http\Controllers\Api\CallController;
+use App\Http\Controllers\Api\CallReportApiController;
+use App\Http\Controllers\Api\DashboardLeaderboardController;
+use App\Http\Controllers\Api\EntryPackController;
 use App\Http\Controllers\Api\GreedyGameController;
+use App\Http\Controllers\Api\HostFollowController;
+use App\Http\Controllers\Api\HostModerationController;
+use App\Http\Controllers\Api\LevelController;
+use App\Http\Controllers\Api\LiveRoomController;
+use App\Http\Controllers\Api\LiveRoomGiftController;
+use App\Http\Controllers\Api\LiveRoomIngestController;
+use App\Http\Controllers\Api\LiveRoomPkController;
+use App\Http\Controllers\Api\LiveRoomSeatRequestController;
+use App\Http\Controllers\Api\MetaAppEventController;
+use App\Http\Controllers\Api\NotificationApiController;
+use App\Http\Controllers\Api\OpsController;
+use App\Http\Controllers\Api\PlanController;
+use App\Http\Controllers\Api\PresenceController;
+use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\PushTokenController;
+use App\Http\Controllers\Api\RazorpayWebhookController;
+use App\Http\Controllers\Api\RechargeOrderController;
+use App\Http\Controllers\Api\RechargePlanController;
+use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\TeenPattiController;
+use App\Http\Controllers\Api\UnblockRequestController;
+use App\Http\Controllers\Api\UserReportController;
+use App\Http\Controllers\Api\WalletApiController;
+use App\Http\Controllers\Api\WsModerationController;
 use App\Http\Controllers\Auth\FirebaseAuthApiController;
 use App\Models\UserSubscription;
 use App\Services\AppSettingsService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
-Route::get('/ping', fn() => response()->json(['ok' => true, 'ts' => now()]));
-Route::get('/app-config', fn(Request $request, AppSettingsService $settings) => response()->json([
+Route::get('/ping', fn () => response()->json(['ok' => true, 'ts' => now()]));
+Route::get('/app-config', fn (Request $request, AppSettingsService $settings) => response()->json([
     'ok' => true,
     'data' => $settings->publicAppPayload(
         $request->user('sanctum'),
@@ -18,7 +49,7 @@ Route::get('/app-config', fn(Request $request, AppSettingsService $settings) => 
         $request->header('X-Client-Platform'),
     ),
 ]));
-Route::get('/app/settings', fn(Request $request, AppSettingsService $settings) => response()->json([
+Route::get('/app/settings', fn (Request $request, AppSettingsService $settings) => response()->json([
     'ok' => true,
     'data' => $settings->publicAppPayload(
         $request->user('sanctum'),
@@ -36,11 +67,11 @@ Route::get('/games/greedy/public-snapshot', [GreedyGameController::class, 'publi
 Route::get('/levels', [LevelController::class, 'index']);
 
 // host/admin only
-Route::middleware(['auth:sanctum','throttle:240,1'])->group(function () {
-    Route::get('/live/rooms',                           [LiveRoomController::class, 'index'])->middleware('live_room_feature_enabled');
-    Route::post('/live/rooms',                          [LiveRoomController::class, 'createOrStart'])->middleware('live_room_feature_enabled');
+Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
+    Route::get('/live/rooms', [LiveRoomController::class, 'index'])->middleware('live_room_feature_enabled');
+    Route::post('/live/rooms', [LiveRoomController::class, 'createOrStart'])->middleware('live_room_feature_enabled');
     Route::post('/live/rooms/{live_room:room_id}/heartbeat', [LiveRoomController::class, 'heartbeat'])->middleware('live_room_feature_enabled');
-    Route::post('/live/rooms/{live_room:room_id}/end',  [LiveRoomController::class, 'end'])->middleware('live_room_feature_enabled');
+    Route::post('/live/rooms/{live_room:room_id}/end', [LiveRoomController::class, 'end'])->middleware('live_room_feature_enabled');
     Route::get('/live/rooms/{room_id}/seat-requests', [LiveRoomSeatRequestController::class, 'index'])->middleware('live_room_feature_enabled');
     Route::post('/live/rooms/{room_id}/seat-requests', [LiveRoomSeatRequestController::class, 'store'])->middleware('live_room_feature_enabled');
     Route::post('/live/rooms/{room_id}/seat-requests/invite', [LiveRoomSeatRequestController::class, 'invite'])->middleware('live_room_feature_enabled');
@@ -62,13 +93,12 @@ Route::middleware(['auth:sanctum','throttle:240,1'])->group(function () {
     Route::post('/push/unregister', [PushTokenController::class, 'unregister']);
     Route::post('/marketing/meta-events', [MetaAppEventController::class, 'store'])->middleware('throttle:60,1');
 
-
-    Route::get('/plans', [PlanController::class,'index'])->middleware('feature_enabled:subscriptions_enabled');
-    Route::post('/subscriptions', [SubscriptionController::class,'purchase'])->middleware('feature_enabled:subscriptions_enabled');
-    Route::get('/subscriptions/me', [SubscriptionController::class,'mine'])->middleware('feature_enabled:subscriptions_enabled');
-    Route::post('/subscriptions/{id}/cancel', [SubscriptionController::class,'cancel'])->middleware('feature_enabled:subscriptions_enabled');
-    Route::get('/subscriptions/welcome-tip', [\App\Http\Controllers\Api\SubscriptionController::class,'welcomeTip'])->middleware('feature_enabled:subscriptions_enabled');
-    Route::post('/subscriptions/welcome-tip/ack', [\App\Http\Controllers\Api\SubscriptionController::class,'ackWelcomeTip'])->middleware('feature_enabled:subscriptions_enabled');
+    Route::get('/plans', [PlanController::class, 'index'])->middleware('feature_enabled:subscriptions_enabled');
+    Route::post('/subscriptions', [SubscriptionController::class, 'purchase'])->middleware('feature_enabled:subscriptions_enabled');
+    Route::get('/subscriptions/me', [SubscriptionController::class, 'mine'])->middleware('feature_enabled:subscriptions_enabled');
+    Route::post('/subscriptions/{id}/cancel', [SubscriptionController::class, 'cancel'])->middleware('feature_enabled:subscriptions_enabled');
+    Route::get('/subscriptions/welcome-tip', [\App\Http\Controllers\Api\SubscriptionController::class, 'welcomeTip'])->middleware('feature_enabled:subscriptions_enabled');
+    Route::post('/subscriptions/welcome-tip/ack', [\App\Http\Controllers\Api\SubscriptionController::class, 'ackWelcomeTip'])->middleware('feature_enabled:subscriptions_enabled');
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::get('/profile/users/{user}', [ProfileController::class, 'publicShow']);
     Route::get('/profile/host-earnings-report', [ProfileController::class, 'hostEarningsReport']);
@@ -77,6 +107,7 @@ Route::middleware(['auth:sanctum','throttle:240,1'])->group(function () {
     Route::post('/profile/avatar', [ProfileController::class, 'avatar']);
     Route::post('/app/activity', function (Request $request) {
         $result = app(\App\Services\AppActivityService::class)->recordDailyActivity($request->user());
+
         return response()->json([
             'ok' => true,
             'data' => [
@@ -130,6 +161,7 @@ Route::middleware(['auth:sanctum','throttle:240,1'])->group(function () {
     Route::get('/recharge/orders', [RechargeOrderController::class, 'index'])->middleware('feature_enabled:wallet_recharge_enabled');
     Route::post('/recharge/orders', [RechargeOrderController::class, 'store'])->middleware('feature_enabled:wallet_recharge_enabled');
     Route::post('/recharge/orders/{orderId}/verify', [RechargeOrderController::class, 'verify'])->middleware('feature_enabled:wallet_recharge_enabled');
+    Route::post('/recharge/apple/verify', [RechargeOrderController::class, 'verifyApple'])->middleware('feature_enabled:wallet_recharge_enabled');
 
     Route::post('/live/rooms/{room_id}/request-call', [CallController::class, 'requestFromLiveRoom'])->middleware(['feature_enabled:host_calling_enabled', 'live_room_feature_enabled']);
     Route::post('/calls/{call}/accept', [CallController::class, 'accept'])->middleware('feature_enabled:host_calling_enabled');
@@ -164,9 +196,9 @@ Route::middleware(['auth:sanctum', 'throttle:240,1', 'feature_enabled:host_calli
 });
 
 Route::middleware('throttle:120,1')->group(function () {
-    Route::get('/live/rooms/{room_id}/access', [LiveRoomIngestController::class,'access'])->middleware('live_room_feature_enabled');
-    Route::post('/live/rooms/{room_id}/join',  [LiveRoomIngestController::class,'join'])->middleware('live_room_feature_enabled');
-    Route::post('/live/rooms/{room_id}/leave', [LiveRoomIngestController::class,'leave'])->middleware('live_room_feature_enabled');
+    Route::get('/live/rooms/{room_id}/access', [LiveRoomIngestController::class, 'access'])->middleware('live_room_feature_enabled');
+    Route::post('/live/rooms/{room_id}/join', [LiveRoomIngestController::class, 'join'])->middleware('live_room_feature_enabled');
+    Route::post('/live/rooms/{room_id}/leave', [LiveRoomIngestController::class, 'leave'])->middleware('live_room_feature_enabled');
 });
 
 Route::middleware('throttle:240,1')->group(function () {
@@ -174,13 +206,13 @@ Route::middleware('throttle:240,1')->group(function () {
     Route::post('/banners/{banner}/click', [BannerTrackingController::class, 'click']);
 });
 
-
 Route::post('/auth/firebase/login', [FirebaseAuthApiController::class, 'login']);
 Route::post('/payments/razorpay/webhook', RazorpayWebhookController::class)->middleware('throttle:120,1');
+Route::post('/payments/apple/notifications', AppleIapNotificationController::class)->middleware('throttle:120,1');
 Route::middleware('auth:sanctum')->post('/auth/logout', [FirebaseAuthApiController::class, 'logout']);
 
 // Example of an authenticated API route:
-Route::middleware('auth:sanctum')->get('/me', fn(\Illuminate\Http\Request $r) => $r->user());
+Route::middleware('auth:sanctum')->get('/me', fn (\Illuminate\Http\Request $r) => $r->user());
 Route::middleware('auth:sanctum')->get('/ws/verify', function (\Illuminate\Http\Request $r) {
     $u = $r->user();
     $u->loadMissing('level');
@@ -208,6 +240,7 @@ Route::middleware('auth:sanctum')->get('/ws/verify', function (\Illuminate\Http\
         || str_contains($planName, 'elite')
         || str_contains($planName, 'platinum')
         || str_contains($planName, 'gold');
+
     return [
         'id' => $u->id,
         'name' => $u->name,

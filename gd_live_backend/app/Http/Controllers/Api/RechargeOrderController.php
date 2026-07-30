@@ -3,16 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\RechargeOrderService;
 use App\Services\MetaAppEventRecorder;
+use App\Services\RechargeOrderService;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
 
 class RechargeOrderController extends Controller
 {
-    public function __construct(private RechargeOrderService $service)
-    {
-    }
+    public function __construct(private RechargeOrderService $service) {}
 
     public function index(Request $request)
     {
@@ -108,5 +106,49 @@ class RechargeOrderController extends Controller
                 'already_processed' => $result['already_processed'],
             ],
         ], $httpStatus);
+    }
+
+    public function verifyApple(Request $request, MetaAppEventRecorder $metaEvents)
+    {
+        if (strtolower((string) $request->header('X-Client-Platform')) !== 'ios') {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Apple In-App Purchase verification is available only to iOS clients.',
+            ], 422);
+        }
+
+        $data = $request->validate([
+            'product_id' => ['required', 'string', 'max:100'],
+            'transaction_id' => ['required', 'string', 'max:120'],
+        ]);
+
+        try {
+            $result = $this->service->verifyApplePurchase(
+                $request->user(),
+                $data['product_id'],
+                $data['transaction_id'],
+            );
+        } catch (InvalidArgumentException $exception) {
+            return response()->json([
+                'ok' => false,
+                'message' => $exception->getMessage(),
+            ], 422);
+        }
+
+        $order = $result['order']->loadMissing('user');
+        $metaEvents->recordVerifiedPurchase($order, $request);
+
+        return response()->json([
+            'ok' => true,
+            'message' => $result['already_processed']
+                ? 'Apple purchase already verified.'
+                : 'Apple purchase verified and coins added.',
+            'data' => [
+                'order' => $order,
+                'wallet_balance' => (int) $result['wallet']->balance,
+                'transaction' => $result['transaction'],
+                'already_processed' => $result['already_processed'],
+            ],
+        ]);
     }
 }

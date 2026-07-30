@@ -9,6 +9,7 @@ class RechargePlan extends Model
     protected $fillable = [
         'title',
         'amount_rupees',
+        'apple_product_id',
         'coins',
         'bonus_coins',
         'agency_bonus_coins',

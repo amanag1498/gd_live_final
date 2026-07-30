@@ -59,6 +59,12 @@
       <input type="text" class="{{ $inputClass }}" value="{{ number_format((int) ($plan->total_coins ?? (($plan->coins ?? 0) + ($plan->bonus_coins ?? 0)))) }}" disabled>
       <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Normal total remains base plus bonus. Agency user total: {{ number_format((int) ($plan->total_coins ?? (($plan->coins ?? 0) + ($plan->bonus_coins ?? 0))) + (int) ($plan->agency_bonus_coins ?? 0)) }}.</p>
     </div>
+    <div class="lg:col-span-12">
+      <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Apple Consumable Product ID</label>
+      <input type="text" name="apple_product_id" class="{{ $inputClass }}" value="{{ old('apple_product_id', $plan->apple_product_id) }}" placeholder="com.techybugs.gdlive.coins.500">
+      @error('apple_product_id')<div class="mt-2 text-sm text-error-600 dark:text-error-300">{{ $message }}</div>@enderror
+      <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Must exactly match App Store Connect. When blank, it is generated from the app recharge total.</p>
+    </div>
   </div>
 
   <x-slot:footer>

@@ -15,8 +15,11 @@ use InvalidArgumentException;
 class RechargeOrderService
 {
     private const GD_LIVE_APP_CODE = 'gdlive';
+
     private const GD_LIVE_APP_SLUG = 'gd_live';
+
     private const GD_LIVE_RECEIPT_PREFIX = 'gdl_';
+
     private const ALLOWED_RAZORPAY_WEBHOOK_EVENTS = [
         'payment.authorized',
         'payment.failed',
@@ -26,8 +29,8 @@ class RechargeOrderService
 
     public function __construct(
         private RazorpayGatewayService $razorpay,
-    ) {
-    }
+        private AppleAppStoreService $apple,
+    ) {}
 
     public function paymentOrdersAvailable(): bool
     {
@@ -46,13 +49,23 @@ class RechargeOrderService
             && Schema::hasColumn('wallet_transactions', 'category');
     }
 
-    public function paymentReady(): bool
+    public function paymentReady(?string $platform = null): bool
     {
+        if (strtolower(trim((string) $platform)) === 'ios') {
+            return $this->apple->configured();
+        }
+
         return $this->razorpay->configured();
     }
 
-    public function paymentSummaryMessage(): string
+    public function paymentSummaryMessage(?string $platform = null): string
     {
+        if (strtolower(trim((string) $platform)) === 'ios') {
+            return $this->apple->configured()
+                ? 'Secure payment through Apple In-App Purchase.'
+                : 'Apple In-App Purchase setup required.';
+        }
+
         if ($this->razorpay->configured()) {
             return 'Secure payments with Razorpay.';
         }
@@ -64,9 +77,224 @@ class RechargeOrderService
         return 'Payment setup required.';
     }
 
+    /**
+     * Verify an iOS consumable with Apple before creating the order and
+     * crediting the existing wallet ledger.
+     */
+    public function verifyApplePurchase(
+        User $user,
+        string $productId,
+        string $transactionId,
+    ): array {
+        if (! $this->paymentOrdersAvailable()
+            || ! $this->rechargeLedgerColumnsAvailable()
+            || ! Schema::hasColumn('payment_orders', 'apple_transaction_id')
+            || ! Schema::hasColumn('recharge_plans', 'apple_product_id')
+        ) {
+            throw new InvalidArgumentException('Apple recharge setup is incomplete. Run the latest migrations.');
+        }
+
+        $productId = trim($productId);
+        $transactionId = trim($transactionId);
+        $plan = RechargePlan::query()
+            ->where('is_active', true)
+            ->where('apple_product_id', $productId)
+            ->first();
+
+        if (! $plan) {
+            throw new InvalidArgumentException('Apple coin pack is unavailable.');
+        }
+
+        $appleTransaction = $this->apple->transaction($transactionId);
+        if ((string) ($appleTransaction['productId'] ?? '') !== $productId) {
+            throw new InvalidArgumentException('Apple purchase product does not match this coin pack.');
+        }
+        if (strtolower((string) ($appleTransaction['appAccountToken'] ?? ''))
+            !== $this->appleAccountToken($user)
+        ) {
+            throw new InvalidArgumentException('Apple purchase is not linked to this GD Live account.');
+        }
+
+        return DB::transaction(function () use ($user, $plan, $productId, $transactionId, $appleTransaction) {
+            $order = PaymentOrder::query()
+                ->where('apple_transaction_id', $transactionId)
+                ->lockForUpdate()
+                ->first();
+
+            if ($order && (int) $order->user_id !== (int) $user->id) {
+                throw new InvalidArgumentException('Apple purchase has already been claimed by another account.');
+            }
+            if ($order && (int) $order->recharge_plan_id !== (int) $plan->id) {
+                throw new InvalidArgumentException('Apple purchase was recorded for another coin pack.');
+            }
+
+            if (! $order) {
+                $rawPrice = is_numeric($appleTransaction['price'] ?? null)
+                    ? (float) $appleTransaction['price']
+                    : null;
+                $order = PaymentOrder::query()->create([
+                    'user_id' => $user->id,
+                    'recharge_plan_id' => $plan->id,
+                    'order_id' => self::GD_LIVE_RECEIPT_PREFIX.Str::lower((string) Str::ulid()),
+                    'amount_rupees' => $plan->amount_rupees,
+                    'coins' => $plan->coins,
+                    'bonus_coins' => $plan->bonus_coins,
+                    'total_coins' => $plan->total_coins,
+                    'status' => 'verified',
+                    'gateway' => 'apple_iap',
+                    'gateway_payment_id' => $transactionId,
+                    'apple_transaction_id' => $transactionId,
+                    'store_product_id' => $productId,
+                    'store_environment' => strtolower((string) ($appleTransaction['environment'] ?? '')),
+                    'store_price' => $rawPrice === null ? null : $rawPrice / 1000,
+                    'store_currency' => strtoupper((string) ($appleTransaction['currency'] ?? '')),
+                    'gateway_response' => [
+                        'apple_transaction' => $appleTransaction,
+                    ],
+                ]);
+            }
+
+            WalletService::getOrCreate($user);
+            $wallet = Wallet::query()
+                ->where('user_id', $user->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            return $this->completeSuccessfulOrder(
+                $order,
+                $wallet,
+                $transactionId,
+                ['apple_transaction' => $appleTransaction],
+            );
+        });
+    }
+
+    public function processAppleNotification(string $signedPayload): array
+    {
+        $notification = $this->apple->notification($signedPayload);
+        $appleTransaction = $notification['transaction'] ?? [];
+        $transactionId = trim((string) ($appleTransaction['transactionId'] ?? ''));
+
+        return DB::transaction(function () use ($notification, $appleTransaction, $transactionId) {
+            $order = PaymentOrder::query()
+                ->where('apple_transaction_id', $transactionId)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $order) {
+                return [
+                    'processed' => false,
+                    'reason' => 'order_not_found',
+                ];
+            }
+
+            $notificationUuid = trim((string) ($notification['notification_uuid'] ?? ''));
+            $existingPayload = is_array($order->gateway_response)
+                ? $order->gateway_response
+                : [];
+            $processedUuids = array_values(array_filter(
+                (array) ($existingPayload['apple_notification_uuids'] ?? []),
+            ));
+            if ($notificationUuid !== '' && in_array($notificationUuid, $processedUuids, true)) {
+                return [
+                    'processed' => true,
+                    'reason' => 'already_processed',
+                ];
+            }
+            if ($notificationUuid !== '') {
+                $processedUuids[] = $notificationUuid;
+            }
+
+            $notificationAudit = [
+                'notification_uuid' => $notificationUuid,
+                'notification_type' => $notification['notification_type'] ?? null,
+                'subtype' => $notification['subtype'] ?? null,
+                'received_at' => now()->toIso8601String(),
+                'transaction' => $appleTransaction,
+            ];
+
+            if (empty($appleTransaction['revocationDate'])) {
+                $order->forceFill([
+                    'gateway_response' => array_merge($existingPayload, [
+                        'latest_apple_notification' => $notificationAudit,
+                        'apple_notification_uuids' => $processedUuids,
+                    ]),
+                ])->save();
+
+                return [
+                    'processed' => true,
+                    'reason' => 'no_revocation',
+                ];
+            }
+
+            WalletService::getOrCreate($order->user);
+            $wallet = Wallet::query()
+                ->where('user_id', $order->user_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $existingRefund = WalletTransaction::query()
+                ->where('wallet_id', $wallet->id)
+                ->where('reference_type', 'payment_order_refund')
+                ->where('reference_id', $order->id)
+                ->where('category', 'recharge_refund')
+                ->first();
+
+            $recoveredCoins = (int) ($existingRefund?->coins ?? 0);
+            if (! $existingRefund) {
+                $balanceBefore = (int) $wallet->balance;
+                $recoveredCoins = min($balanceBefore, (int) $order->total_coins);
+                $balanceAfter = $balanceBefore - $recoveredCoins;
+                if ($recoveredCoins > 0) {
+                    $existingRefund = WalletTransaction::query()->create([
+                        'wallet_id' => $wallet->id,
+                        'type' => 'debit',
+                        'coins' => $recoveredCoins,
+                        'amount' => $order->store_price ?? $order->amount_rupees,
+                        'currency' => $order->store_currency ?: 'INR',
+                        'category' => 'recharge_refund',
+                        'reference' => 'payment_order_refund:'.$order->id,
+                        'reference_type' => 'payment_order_refund',
+                        'reference_id' => $order->id,
+                        'transaction_id' => $transactionId,
+                        'gateway' => 'apple_iap',
+                        'description' => 'Apple purchase refunded',
+                        'balance_before' => $balanceBefore,
+                        'balance_after' => $balanceAfter,
+                        'meta' => [
+                            'order_id' => $order->order_id,
+                            'store_product_id' => $order->store_product_id,
+                            'refunded_coins' => (int) $order->total_coins,
+                            'unrecovered_coins' => (int) $order->total_coins - $recoveredCoins,
+                        ],
+                    ]);
+                    $wallet->update(['balance' => $balanceAfter]);
+                }
+            }
+
+            $order->forceFill([
+                'status' => 'refunded',
+                'gateway_response' => array_merge($existingPayload, [
+                    'latest_apple_notification' => $notificationAudit,
+                    'apple_notification_uuids' => $processedUuids,
+                    'apple_refund' => [
+                        'recovered_coins' => $recoveredCoins,
+                        'unrecovered_coins' => (int) $order->total_coins - $recoveredCoins,
+                    ],
+                ]),
+            ])->save();
+
+            return [
+                'processed' => true,
+                'reason' => $existingRefund ? 'refunded' : 'refund_recorded',
+                'recovered_coins' => $recoveredCoins,
+                'unrecovered_coins' => (int) $order->total_coins - $recoveredCoins,
+            ];
+        });
+    }
+
     public function createOrder(User $user, int $planId, ?string $gateway = null): PaymentOrder
     {
-        if (!$this->paymentOrdersAvailable()) {
+        if (! $this->paymentOrdersAvailable()) {
             throw new InvalidArgumentException('Recharge setup is incomplete. Run the latest migrations.');
         }
 
@@ -75,15 +303,15 @@ class RechargeOrderService
             ->where('is_active', true)
             ->first();
 
-        if (!$plan) {
+        if (! $plan) {
             throw new InvalidArgumentException('Recharge plan is unavailable.');
         }
 
         $selectedGateway = $this->resolveGateway($gateway);
-        $appOrderId = self::GD_LIVE_RECEIPT_PREFIX . Str::lower((string) Str::ulid());
+        $appOrderId = self::GD_LIVE_RECEIPT_PREFIX.Str::lower((string) Str::ulid());
 
         if ($selectedGateway === 'razorpay') {
-            if (!$this->paymentOrderGatewayColumnsAvailable()) {
+            if (! $this->paymentOrderGatewayColumnsAvailable()) {
                 throw new InvalidArgumentException('Recharge setup is incomplete. Run the latest migrations.');
             }
 
@@ -133,9 +361,9 @@ class RechargeOrderService
 
     public function verifyOrder(User $user, string $orderId, array $payload = []): array
     {
-        if (!$this->paymentOrdersAvailable()
-            || !$this->rechargeLedgerColumnsAvailable()
-            || !$this->paymentOrderGatewayColumnsAvailable()
+        if (! $this->paymentOrdersAvailable()
+            || ! $this->rechargeLedgerColumnsAvailable()
+            || ! $this->paymentOrderGatewayColumnsAvailable()
         ) {
             throw new InvalidArgumentException('Recharge setup is incomplete. Run the latest migrations.');
         }
@@ -190,7 +418,7 @@ class RechargeOrderService
                 ];
             }
 
-            if (!config('services.mock_payments.enabled', true) && $order->gateway === 'mock') {
+            if (! config('services.mock_payments.enabled', true) && $order->gateway === 'mock') {
                 throw new InvalidArgumentException('Mock payments are disabled.');
             }
 
@@ -229,12 +457,12 @@ class RechargeOrderService
                 'amount' => $order->amount_rupees,
                 'currency' => 'INR',
                 'category' => 'recharge',
-                'reference' => 'payment_order:' . $order->id,
+                'reference' => 'payment_order:'.$order->id,
                 'reference_type' => 'payment_order',
                 'reference_id' => $order->id,
                 'transaction_id' => $gatewayPaymentId,
                 'gateway' => $order->gateway,
-                'description' => 'Recharge ₹' . number_format((float) $order->amount_rupees, 0),
+                'description' => 'Recharge ₹'.number_format((float) $order->amount_rupees, 0),
                 'balance_before' => $balanceBefore,
                 'balance_after' => $balanceAfter,
                 'meta' => [
@@ -264,7 +492,7 @@ class RechargeOrderService
 
     public function ordersFor(User $user)
     {
-        if (!$this->paymentOrdersAvailable()) {
+        if (! $this->paymentOrdersAvailable()) {
             throw new InvalidArgumentException('Recharge setup is incomplete. Run the latest migrations.');
         }
 
@@ -283,10 +511,12 @@ class RechargeOrderService
             ->when($filter && $filter !== 'all', function ($query) use ($filter) {
                 if ($filter === 'earning') {
                     $query->where('type', 'credit')->whereNotIn('category', ['recharge', 'purchase', 'adjustment']);
+
                     return;
                 }
                 if ($filter === 'recharge') {
                     $query->where('category', 'recharge');
+
                     return;
                 }
                 $query->where('type', $filter);
@@ -297,7 +527,7 @@ class RechargeOrderService
 
     public function anomalies(): array
     {
-        if (!$this->paymentOrdersAvailable() || !$this->rechargeLedgerColumnsAvailable()) {
+        if (! $this->paymentOrdersAvailable() || ! $this->rechargeLedgerColumnsAvailable()) {
             return [
                 'payment_success_without_wallet_transaction' => 0,
                 'wallet_transaction_without_payment_order' => 0,
@@ -309,7 +539,7 @@ class RechargeOrderService
         $successfulWithoutTx = PaymentOrder::query()
             ->where('status', 'success')
             ->get()
-            ->filter(fn (PaymentOrder $order) => !WalletTransaction::query()
+            ->filter(fn (PaymentOrder $order) => ! WalletTransaction::query()
                 ->where('reference_type', 'payment_order')
                 ->where('reference_id', $order->id)
                 ->where('category', 'recharge')
@@ -320,7 +550,7 @@ class RechargeOrderService
             ->where('category', 'recharge')
             ->where('reference_type', 'payment_order')
             ->get()
-            ->filter(fn (WalletTransaction $transaction) => !PaymentOrder::query()->whereKey($transaction->reference_id)->exists())
+            ->filter(fn (WalletTransaction $transaction) => ! PaymentOrder::query()->whereKey($transaction->reference_id)->exists())
             ->count();
 
         $duplicates = WalletTransaction::query()
@@ -356,7 +586,7 @@ class RechargeOrderService
 
     public function checkoutPayloadFor(PaymentOrder $order, User $user): ?array
     {
-        if ($order->gateway !== 'razorpay' || !$order->gateway_order_id || !$this->razorpay->configured()) {
+        if ($order->gateway !== 'razorpay' || ! $order->gateway_order_id || ! $this->razorpay->configured()) {
             return null;
         }
 
@@ -393,12 +623,12 @@ class RechargeOrderService
             throw new InvalidArgumentException('Webhook signature is missing.');
         }
 
-        if (!$this->razorpay->verifyWebhookSignature($rawPayload, $signature)) {
+        if (! $this->razorpay->verifyWebhookSignature($rawPayload, $signature)) {
             throw new InvalidArgumentException('Webhook signature verification failed.');
         }
 
         $body = json_decode($rawPayload, true);
-        if (!is_array($body)) {
+        if (! is_array($body)) {
             throw new InvalidArgumentException('Webhook payload is invalid JSON.');
         }
 
@@ -408,7 +638,7 @@ class RechargeOrderService
         $gatewayOrderId = trim((string) (($payment['order_id'] ?? null) ?: ($gatewayOrder['id'] ?? '')));
         $gatewayPaymentId = trim((string) ($payment['id'] ?? ''));
 
-        if (!in_array($event, self::ALLOWED_RAZORPAY_WEBHOOK_EVENTS, true)) {
+        if (! in_array($event, self::ALLOWED_RAZORPAY_WEBHOOK_EVENTS, true)) {
             return [
                 'processed' => false,
                 'reason' => 'event_ignored',
@@ -431,7 +661,7 @@ class RechargeOrderService
                 ->lockForUpdate()
                 ->first();
 
-            if (!$order) {
+            if (! $order) {
                 return [
                     'processed' => false,
                     'reason' => 'order_not_found',
@@ -544,7 +774,7 @@ class RechargeOrderService
 
     public function reconcileGatewayOrders(int $limit = 100): array
     {
-        if (!$this->paymentOrdersAvailable() || !$this->paymentOrderGatewayColumnsAvailable()) {
+        if (! $this->paymentOrdersAvailable() || ! $this->paymentOrderGatewayColumnsAvailable()) {
             throw new InvalidArgumentException('Recharge setup is incomplete. Run the latest migrations.');
         }
 
@@ -622,8 +852,9 @@ class RechargeOrderService
                 });
 
                 $report['processed']++;
-                if (!empty($result['skipped'])) {
+                if (! empty($result['skipped'])) {
                     $report['skipped']++;
+
                     continue;
                 }
 
@@ -648,7 +879,7 @@ class RechargeOrderService
 
     public function reconcileOrder(string $identifier): array
     {
-        if (!$this->paymentOrdersAvailable() || !$this->paymentOrderGatewayColumnsAvailable()) {
+        if (! $this->paymentOrdersAvailable() || ! $this->paymentOrderGatewayColumnsAvailable()) {
             throw new InvalidArgumentException('Recharge setup is incomplete. Run the latest migrations.');
         }
 
@@ -667,7 +898,7 @@ class RechargeOrderService
                 ->lockForUpdate()
                 ->first();
 
-            if (!$order) {
+            if (! $order) {
                 throw new InvalidArgumentException('Recharge order not found.');
             }
 
@@ -780,7 +1011,7 @@ class RechargeOrderService
             throw new InvalidArgumentException('Payment order mismatch.');
         }
 
-        if (!$this->razorpay->verifySignature($gatewayOrderId, $gatewayPaymentId, $gatewaySignature)) {
+        if (! $this->razorpay->verifySignature($gatewayOrderId, $gatewayPaymentId, $gatewaySignature)) {
             $this->persistRazorpayFailure(
                 $order,
                 $wallet,
@@ -975,19 +1206,25 @@ class RechargeOrderService
         $balanceBefore = (int) $wallet->balance;
         $balanceAfter = $balanceBefore + (int) $order->total_coins;
 
+        $currency = $order->store_currency ?: 'INR';
+        $amount = $order->store_price ?? $order->amount_rupees;
+        $description = $order->gateway === 'apple_iap'
+            ? 'Apple In-App Purchase '.$order->store_product_id
+            : 'Recharge ₹'.number_format((float) $order->amount_rupees, 0);
+
         $transaction = WalletTransaction::query()->create([
             'wallet_id' => $wallet->id,
             'type' => 'credit',
             'coins' => (int) $order->total_coins,
-            'amount' => $order->amount_rupees,
-            'currency' => 'INR',
+            'amount' => $amount,
+            'currency' => $currency,
             'category' => 'recharge',
-            'reference' => 'payment_order:' . $order->id,
+            'reference' => 'payment_order:'.$order->id,
             'reference_type' => 'payment_order',
             'reference_id' => $order->id,
             'transaction_id' => $gatewayPaymentId,
             'gateway' => $order->gateway,
-            'description' => 'Recharge ₹' . number_format((float) $order->amount_rupees, 0),
+            'description' => $description,
             'balance_before' => $balanceBefore,
             'balance_after' => $balanceAfter,
             'meta' => [
@@ -995,6 +1232,8 @@ class RechargeOrderService
                 'bonus_coins' => (int) $order->bonus_coins,
                 'order_id' => $order->order_id,
                 'gateway_order_id' => $order->gateway_order_id,
+                'store_product_id' => $order->store_product_id,
+                'store_environment' => $order->store_environment,
             ],
         ]);
 
@@ -1065,11 +1304,30 @@ class RechargeOrderService
     private function mergedGatewayResponse(PaymentOrder $order, array $extra): array
     {
         $existing = $order->gateway_response;
-        if (!is_array($existing)) {
+        if (! is_array($existing)) {
             $existing = [];
         }
 
         return array_merge($existing, $extra);
+    }
+
+    private function appleAccountToken(User $user): string
+    {
+        $namespace = hex2bin('6ba7b8119dad11d180b400c04fd430c8');
+        $hash = sha1($namespace.'com.techybugs.gdlive:user:'.$user->id, true);
+        $bytes = array_values(unpack('C16', substr($hash, 0, 16)));
+        $bytes[6] = ($bytes[6] & 0x0F) | 0x50;
+        $bytes[8] = ($bytes[8] & 0x3F) | 0x80;
+        $hex = implode('', array_map(fn (int $byte) => sprintf('%02x', $byte), $bytes));
+
+        return sprintf(
+            '%s-%s-%s-%s-%s',
+            substr($hex, 0, 8),
+            substr($hex, 8, 4),
+            substr($hex, 12, 4),
+            substr($hex, 16, 4),
+            substr($hex, 20, 12),
+        );
     }
 
     private function amountInSubunits(mixed $amountRupees): int
@@ -1082,16 +1340,18 @@ class RechargeOrderService
         $normalized = strtolower(trim((string) $gateway));
         if ($normalized !== '') {
             if ($normalized === 'razorpay') {
-                if (!$this->razorpay->configured()) {
+                if (! $this->razorpay->configured()) {
                     throw new InvalidArgumentException('Razorpay is not configured.');
                 }
+
                 return 'razorpay';
             }
 
             if ($normalized === 'mock') {
-                if (!config('services.mock_payments.enabled', false)) {
+                if (! config('services.mock_payments.enabled', false)) {
                     throw new InvalidArgumentException('Mock payments are disabled.');
                 }
+
                 return 'mock';
             }
 
@@ -1122,7 +1382,7 @@ class RechargeOrderService
     {
         $receipt = strtolower(trim((string) ($gatewayOrder['receipt'] ?? '')));
         if ($receipt !== '') {
-            if (!str_starts_with($receipt, self::GD_LIVE_RECEIPT_PREFIX)) {
+            if (! str_starts_with($receipt, self::GD_LIVE_RECEIPT_PREFIX)) {
                 return false;
             }
         }
@@ -1137,7 +1397,7 @@ class RechargeOrderService
 
         $appSlug = strtolower(trim((string) ($notes['app_slug'] ?? '')));
         if ($appSlug !== '') {
-            if (!in_array($appSlug, [self::GD_LIVE_APP_SLUG, self::GD_LIVE_APP_CODE], true)) {
+            if (! in_array($appSlug, [self::GD_LIVE_APP_SLUG, self::GD_LIVE_APP_CODE], true)) {
                 return false;
             }
         }
@@ -1155,7 +1415,7 @@ class RechargeOrderService
         if (is_array($localCreateOrder)) {
             $localReceipt = strtolower(trim((string) ($localCreateOrder['receipt'] ?? '')));
             if ($localReceipt !== '') {
-                if (!str_starts_with($localReceipt, self::GD_LIVE_RECEIPT_PREFIX)) {
+                if (! str_starts_with($localReceipt, self::GD_LIVE_RECEIPT_PREFIX)) {
                     return false;
                 }
             }
@@ -1170,7 +1430,7 @@ class RechargeOrderService
 
             $localAppSlug = strtolower(trim((string) ($localNotes['app_slug'] ?? '')));
             if ($localAppSlug !== '') {
-                if (!in_array($localAppSlug, [self::GD_LIVE_APP_SLUG, self::GD_LIVE_APP_CODE], true)) {
+                if (! in_array($localAppSlug, [self::GD_LIVE_APP_SLUG, self::GD_LIVE_APP_CODE], true)) {
                     return false;
                 }
             }

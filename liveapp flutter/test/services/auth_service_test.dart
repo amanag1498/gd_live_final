@@ -29,4 +29,19 @@ void main() {
       isFalse,
     );
   });
+
+  test('recognizes Apple sign-in cancellation without showing an error', () {
+    expect(isAppleSignInCancellation('web-context-canceled', null), isTrue);
+    expect(
+      isAppleSignInCancellation(
+        'unknown',
+        'The operation was cancelled by the user',
+      ),
+      isTrue,
+    );
+    expect(
+      isAppleSignInCancellation('operation-not-allowed', 'Provider disabled'),
+      isFalse,
+    );
+  });
 }

@@ -58,7 +58,9 @@ import '../../services/live_eligibility_service.dart'; // 👈 add
 import '../../services/meta_attribution_service.dart';
 import '../../services/push_service.dart';
 import '../../modules/wallet/services/wallet_api.dart';
+import '../../modules/wallet/services/apple_in_app_purchase_service.dart';
 import '../../modules/wallet/services/razorpay_checkout_service.dart';
+import '../../modules/wallet/services/recharge_payment_platform.dart';
 import '../../modules/wallet/views/wallet_history_page.dart';
 
 import '../middleware/auth_middleware.dart';
@@ -100,13 +102,25 @@ class AppPages {
     Get.put<ProfileApi>(ProfileApi(api), permanent: true);
     Get.put<HostFollowApi>(HostFollowApi(api), permanent: true);
     Get.put<ApplicationsApi>(ApplicationsApi(api), permanent: true);
-    Get.put<WalletApi>(WalletApi(api), permanent: true);
+    final walletApi = Get.put<WalletApi>(WalletApi(api), permanent: true);
     Get.put<TeenPattiApi>(TeenPattiApi(api), permanent: true);
     Get.put<GreedyApi>(GreedyApi(api), permanent: true);
-    Get.put<RazorpayCheckoutService>(
-      RazorpayCheckoutService(),
-      permanent: true,
-    );
+    if (rechargePaymentProviderFor(AppSettingsService.clientPlatform) ==
+        RechargePaymentProvider.appleInAppPurchase) {
+      final applePurchases = Get.put<AppleInAppPurchaseService>(
+        AppleInAppPurchaseService(
+          walletApi: walletApi,
+          authService: authService,
+        ),
+        permanent: true,
+      );
+      unawaited(applePurchases.initialize());
+    } else {
+      Get.put<RazorpayCheckoutService>(
+        RazorpayCheckoutService(),
+        permanent: true,
+      );
+    }
     Get.put<EntryPackApi>(EntryPackApi(api), permanent: true);
     Get.put<DashboardApi>(DashboardApi(api), permanent: true);
     Get.put<BannerService>(

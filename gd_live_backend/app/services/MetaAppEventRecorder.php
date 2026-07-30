@@ -18,7 +18,7 @@ class MetaAppEventRecorder
         array $attributes = [],
         ?Request $request = null,
     ): ?MetaAppEvent {
-        if (!$this->schemaReady()) {
+        if (! $this->schemaReady()) {
             return null;
         }
 
@@ -46,7 +46,7 @@ class MetaAppEventRecorder
 
     public function recordVerifiedPurchase(PaymentOrder $order, ?Request $request = null): ?MetaAppEvent
     {
-        if (!$this->schemaReady()) {
+        if (! $this->schemaReady()) {
             return null;
         }
 
@@ -55,8 +55,8 @@ class MetaAppEventRecorder
             'event_id' => (string) Str::uuid(),
             'event_name' => 'purchase',
             'source' => 'server',
-            'value' => $order->amount_rupees,
-            'currency' => 'INR',
+            'value' => $order->store_price ?? $order->amount_rupees,
+            'currency' => $order->store_currency ?: 'INR',
             'properties' => [
                 'order_id' => $order->order_id,
                 'gateway' => $order->gateway,
@@ -72,7 +72,7 @@ class MetaAppEventRecorder
     {
         $ready = Schema::hasTable('meta_app_events');
 
-        if (!$ready) {
+        if (! $ready) {
             Log::warning('META_APP_EVENTS_TABLE_MISSING', [
                 'action' => 'Run php artisan migrate --force',
             ]);

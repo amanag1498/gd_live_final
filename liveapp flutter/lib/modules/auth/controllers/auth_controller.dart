@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart'; // 👈 add this
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../app/widgets/logout_and_blocked_dialog.dart';
 import '../../../data/models/user_model.dart';
@@ -14,6 +15,7 @@ class AuthController extends GetxController {
 
   final Rxn<UserModel> user = Rxn<UserModel>();
   final RxBool loading = false.obs;
+  final RxString activeProvider = ''.obs;
   final RxString error = ''.obs;
 
   bool get isLoggedIn => auth.isLoggedIn;
@@ -27,15 +29,20 @@ class AuthController extends GetxController {
   }
 
   Future<void> loginWithGoogle() async {
-    await _login(auth.signInWithGoogleAndBackend);
+    await _login('google', auth.signInWithGoogleAndBackend);
   }
 
   Future<void> loginWithApple() async {
-    await _login(auth.signInWithAppleAndBackend);
+    await _login('apple', auth.signInWithAppleAndBackend);
   }
 
-  Future<void> _login(Future<UserModel> Function() signIn) async {
+  Future<void> _login(
+    String provider,
+    Future<UserModel> Function() signIn,
+  ) async {
+    if (loading.value) return;
     loading.value = true;
+    activeProvider.value = provider;
     error.value = '';
     try {
       final u = await signIn();
@@ -50,8 +57,10 @@ class AuthController extends GetxController {
         await Get.find<LiveRoomsController>().refreshForCurrentAuth();
       }
       Get.offAllNamed(Routes.home);
+    } on AuthSignInCancelledException {
+      error.value = '';
     } catch (e) {
-      final msg = e.toString();
+      final msg = friendlyAuthError(e);
       error.value = msg;
 
       // Use the branded blocked dialog when the user is blocked
@@ -62,11 +71,11 @@ class AuthController extends GetxController {
           builder: (_) => const BlockedDialog(),
         );
       } else {
-        print(msg);
-        //_showErrorSnack(msg);
+        debugPrint('[auth] sign-in failed: $msg');
       }
     } finally {
       loading.value = false;
+      activeProvider.value = '';
     }
   }
 
@@ -97,4 +106,12 @@ class AuthController extends GetxController {
       duration: const Duration(seconds: 4),
     );
   }
+}
+
+@visibleForTesting
+String friendlyAuthError(Object error) {
+  final message = error.toString().trim();
+  return message
+      .replaceFirst(RegExp(r'^Exception:\s*'), '')
+      .replaceFirst(RegExp(r'^FirebaseAuthException:\s*'), '');
 }

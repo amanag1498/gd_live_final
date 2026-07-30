@@ -23,6 +23,7 @@ class _WalletHistoryPageState extends State<WalletHistoryPage> {
     'completed',
     'pending',
     'failed',
+    'refunded',
   ];
 
   String _selectedOrderFilter = 'all';
@@ -321,6 +322,7 @@ class _WalletHistoryPageState extends State<WalletHistoryPage> {
     if (value == 'paid' || value == 'completed' || value == 'success')
       return 'completed';
     if (value == 'failed' || value == 'failure') return 'failed';
+    if (value == 'refunded' || value == 'revoked') return 'refunded';
     return 'pending';
   }
 
@@ -329,6 +331,7 @@ class _WalletHistoryPageState extends State<WalletHistoryPage> {
       'completed' => 'Completed',
       'pending' => 'Pending',
       'failed' => 'Failed',
+      'refunded' => 'Refunded',
       _ => 'All',
     };
   }
@@ -348,9 +351,11 @@ class _RechargeHero extends StatelessWidget {
           _WalletHistoryPageState._normalizedStatus(order.status) ==
           'completed',
     );
+    final currencies =
+        successfulOrders.map((order) => order.storeCurrency ?? 'INR').toSet();
     final totalSpent = successfulOrders.fold<num>(
       0,
-      (sum, order) => sum + order.amountRupees,
+      (sum, order) => sum + (order.storePrice ?? order.amountRupees),
     );
     final totalCoins = successfulOrders.fold<int>(
       0,
@@ -402,7 +407,10 @@ class _RechargeHero extends StatelessWidget {
               Expanded(
                 child: _HeadlineMetric(
                   label: 'Recharge spent',
-                  value: '₹${_formatAmount(totalSpent)}',
+                  value:
+                      currencies.length == 1
+                          ? _formatMoney(totalSpent, currencies.first)
+                          : 'Multiple',
                 ),
               ),
               const SizedBox(width: 10),
@@ -430,6 +438,14 @@ class _RechargeHero extends StatelessWidget {
   static String _formatAmount(num value) {
     if (value == value.roundToDouble()) return value.toInt().toString();
     return value.toStringAsFixed(2);
+  }
+
+  static String _formatMoney(num value, String currency) {
+    try {
+      return NumberFormat.simpleCurrency(name: currency).format(value);
+    } catch (_) {
+      return '$currency ${_formatAmount(value)}';
+    }
   }
 }
 
@@ -552,6 +568,7 @@ class _RechargeOrderCard extends StatelessWidget {
     final accent = switch (normalizedStatus) {
       'completed' => const Color(0xFF55D38A),
       'failed' => const Color(0xFFFF6B7A),
+      'refunded' => const Color(0xFFFFA94D),
       _ => kGdLiveGold,
     };
     final totalCoins = order.totalCoins;
@@ -606,7 +623,7 @@ class _RechargeOrderCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '₹${_RechargeHero._formatAmount(order.amountRupees)} • $totalCoins coins',
+                      '${_RechargeHero._formatMoney(order.storePrice ?? order.amountRupees, order.storeCurrency ?? 'INR')} • $totalCoins coins',
                       style: TextStyle(
                         color: tokens.textSecondary.withValues(alpha: .78),
                         fontWeight: FontWeight.w600,

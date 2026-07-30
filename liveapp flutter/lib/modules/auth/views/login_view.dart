@@ -86,6 +86,8 @@ class _GdLoginView extends GetView<AuthController> {
                           constraints: const BoxConstraints(maxWidth: 620),
                           child: Obx(() {
                             final loading = controller.loading.value;
+                            final activeProvider =
+                                controller.activeProvider.value;
                             final error = controller.error.value.trim();
 
                             return Column(
@@ -121,12 +123,14 @@ class _GdLoginView extends GetView<AuthController> {
                                 _SignInDock(
                                   tokens: tokens,
                                   loading: loading,
+                                  activeProvider: activeProvider,
                                   error: error,
                                   onGooglePressed: controller.loginWithGoogle,
                                   onApplePressed:
-                                      !kIsWeb &&
-                                              defaultTargetPlatform ==
-                                                  TargetPlatform.iOS
+                                      shouldOfferAppleSignIn(
+                                            isWeb: kIsWeb,
+                                            platform: defaultTargetPlatform,
+                                          )
                                           ? controller.loginWithApple
                                           : null,
                                 ),
@@ -151,6 +155,7 @@ class _SignInDock extends StatelessWidget {
   const _SignInDock({
     required this.tokens,
     required this.loading,
+    required this.activeProvider,
     required this.error,
     required this.onGooglePressed,
     this.onApplePressed,
@@ -158,6 +163,7 @@ class _SignInDock extends StatelessWidget {
 
   final BrandTokens tokens;
   final bool loading;
+  final String activeProvider;
   final String error;
   final VoidCallback onGooglePressed;
   final VoidCallback? onApplePressed;
@@ -178,16 +184,22 @@ class _SignInDock extends StatelessWidget {
         ],
         _AuthButton(
           label: 'Sign in with Google',
-          loading: loading,
+          loading: loading && activeProvider == 'google',
+          enabled: !loading,
           onPressed: onGooglePressed,
           tokens: tokens,
-          leading: Image.asset('assets/logos/google-icon.png'),
+          leading: Image.asset(
+            'assets/logos/google-icon.png',
+            width: 22,
+            height: 22,
+          ),
         ),
         if (onApplePressed != null) ...[
           const SizedBox(height: 12),
           _AuthButton(
             label: 'Sign in with Apple',
-            loading: loading,
+            loading: loading && activeProvider == 'apple',
+            enabled: !loading,
             onPressed: onApplePressed!,
             tokens: tokens,
             dark: true,
@@ -203,6 +215,7 @@ class _AuthButton extends StatelessWidget {
   const _AuthButton({
     required this.label,
     required this.loading,
+    required this.enabled,
     required this.onPressed,
     required this.tokens,
     required this.leading,
@@ -211,6 +224,7 @@ class _AuthButton extends StatelessWidget {
 
   final String label;
   final bool loading;
+  final bool enabled;
   final VoidCallback onPressed;
   final BrandTokens tokens;
   final Widget leading;
@@ -218,73 +232,81 @@ class _AuthButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 58,
-      decoration: BoxDecoration(
-        color: dark ? Colors.black : Colors.white.withOpacity(.86),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: tokens.borderColor.withOpacity(.34)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(.03),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: TextButton(
-        onPressed: loading ? null : onPressed,
-        style: TextButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          foregroundColor: dark ? Colors.white : tokens.textPrimary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 18),
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 160),
+      opacity: enabled || loading ? 1 : .52,
+      child: Container(
+        height: 58,
+        decoration: BoxDecoration(
+          color: dark ? Colors.black : Colors.white.withOpacity(.86),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: tokens.borderColor.withOpacity(.34)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(.03),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
-        child:
-            loading
-                ? SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.4,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      tokens.primaryButtonGradient.first,
+        child: TextButton(
+          onPressed: enabled ? onPressed : null,
+          style: TextButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            foregroundColor: dark ? Colors.white : tokens.textPrimary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+          ),
+          child:
+              loading
+                  ? SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.4,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        dark
+                            ? Colors.white
+                            : tokens.primaryButtonGradient.first,
+                      ),
                     ),
-                  ),
-                )
-                : Row(
-                  children: [
-                    SizedBox(
-                      width: 32,
-                      height: 32,
-                      child: Center(child: leading),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Text(
+                  )
+                  : Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: Center(child: leading),
+                        ),
+                      ),
+                      Text(
                         label,
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           color: dark ? Colors.white : tokens.textPrimary,
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      size: 20,
-                      color:
-                          dark
-                              ? Colors.white.withOpacity(.7)
-                              : tokens.textSecondary,
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+        ),
       ),
     );
   }
+}
+
+@visibleForTesting
+bool shouldOfferAppleSignIn({
+  required bool isWeb,
+  required TargetPlatform platform,
+}) {
+  return !isWeb && platform == TargetPlatform.iOS;
 }
 
 class _ErrorBanner extends StatelessWidget {
