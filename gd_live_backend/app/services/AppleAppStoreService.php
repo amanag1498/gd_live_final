@@ -10,9 +10,9 @@ use RuntimeException;
 
 class AppleAppStoreService
 {
-    private const PRODUCTION_URL = 'https://api.storekit.itunes.apple.com';
+    private const PRODUCTION_URL = 'https://api.storekit.apple.com';
 
-    private const SANDBOX_URL = 'https://api.storekit-sandbox.itunes.apple.com';
+    private const SANDBOX_URL = 'https://api.storekit-sandbox.apple.com';
 
     public function configured(): bool
     {

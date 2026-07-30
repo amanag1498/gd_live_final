@@ -212,6 +212,24 @@ class RechargeOrderService
                 'received_at' => now()->toIso8601String(),
                 'transaction' => $appleTransaction,
             ];
+            $notificationType = strtoupper(trim((string) ($notification['notification_type'] ?? '')));
+
+            WalletService::getOrCreate($order->user);
+            $wallet = Wallet::query()
+                ->where('user_id', $order->user_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($notificationType === 'REFUND_REVERSED') {
+                return $this->reverseAppleRefund(
+                    $order,
+                    $wallet,
+                    $transactionId,
+                    $notificationAudit,
+                    $processedUuids,
+                    $existingPayload,
+                );
+            }
 
             if (empty($appleTransaction['revocationDate'])) {
                 $order->forceFill([
@@ -227,11 +245,6 @@ class RechargeOrderService
                 ];
             }
 
-            WalletService::getOrCreate($order->user);
-            $wallet = Wallet::query()
-                ->where('user_id', $order->user_id)
-                ->lockForUpdate()
-                ->firstOrFail();
             $existingRefund = WalletTransaction::query()
                 ->where('wallet_id', $wallet->id)
                 ->where('reference_type', 'payment_order_refund')
@@ -239,57 +252,148 @@ class RechargeOrderService
                 ->where('category', 'recharge_refund')
                 ->first();
 
+            $revocationPercentage = max(
+                1,
+                min(100000, (int) ($appleTransaction['revocationPercentage'] ?? 100000)),
+            );
+            $refundedCoins = (int) ceil(
+                ((int) $order->total_coins * $revocationPercentage) / 100000,
+            );
             $recoveredCoins = (int) ($existingRefund?->coins ?? 0);
             if (! $existingRefund) {
                 $balanceBefore = (int) $wallet->balance;
-                $recoveredCoins = min($balanceBefore, (int) $order->total_coins);
+                $recoveredCoins = min($balanceBefore, $refundedCoins);
                 $balanceAfter = $balanceBefore - $recoveredCoins;
+                $existingRefund = WalletTransaction::query()->create([
+                    'wallet_id' => $wallet->id,
+                    'type' => 'debit',
+                    'coins' => $recoveredCoins,
+                    'amount' => $order->store_price ?? $order->amount_rupees,
+                    'currency' => $order->store_currency ?: 'INR',
+                    'category' => 'recharge_refund',
+                    'reference' => 'payment_order_refund:'.$order->id,
+                    'reference_type' => 'payment_order_refund',
+                    'reference_id' => $order->id,
+                    'transaction_id' => $transactionId,
+                    'gateway' => 'apple_iap',
+                    'description' => 'Apple purchase refunded',
+                    'balance_before' => $balanceBefore,
+                    'balance_after' => $balanceAfter,
+                    'meta' => [
+                        'order_id' => $order->order_id,
+                        'store_product_id' => $order->store_product_id,
+                        'revocation_percentage' => $revocationPercentage,
+                        'refunded_coins' => $refundedCoins,
+                        'unrecovered_coins' => $refundedCoins - $recoveredCoins,
+                    ],
+                ]);
                 if ($recoveredCoins > 0) {
-                    $existingRefund = WalletTransaction::query()->create([
-                        'wallet_id' => $wallet->id,
-                        'type' => 'debit',
-                        'coins' => $recoveredCoins,
-                        'amount' => $order->store_price ?? $order->amount_rupees,
-                        'currency' => $order->store_currency ?: 'INR',
-                        'category' => 'recharge_refund',
-                        'reference' => 'payment_order_refund:'.$order->id,
-                        'reference_type' => 'payment_order_refund',
-                        'reference_id' => $order->id,
-                        'transaction_id' => $transactionId,
-                        'gateway' => 'apple_iap',
-                        'description' => 'Apple purchase refunded',
-                        'balance_before' => $balanceBefore,
-                        'balance_after' => $balanceAfter,
-                        'meta' => [
-                            'order_id' => $order->order_id,
-                            'store_product_id' => $order->store_product_id,
-                            'refunded_coins' => (int) $order->total_coins,
-                            'unrecovered_coins' => (int) $order->total_coins - $recoveredCoins,
-                        ],
-                    ]);
                     $wallet->update(['balance' => $balanceAfter]);
                 }
             }
 
             $order->forceFill([
-                'status' => 'refunded',
+                'status' => $revocationPercentage < 100000
+                    ? 'partially_refunded'
+                    : 'refunded',
                 'gateway_response' => array_merge($existingPayload, [
                     'latest_apple_notification' => $notificationAudit,
                     'apple_notification_uuids' => $processedUuids,
                     'apple_refund' => [
+                        'revocation_percentage' => $revocationPercentage,
+                        'refunded_coins' => $refundedCoins,
                         'recovered_coins' => $recoveredCoins,
-                        'unrecovered_coins' => (int) $order->total_coins - $recoveredCoins,
+                        'unrecovered_coins' => $refundedCoins - $recoveredCoins,
                     ],
                 ]),
             ])->save();
 
             return [
                 'processed' => true,
-                'reason' => $existingRefund ? 'refunded' : 'refund_recorded',
+                'reason' => 'refunded',
+                'refunded_coins' => $refundedCoins,
                 'recovered_coins' => $recoveredCoins,
-                'unrecovered_coins' => (int) $order->total_coins - $recoveredCoins,
+                'unrecovered_coins' => $refundedCoins - $recoveredCoins,
             ];
         });
+    }
+
+    /**
+     * Reinstate only coins actually recovered when Apple reverses a refund.
+     *
+     * @param  array<string, mixed>  $notificationAudit
+     * @param  array<int, string>  $processedUuids
+     * @param  array<string, mixed>  $existingPayload
+     * @return array<string, mixed>
+     */
+    private function reverseAppleRefund(
+        PaymentOrder $order,
+        Wallet $wallet,
+        string $transactionId,
+        array $notificationAudit,
+        array $processedUuids,
+        array $existingPayload,
+    ): array {
+        $refund = WalletTransaction::query()
+            ->where('wallet_id', $wallet->id)
+            ->where('reference_type', 'payment_order_refund')
+            ->where('reference_id', $order->id)
+            ->where('category', 'recharge_refund')
+            ->first();
+        $reversal = WalletTransaction::query()
+            ->where('wallet_id', $wallet->id)
+            ->where('reference_type', 'payment_order_refund_reversal')
+            ->where('reference_id', $order->id)
+            ->where('category', 'recharge_refund_reversal')
+            ->first();
+        $restoredCoins = (int) ($reversal?->coins ?? 0);
+
+        if ($refund && ! $reversal) {
+            $restoredCoins = (int) $refund->coins;
+            $balanceBefore = (int) $wallet->balance;
+            $balanceAfter = $balanceBefore + $restoredCoins;
+            WalletTransaction::query()->create([
+                'wallet_id' => $wallet->id,
+                'type' => 'credit',
+                'coins' => $restoredCoins,
+                'amount' => $order->store_price ?? $order->amount_rupees,
+                'currency' => $order->store_currency ?: 'INR',
+                'category' => 'recharge_refund_reversal',
+                'reference' => 'payment_order_refund_reversal:'.$order->id,
+                'reference_type' => 'payment_order_refund_reversal',
+                'reference_id' => $order->id,
+                'transaction_id' => $transactionId,
+                'gateway' => 'apple_iap',
+                'description' => 'Apple purchase refund reversed',
+                'balance_before' => $balanceBefore,
+                'balance_after' => $balanceAfter,
+                'meta' => [
+                    'order_id' => $order->order_id,
+                    'store_product_id' => $order->store_product_id,
+                    'restored_coins' => $restoredCoins,
+                ],
+            ]);
+            if ($restoredCoins > 0) {
+                $wallet->update(['balance' => $balanceAfter]);
+            }
+        }
+
+        $order->forceFill([
+            'status' => 'success',
+            'gateway_response' => array_merge($existingPayload, [
+                'latest_apple_notification' => $notificationAudit,
+                'apple_notification_uuids' => $processedUuids,
+                'apple_refund_reversal' => [
+                    'restored_coins' => $restoredCoins,
+                ],
+            ]),
+        ])->save();
+
+        return [
+            'processed' => true,
+            'reason' => $reversal ? 'already_reversed' : 'refund_reversed',
+            'restored_coins' => $restoredCoins,
+        ];
     }
 
     public function createOrder(User $user, int $planId, ?string $gateway = null): PaymentOrder

@@ -203,6 +203,161 @@ class AppleInAppPurchaseApiTest extends TestCase
             'balance_after' => 0,
         ]);
         $this->assertDatabaseCount('wallet_transactions', 2);
+        $this->assertSame(0, (int) $user->fresh()->lifetime_spend_coins);
+    }
+
+    public function test_apple_partial_refund_reversal_restores_only_recovered_coins(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('user');
+        Sanctum::actingAs($user);
+        $plan = RechargePlan::query()->orderBy('sort_order')->firstOrFail();
+        $transactionId = '2000000999000016';
+        $this->fakeAppleTransaction($user, $plan, $transactionId);
+
+        $this->withHeader('X-Client-Platform', 'ios')
+            ->postJson('/api/recharge/apple/verify', [
+                'product_id' => $plan->apple_product_id,
+                'transaction_id' => $transactionId,
+            ])
+            ->assertOk();
+
+        $refund = [
+            'notification_uuid' => 'notification-partial-refund',
+            'notification_type' => 'REFUND',
+            'subtype' => null,
+            'transaction' => [
+                'transactionId' => $transactionId,
+                'bundleId' => 'com.techybugs.gdlive',
+                'productId' => $plan->apple_product_id,
+                'type' => 'CONSUMABLE',
+                'environment' => 'Sandbox',
+                'appAccountToken' => $this->accountToken($user),
+                'revocationDate' => now()->getTimestampMs(),
+                'revocationPercentage' => 50000,
+            ],
+        ];
+        $reversal = [
+            'notification_uuid' => 'notification-refund-reversed',
+            'notification_type' => 'REFUND_REVERSED',
+            'subtype' => null,
+            'transaction' => [
+                'transactionId' => $transactionId,
+                'bundleId' => 'com.techybugs.gdlive',
+                'productId' => $plan->apple_product_id,
+                'type' => 'CONSUMABLE',
+                'environment' => 'Sandbox',
+                'appAccountToken' => $this->accountToken($user),
+            ],
+        ];
+        $apple = Mockery::mock(AppleAppStoreService::class);
+        $apple->shouldReceive('notification')
+            ->twice()
+            ->with('signed-notification')
+            ->andReturn($refund, $reversal);
+        $this->app->instance(AppleAppStoreService::class, $apple);
+
+        $this->postJson('/api/payments/apple/notifications', [
+            'signedPayload' => 'signed-notification',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.refunded_coins', 250)
+            ->assertJsonPath('data.recovered_coins', 250);
+
+        $this->assertDatabaseHas('payment_orders', [
+            'apple_transaction_id' => $transactionId,
+            'status' => 'partially_refunded',
+        ]);
+
+        $this->postJson('/api/payments/apple/notifications', [
+            'signedPayload' => 'signed-notification',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.reason', 'refund_reversed')
+            ->assertJsonPath('data.restored_coins', 250);
+
+        $this->assertSame(
+            500,
+            (int) Wallet::query()->where('user_id', $user->id)->value('balance'),
+        );
+        $this->assertDatabaseHas('payment_orders', [
+            'apple_transaction_id' => $transactionId,
+            'status' => 'success',
+        ]);
+        $this->assertDatabaseHas('wallet_transactions', [
+            'category' => 'recharge_refund_reversal',
+            'reference_type' => 'payment_order_refund_reversal',
+            'coins' => 250,
+        ]);
+    }
+
+    public function test_zero_balance_refund_is_recorded_and_cannot_debit_later_coins(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('user');
+        Sanctum::actingAs($user);
+        $plan = RechargePlan::query()->orderBy('sort_order')->firstOrFail();
+        $transactionId = '2000000999000017';
+        $this->fakeAppleTransaction($user, $plan, $transactionId);
+
+        $this->withHeader('X-Client-Platform', 'ios')
+            ->postJson('/api/recharge/apple/verify', [
+                'product_id' => $plan->apple_product_id,
+                'transaction_id' => $transactionId,
+            ])
+            ->assertOk();
+
+        Wallet::query()->where('user_id', $user->id)->update(['balance' => 0]);
+        $notification = [
+            'notification_uuid' => 'notification-zero-refund-1',
+            'notification_type' => 'REFUND',
+            'subtype' => null,
+            'transaction' => [
+                'transactionId' => $transactionId,
+                'bundleId' => 'com.techybugs.gdlive',
+                'productId' => $plan->apple_product_id,
+                'type' => 'CONSUMABLE',
+                'environment' => 'Sandbox',
+                'appAccountToken' => $this->accountToken($user),
+                'revocationDate' => now()->getTimestampMs(),
+            ],
+        ];
+        $apple = Mockery::mock(AppleAppStoreService::class);
+        $apple->shouldReceive('notification')
+            ->twice()
+            ->with('signed-notification')
+            ->andReturnUsing(function () use (&$notification) {
+                $result = $notification;
+                $notification['notification_uuid'] = 'notification-zero-refund-2';
+
+                return $result;
+            });
+        $this->app->instance(AppleAppStoreService::class, $apple);
+
+        $this->postJson('/api/payments/apple/notifications', [
+            'signedPayload' => 'signed-notification',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.recovered_coins', 0)
+            ->assertJsonPath('data.unrecovered_coins', 500);
+
+        Wallet::query()->where('user_id', $user->id)->update(['balance' => 100]);
+
+        $this->postJson('/api/payments/apple/notifications', [
+            'signedPayload' => 'signed-notification',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.recovered_coins', 0);
+
+        $this->assertSame(
+            100,
+            (int) Wallet::query()->where('user_id', $user->id)->value('balance'),
+        );
+        $this->assertDatabaseHas('wallet_transactions', [
+            'category' => 'recharge_refund',
+            'reference_type' => 'payment_order_refund',
+            'coins' => 0,
+        ]);
     }
 
     private function fakeAppleTransaction(

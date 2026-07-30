@@ -7,8 +7,8 @@ use App\Models\User;
 use App\Models\UserLevel;
 use App\Models\UserLevelHistory;
 use App\Models\WalletTransaction;
-use Illuminate\Support\Collection;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class UserLevelService
@@ -26,6 +26,7 @@ class UserLevelService
         'gift_earning',
         'gift_agency_earning',
         'game_bet_debit',
+        'recharge_refund',
         'adjustment',
     ];
 
@@ -53,7 +54,7 @@ class UserLevelService
                 ->lockForUpdate()
                 ->find($transactionId);
 
-            if (!$walletTransaction || !$walletTransaction->wallet || !$this->isSpendTransaction($walletTransaction)) {
+            if (! $walletTransaction || ! $walletTransaction->wallet || ! $this->isSpendTransaction($walletTransaction)) {
                 return null;
             }
 
@@ -62,7 +63,7 @@ class UserLevelService
                 ->lockForUpdate()
                 ->find($walletTransaction->wallet->user_id);
 
-            if (!$user) {
+            if (! $user) {
                 return null;
             }
 
@@ -89,7 +90,7 @@ class UserLevelService
                 ]);
             } catch (QueryException $e) {
                 $sqlCode = (string) ($e->errorInfo[1] ?? $e->getCode());
-                if (!in_array($sqlCode, ['19', '1062', '1555', '2067'], true)) {
+                if (! in_array($sqlCode, ['19', '1062', '1555', '2067'], true)) {
                     throw $e;
                 }
 
@@ -264,8 +265,9 @@ class UserLevelService
                 'changed' => $changed,
             ];
 
-            if (!$changed && !$dryRun) {
+            if (! $changed && ! $dryRun) {
                 $this->syncSpendEvents($user, $spendTransactions, $spendIds);
+
                 continue;
             }
 
@@ -298,7 +300,7 @@ class UserLevelService
                         'triggered_by_transaction_id' => $spendTransactions->last()?->id,
                     ]);
 
-                    if (!$oldLevel || (int) $newLevel->level > (int) $oldLevel->level) {
+                    if (! $oldLevel || (int) $newLevel->level > (int) $oldLevel->level) {
                         $this->emitLevelUpRealtime(
                             $lockedUser->fresh('level'),
                             $newLevel,
@@ -371,5 +373,4 @@ class UserLevelService
             // Realtime level-up feedback must never block wallet progression.
         }
     }
-
 }
