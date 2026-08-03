@@ -195,6 +195,44 @@ class AgencyPayoutReportTest extends TestCase
         $this->assertSame(0, (int) data_get($currentReport->meta, 'totals.video_room_minutes'));
     }
 
+    public function test_report_items_are_ordered_by_user_id_instead_of_host_id(): void
+    {
+        $owner = User::factory()->create();
+        $agency = Agency::query()->create([
+            'owner_user_id' => $owner->id,
+            'name' => 'Ordering Agency',
+        ]);
+        $lowerUser = User::factory()->create();
+        $higherUser = User::factory()->create();
+
+        $lowerHostId = Host::query()->create([
+            'user_id' => $higherUser->id,
+            'agency_id' => $agency->id,
+            'stage_name' => 'Higher User ID',
+        ]);
+        $higherHostId = Host::query()->create([
+            'user_id' => $lowerUser->id,
+            'agency_id' => $agency->id,
+            'stage_name' => 'Lower User ID',
+        ]);
+
+        $report = AgencyPayoutReport::query()->create([
+            'agency_id' => $agency->id,
+            'period_start' => '2026-04-21 00:00:00',
+            'period_end' => '2026-04-27 23:59:59',
+        ]);
+        $report->items()->create(['host_id' => $lowerHostId->id]);
+        $report->items()->create(['host_id' => $higherHostId->id]);
+
+        $orderedItems = $report->fresh()->items()->with('host')->get();
+
+        $this->assertGreaterThan($lowerHostId->id, $higherHostId->id);
+        $this->assertSame(
+            [$lowerUser->id, $higherUser->id],
+            $orderedItems->map(fn ($item) => $item->host->user_id)->all(),
+        );
+    }
+
     public function test_amounts_cannot_be_modified_after_approval(): void
     {
         [$agency] = $this->seedAgencyFixture();
@@ -284,8 +322,8 @@ class AgencyPayoutReportTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.agency-payout-reports.show', $report))
             ->assertOk()
-            ->assertSee('Host ID / Host')
-            ->assertSee('#'.$host->id.' ·', false)
+            ->assertSee('User ID / Host')
+            ->assertSee('#'.$host->user_id.' ·', false)
             ->assertSee('js-payout-row-delete-form', false)
             ->assertSee(route('admin.agency-payout-reports.items.destroy', [$report, $item]), false);
 
@@ -444,7 +482,8 @@ class AgencyPayoutReportTest extends TestCase
             ->get(route('admin.agency-payout-reports.show', $report))
             ->assertOk()
             ->assertSee('Host Settlement Grid')
-            ->assertSee('User ID: '.$host->user_id);
+            ->assertSee('#'.$host->user_id.' ·', false)
+            ->assertSee('Host ID: '.$host->id);
 
         $this->actingAs($owner)
             ->get(route('agency.payout-reports.index'))

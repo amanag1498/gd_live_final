@@ -51,7 +51,13 @@ class AgencyPayoutReport extends Model
 
     public function items(): HasMany
     {
-        return $this->hasMany(AgencyPayoutReportItem::class)->orderBy('host_id');
+        return $this->hasMany(AgencyPayoutReportItem::class)
+            ->orderBy(
+                Host::query()
+                    ->select('user_id')
+                    ->whereColumn('hosts.id', 'agency_payout_report_items.host_id')
+            )
+            ->orderBy('host_id');
     }
 
     public function publishedByAdmin(): BelongsTo

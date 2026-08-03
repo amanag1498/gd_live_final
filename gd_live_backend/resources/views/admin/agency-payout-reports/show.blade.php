@@ -185,7 +185,7 @@
     </x-common.component-card>
   </div>
 
-  <x-common.component-card title="Host Settlement Grid" desc="Hosts are aligned in ascending Host ID order for consistent review and export.">
+  <x-common.component-card title="Host Settlement Grid" desc="Hosts are aligned in ascending User ID order for consistent review and export.">
     <div class="mb-4 flex flex-col gap-2 rounded-2xl bg-gray-50 px-4 py-3 text-xs text-gray-500 sm:flex-row sm:items-center sm:justify-between dark:bg-gray-950/60 dark:text-gray-400">
       <span>Edit values directly; row and grand totals update while you type.</span>
       <span class="sm:text-right">Scroll vertically across hosts and horizontally across settlement fields. Header, host, totals, and Save stay visible.</span>
@@ -194,7 +194,7 @@
       <table id="payout-settlement-grid" class="payout-grid-table table-auto divide-y divide-gray-200 text-sm dark:divide-gray-800">
         <thead class="bg-gray-50 dark:bg-gray-950/60">
           <tr>
-            <th class="payout-grid-sticky-left min-w-[180px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Host ID / Host</th>
+            <th class="payout-grid-sticky-left min-w-[180px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">User ID / Host</th>
             <th class="min-w-[190px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total Video Room Timing</th>
             <th class="min-w-[190px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total Video Room Gifts</th>
             <th class="min-w-[180px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total PK Gifts</th>
@@ -217,8 +217,8 @@
                 <form id="{{ $formId }}" class="js-payout-row-form" method="post" action="{{ route('admin.agency-payout-reports.items.update', [$report, $item]) }}" data-row-id="{{ $item->id }}">
                   @csrf
                 </form>
-                <div class="font-semibold text-gray-900 dark:text-white">#{{ $item->host_id }} · {{ $item->host?->user?->name ?? $item->host?->stage_name ?? '—' }}</div>
-                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">User ID: {{ $item->host?->user_id ?? '—' }} · {{ $item->host?->stage_name ?? '—' }}</div>
+                <div class="font-semibold text-gray-900 dark:text-white">#{{ $item->host?->user_id ?? '—' }} · {{ $item->host?->user?->name ?? $item->host?->stage_name ?? '—' }}</div>
+                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">Host ID: {{ $item->host_id }} · {{ $item->host?->stage_name ?? '—' }}</div>
               </td>
               <td class="min-w-[190px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="video_room_minutes" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('video_room_minutes', $item->video_room_minutes) }}" @disabled($locked)></td>
               <td class="min-w-[190px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="video_gift_coins" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('video_gift_coins', $item->video_gift_coins) }}" @disabled($locked)></td>
@@ -236,7 +236,7 @@
               <td class="payout-grid-sticky-right min-w-[190px] px-4 py-4 text-right">
                 <div class="flex justify-end gap-2">
                   <x-ui.button data-row-save type="submit" size="sm" form="{{ $formId }}" :disabled="$locked">Save</x-ui.button>
-                  <form class="js-payout-row-delete-form" method="post" action="{{ route('admin.agency-payout-reports.items.destroy', [$report, $item]) }}" data-row-id="{{ $item->id }}" data-host-id="{{ $item->host_id }}">
+                  <form class="js-payout-row-delete-form" method="post" action="{{ route('admin.agency-payout-reports.items.destroy', [$report, $item]) }}" data-row-id="{{ $item->id }}" data-user-id="{{ $item->host?->user_id ?? '—' }}">
                     @csrf
                     @method('DELETE')
                     <x-ui.button data-row-delete type="submit" variant="danger" size="sm" :disabled="$locked">Delete</x-ui.button>
@@ -511,7 +511,7 @@
   document.querySelectorAll('.js-payout-row-delete-form').forEach((form) => {
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      if (!window.confirm(`Delete Host ID ${form.dataset.hostId} from this payout report?`)) return;
+      if (!window.confirm(`Delete User ID ${form.dataset.userId} from this payout report?`)) return;
 
       const row = document.getElementById(`payout-item-${form.dataset.rowId}`);
       const button = form.querySelector('[data-row-delete]');
