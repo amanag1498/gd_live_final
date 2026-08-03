@@ -146,9 +146,10 @@ class LiveRoomAdminController extends Controller
 
     public function endRoom(LiveRoom $live_room)
     {
-        if ($live_room->status !== 'ended') {
+        if ($live_room->status !== 'ended' || !$live_room->ended_at) {
             $this->seats->endRoom($live_room, 'admin_force_end', request()->user());
         }
+
         return back()->with('ok','Room marked as ended.');
     }
     public function show(LiveRoom $live_room)

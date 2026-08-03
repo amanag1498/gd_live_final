@@ -688,9 +688,11 @@ class LiveRoomSeatService
 
         DB::transaction(function () use ($room, $reason, $now, &$revokeIdentities) {
             $lockedRoom = LiveRoom::query()->lockForUpdate()->findOrFail($room->id);
-            if ($lockedRoom->ended_at || $lockedRoom->status === 'ended') {
+            if ($lockedRoom->ended_at && $lockedRoom->status === 'ended') {
                 return;
             }
+
+            $endedAt = $lockedRoom->ended_at ?? $now;
 
             $openParticipants = LiveRoomParticipant::query()
                 ->where('live_room_id', $lockedRoom->id)
@@ -709,9 +711,9 @@ class LiveRoomSeatService
                     $participant->removed_by_host = true;
                 }
 
-                $joinedAt = $participant->joined_at ?? $now;
-                $participant->left_at = $now;
-                $participant->duration_seconds = max(0, $joinedAt->diffInSeconds($now));
+                $joinedAt = $participant->joined_at ?? $endedAt;
+                $participant->left_at = $endedAt;
+                $participant->duration_seconds = max(0, $joinedAt->diffInSeconds($endedAt));
                 $participant->save();
             }
 
@@ -720,10 +722,10 @@ class LiveRoomSeatService
                 ->where('status', 'pending')
                 ->lockForUpdate()
                 ->get()
-                ->each(function (LiveRoomSeatRequest $request) use ($now) {
+                ->each(function (LiveRoomSeatRequest $request) use ($endedAt) {
                     $request->update([
                         'status' => 'cancelled',
-                        'responded_at' => $now,
+                        'responded_at' => $endedAt,
                     ]);
                 });
 
@@ -732,20 +734,20 @@ class LiveRoomSeatService
                 ->where('status', 'accepted')
                 ->lockForUpdate()
                 ->get()
-                ->each(function (LiveRoomSeatRequest $request) use ($now, $reason) {
+                ->each(function (LiveRoomSeatRequest $request) use ($endedAt, $reason) {
                     $request->update([
                         'status' => 'removed',
-                        'removed_at' => $now,
+                        'removed_at' => $endedAt,
                         'remove_reason' => $reason,
-                        'responded_at' => $now,
+                        'responded_at' => $endedAt,
                     ]);
                 });
 
             $lockedRoom->update([
                 'status' => 'ended',
-                'ended_at' => $now,
+                'ended_at' => $endedAt,
                 'end_reason' => $reason,
-                'last_activity_at' => $now,
+                'last_activity_at' => $endedAt,
             ]);
         });
 

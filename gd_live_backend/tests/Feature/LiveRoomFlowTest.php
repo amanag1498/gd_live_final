@@ -206,6 +206,57 @@ class LiveRoomFlowTest extends TestCase
             ->count());
     }
 
+    public function test_admin_force_end_records_the_action_time(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        [, $room] = $this->makeLiveRoom();
+        $forceEndedAt = now()->addMinute()->startOfSecond();
+
+        $this->travelTo($forceEndedAt);
+
+        $this->actingAs($admin)
+            ->from(route('admin.live-rooms.show', $room))
+            ->post(route('admin.live-rooms.end', $room))
+            ->assertRedirect(route('admin.live-rooms.show', $room));
+
+        $room->refresh();
+
+        $this->assertSame('ended', $room->status);
+        $this->assertSame('admin_force_end', $room->end_reason);
+        $this->assertSame($forceEndedAt->toDateTimeString(), $room->ended_at?->toDateTimeString());
+        $this->assertSame($forceEndedAt->toDateTimeString(), $room->last_activity_at?->toDateTimeString());
+        $this->assertSame(0, LiveRoomParticipant::query()
+            ->where('live_room_id', $room->id)
+            ->whereNull('left_at')
+            ->count());
+    }
+
+    public function test_admin_force_end_fills_a_missing_end_time_on_an_ended_room(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        [, $room] = $this->makeLiveRoom();
+        $room->forceFill([
+            'status' => 'ended',
+            'ended_at' => null,
+            'end_reason' => null,
+        ])->save();
+        $forceEndedAt = now()->addMinute()->startOfSecond();
+
+        $this->travelTo($forceEndedAt);
+
+        $this->actingAs($admin)
+            ->post(route('admin.live-rooms.end', $room))
+            ->assertRedirect();
+
+        $room->refresh();
+
+        $this->assertSame('ended', $room->status);
+        $this->assertSame('admin_force_end', $room->end_reason);
+        $this->assertSame($forceEndedAt->toDateTimeString(), $room->ended_at?->toDateTimeString());
+    }
+
     public function test_cleanup_command_ends_live_room_without_active_host(): void
     {
         [$hostUser, $room] = $this->makeLiveRoom();
