@@ -16,6 +16,7 @@ use App\Models\LiveRoomPkEvent;
 use App\Models\User;
 use App\Models\WalletTransaction;
 use App\Services\AgencyWeeklyPayoutReportService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Spatie\Permission\Models\Role;
@@ -29,9 +30,18 @@ class AgencyPayoutReportTest extends TestCase
     {
         parent::setUp();
 
+        Carbon::setTestNow(Carbon::parse('2026-04-23 12:00:00', config('app.timezone')));
+
         foreach (['admin', 'agency', 'host', 'user'] as $role) {
             Role::findOrCreate($role, 'web');
         }
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
     }
 
     public function test_command_generates_reports_idempotently_for_all_agencies(): void
@@ -58,22 +68,22 @@ class AgencyPayoutReportTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame(150, $report->gross_earnings);
-        $this->assertSame(45, $report->platform_commission);
-        $this->assertSame(15, $report->agency_commission);
-        $this->assertSame(90, $report->host_share);
-        $this->assertSame(15, $report->final_payable);
+        $this->assertSame(0, $report->platform_commission);
+        $this->assertSame(0, $report->agency_commission);
+        $this->assertSame(150, $report->host_share);
+        $this->assertSame(150, $report->final_payable);
         $this->assertSame(1, $report->total_hosts);
         $this->assertSame(1, $report->active_hosts_count);
         $this->assertSame(100, $report->total_call_earnings);
-        $this->assertSame(50, $report->total_gift_earnings);
-        $this->assertSame(5, $report->total_live_room_earnings);
+        $this->assertSame(0, $report->total_gift_earnings);
+        $this->assertSame(0, $report->total_live_room_earnings);
         $this->assertSame(50, $report->total_pk_earnings);
 
         $item = $report->items->firstOrFail();
         $this->assertSame($host->id, $item->host_id);
         $this->assertSame(100, $item->call_earnings);
-        $this->assertSame(50, $item->gift_earnings);
-        $this->assertSame(5, $item->live_room_earnings);
+        $this->assertSame(0, $item->gift_earnings);
+        $this->assertSame(0, $item->live_room_earnings);
         $this->assertSame(50, $item->pk_earnings);
 
         Artisan::call('agency:payout-reports:generate', [
@@ -92,7 +102,7 @@ class AgencyPayoutReportTest extends TestCase
         [$start, $end] = $service->resolvePeriod('2026-04-21', '2026-04-27');
 
         $first = $service->generate($start, $end, $agency->id, false)['reports'][0];
-        $this->assertSame(15, $first->final_payable);
+        $this->assertSame(150, $first->final_payable);
 
         CallEarningLedger::query()->create([
             'call_session_id' => CallSession::query()->create([
@@ -124,10 +134,11 @@ class AgencyPayoutReportTest extends TestCase
 
         $forced = $service->generate($start, $end, $agency->id, true)['reports'][0];
         $this->assertSame(170, $forced->gross_earnings);
-        $this->assertSame(17, $forced->final_payable);
+        $this->assertSame(170, $forced->final_payable);
         $this->assertDatabaseCount('agency_payout_reports', 1);
 
         $service->approve($forced, 2, 'Approved');
+        $service->publish($forced, 'Published for payment');
         $paid = $service->markPaid($forced, 'Paid');
         $owner->refresh();
         $this->assertSame('paid', $paid->status);
@@ -149,10 +160,39 @@ class AgencyPayoutReportTest extends TestCase
         [$start, $end] = $service->resolvePeriod('2026-04-21', '2026-04-27');
         $report = $service->generate($start, $end, $agency->id, false)['reports'][0];
         $service->approve($report, 0, 'Approved');
+        $service->publish($report, 'Published for payment');
         $service->markPaid($report, 'Paid offline');
 
         $this->expectException(\InvalidArgumentException::class);
         $service->generate($start, $end, $agency->id, true);
+    }
+
+    public function test_transferred_host_room_time_and_earnings_stay_with_the_historical_agency(): void
+    {
+        [$historicalAgency, , $host] = $this->seedAgencyFixture();
+        $currentOwner = User::factory()->create();
+        $currentOwner->assignRole('agency');
+        $currentAgency = Agency::query()->create([
+            'owner_user_id' => $currentOwner->id,
+            'name' => 'Current Agency',
+        ]);
+
+        $host->update(['agency_id' => $currentAgency->id]);
+
+        $service = app(AgencyWeeklyPayoutReportService::class);
+        [$start, $end] = $service->resolvePeriod('2026-04-21', '2026-04-27');
+
+        $historicalReport = $service->generate($start, $end, $historicalAgency->id)['reports'][0];
+        $historicalItem = $historicalReport->items()->where('host_id', $host->id)->firstOrFail();
+
+        $this->assertSame(150, $historicalItem->total_coins);
+        $this->assertSame(30, $historicalItem->video_room_minutes);
+
+        $currentReport = $service->generate($start, $end, $currentAgency->id)['reports'][0];
+
+        $this->assertFalse($currentReport->items()->where('host_id', $host->id)->exists());
+        $this->assertSame(0, $currentReport->total_coins);
+        $this->assertSame(0, (int) data_get($currentReport->meta, 'totals.video_room_minutes'));
     }
 
     public function test_amounts_cannot_be_modified_after_approval(): void
@@ -223,6 +263,50 @@ class AgencyPayoutReportTest extends TestCase
         $this->assertNull($report->approved_at);
         $this->assertNull($report->published_at);
         $this->assertSame(25, $item->fresh()->bonus_coins);
+    }
+
+    public function test_admin_can_delete_an_ordered_host_row_and_report_totals_are_recalculated(): void
+    {
+        [$agency, , $host] = $this->seedAgencyFixture();
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+
+        $service = app(AgencyWeeklyPayoutReportService::class);
+        [$start, $end] = $service->resolvePeriod('2026-04-21', '2026-04-27');
+        $report = $service->generate($start, $end, $agency->id, false)['reports'][0];
+        $item = $report->fresh('items')->items->firstOrFail();
+
+        $this->assertSame(
+            $report->items->pluck('host_id')->sort()->values()->all(),
+            $report->items->pluck('host_id')->values()->all(),
+        );
+
+        $this->actingAs($admin)
+            ->get(route('admin.agency-payout-reports.show', $report))
+            ->assertOk()
+            ->assertSee('Host ID / Host')
+            ->assertSee('#'.$host->id.' ·', false)
+            ->assertSee('js-payout-row-delete-form', false)
+            ->assertSee(route('admin.agency-payout-reports.items.destroy', [$report, $item]), false);
+
+        $response = $this->actingAs($admin)->deleteJson(
+            route('admin.agency-payout-reports.items.destroy', [$report, $item]),
+        );
+
+        $response->assertOk()
+            ->assertJsonPath('deleted_item_id', $item->id)
+            ->assertJsonPath('report.status', 'pending_review')
+            ->assertJsonPath('report.totals.total_hosts', 0)
+            ->assertJsonPath('report.totals.total_coins', 0)
+            ->assertJsonPath('report.totals.total_video_room_minutes', 0);
+
+        $this->assertDatabaseMissing('agency_payout_report_items', ['id' => $item->id]);
+        $this->assertDatabaseHas('admin_action_audits', [
+            'admin_user_id' => $admin->id,
+            'target_user_id' => $host->user_id,
+            'action' => 'delete_item',
+            'entity_id' => $report->id,
+        ]);
     }
 
     public function test_invalid_generate_input_is_rejected(): void
@@ -429,6 +513,7 @@ class AgencyPayoutReportTest extends TestCase
 
         $room = LiveRoom::query()->create([
             'host_id' => $host->id,
+            'agency_id' => $agency->id,
             'room_id' => 'orbit-room-1',
             'title' => 'Orbit Live',
             'room_type' => 'video',
@@ -496,6 +581,7 @@ class AgencyPayoutReportTest extends TestCase
         ]);
         $otherRoom = LiveRoom::query()->create([
             'host_id' => $otherHost->id,
+            'agency_id' => $otherAgency->id,
             'room_id' => 'rival-room-1',
             'title' => 'Rival Live',
             'room_type' => 'video',

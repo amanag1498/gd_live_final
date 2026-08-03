@@ -82,7 +82,12 @@ class LiveRoomAdminController extends Controller
             'max_speakers' => 'nullable|integer|min:1|max:' . $this->configuredMaxSpeakers('video'),
         ]);
 
-        $room = LiveRoom::create($data + ['meta' => null, 'last_activity_at' => now()]);
+        $host = Host::query()->findOrFail($data['host_id']);
+        $room = LiveRoom::create($data + [
+            'agency_id' => $host->agency_id,
+            'meta' => null,
+            'last_activity_at' => now(),
+        ]);
         LiveRoomBroadcaster::broadcast(
         $room->fresh(),
         ($room->status === 'live' ? 'live' : 'created')
@@ -119,7 +124,11 @@ class LiveRoomAdminController extends Controller
     $beforeTitle  = (string) $live_room->title;
     $beforeHost   = (int) $live_room->host_id;
 
-    $live_room->update($data + ['last_activity_at' => now()]);
+    $host = Host::query()->findOrFail($data['host_id']);
+    $live_room->update($data + [
+        'agency_id' => $host->agency_id,
+        'last_activity_at' => now(),
+    ]);
     $room = $live_room->fresh();
 
     // 🔊 decide & broadcast

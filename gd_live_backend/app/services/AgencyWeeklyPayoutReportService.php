@@ -196,15 +196,40 @@ class AgencyWeeklyPayoutReportService
                 ->get()
                 ->keyBy('host_id');
 
+            $hostsWithOtherAgencyActivity = collect()
+                ->merge(
+                    CallEarningLedger::query()
+                        ->where('agency_id', '<>', $agency->id)
+                        ->whereBetween('created_at', [$periodStart, $periodEnd])
+                        ->pluck('host_id')
+                )
+                ->merge(
+                    LiveRoomGiftEarningLedger::query()
+                        ->where('agency_id', '<>', $agency->id)
+                        ->whereBetween('created_at', [$periodStart, $periodEnd])
+                        ->pluck('host_id')
+                )
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            $currentAgencyHostIds = Host::query()
+                ->where('agency_id', $agency->id)
+                ->when(
+                    $hostsWithOtherAgencyActivity->isNotEmpty(),
+                    fn ($query) => $query->whereNotIn('id', $hostsWithOtherAgencyActivity)
+                )
+                ->pluck('id');
+
             $historicalHostIds = collect()
-                ->merge(Host::query()->where('agency_id', $agency->id)->pluck('id'))
+                ->merge($currentAgencyHostIds)
                 ->merge($callRows->keys())
                 ->merge($giftRows->keys())
                 ->merge($pkRows->keys())
                 ->merge(
                     DB::table('live_rooms')
-                        ->join('hosts', 'hosts.id', '=', 'live_rooms.host_id')
-                        ->where('hosts.agency_id', $agency->id)
+                        ->where('live_rooms.agency_id', $agency->id)
                         ->whereNotNull('live_rooms.started_at')
                         ->where('live_rooms.started_at', '<=', $periodEnd)
                         ->whereRaw('COALESCE(live_rooms.ended_at, live_rooms.last_activity_at, live_rooms.started_at) >= ?', [$periodStart->toDateTimeString()])
@@ -225,6 +250,7 @@ class AgencyWeeklyPayoutReportService
             $roomRows = $this->buildRoomRows(
                 LiveRoom::query()
                     ->whereIn('host_id', $hosts->pluck('id'))
+                    ->where('agency_id', $agency->id)
                     ->whereNotNull('started_at')
                     ->where('started_at', '<=', $periodEnd)
                     ->whereRaw('COALESCE(ended_at, last_activity_at, started_at) >= ?', [$periodStart->toDateTimeString()])
@@ -568,6 +594,69 @@ class AgencyWeeklyPayoutReportService
                         'host_id' => $lockedItem->host_id,
                     ],
                     reason: (string) ($payload['admin_note'] ?? '')
+                );
+            }
+
+            return $locked->fresh(['agency.owner', 'items.host.user', 'publishedByAdmin']);
+        });
+    }
+
+    public function deleteItem(
+        AgencyPayoutReport $report,
+        AgencyPayoutReportItem $item,
+        ?User $actor = null,
+    ): AgencyPayoutReport {
+        return DB::transaction(function () use ($report, $item, $actor) {
+            $locked = AgencyPayoutReport::query()
+                ->with(['agency.owner', 'items.host.user'])
+                ->lockForUpdate()
+                ->findOrFail($report->id);
+
+            if ($locked->paid_at || $locked->status === 'paid') {
+                throw new InvalidArgumentException('Paid payout reports are locked.');
+            }
+
+            if (!in_array($locked->status, ['generated', 'pending_review', 'approved'], true)) {
+                throw new InvalidArgumentException('Only draft or approved report rows can be deleted.');
+            }
+
+            $lockedItem = AgencyPayoutReportItem::query()
+                ->whereKey($item->id)
+                ->where('agency_payout_report_id', $locked->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$lockedItem) {
+                throw new InvalidArgumentException('The host row does not belong to this payout report.');
+            }
+
+            $before = $lockedItem->load('host.user')->toArray();
+            $targetUser = $lockedItem->host?->user;
+            $deletedItemId = (int) $lockedItem->id;
+            $deletedHostId = (int) $lockedItem->host_id;
+            $lockedItem->delete();
+
+            $this->syncReportTotals($locked, [
+                'status' => 'pending_review',
+                'approved_at' => null,
+                'published_at' => null,
+                'published_by_admin_user_id' => null,
+            ]);
+
+            if ($actor) {
+                app(AdminAuditService::class)->log(
+                    area: 'agency_payout_reports',
+                    action: 'delete_item',
+                    admin: $actor,
+                    targetUser: $targetUser,
+                    entity: $locked,
+                    before: $before,
+                    after: null,
+                    meta: [
+                        'report_id' => $locked->id,
+                        'agency_payout_report_item_id' => $deletedItemId,
+                        'host_id' => $deletedHostId,
+                    ]
                 );
             }
 

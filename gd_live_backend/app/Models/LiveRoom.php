@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Collection;
 class LiveRoom extends Model
 {
     protected $fillable = [
-        'host_id','room_id','title','room_type','status','started_at','ended_at','end_reason','last_activity_at','peak_viewers','max_speakers','max_participants','is_locked','topic','language','meta'
+        'host_id','agency_id','room_id','title','room_type','status','started_at','ended_at','end_reason','last_activity_at','peak_viewers','max_speakers','max_participants','is_locked','topic','language','meta'
     ];
 
     protected $casts = [
@@ -26,6 +26,11 @@ class LiveRoom extends Model
     public function host(): BelongsTo
     {
         return $this->belongsTo(Host::class);
+    }
+
+    public function agency(): BelongsTo
+    {
+        return $this->belongsTo(Agency::class);
     }
 
     public function participants()

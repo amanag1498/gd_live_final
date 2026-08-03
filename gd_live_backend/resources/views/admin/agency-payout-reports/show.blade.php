@@ -185,7 +185,7 @@
     </x-common.component-card>
   </div>
 
-  <x-common.component-card title="Host Settlement Grid" desc="Format matches the desktop GD payout workflow with only the required fields.">
+  <x-common.component-card title="Host Settlement Grid" desc="Hosts are aligned in ascending Host ID order for consistent review and export.">
     <div class="mb-4 flex flex-col gap-2 rounded-2xl bg-gray-50 px-4 py-3 text-xs text-gray-500 sm:flex-row sm:items-center sm:justify-between dark:bg-gray-950/60 dark:text-gray-400">
       <span>Edit values directly; row and grand totals update while you type.</span>
       <span class="sm:text-right">Scroll vertically across hosts and horizontally across settlement fields. Header, host, totals, and Save stay visible.</span>
@@ -194,7 +194,7 @@
       <table id="payout-settlement-grid" class="payout-grid-table table-auto divide-y divide-gray-200 text-sm dark:divide-gray-800">
         <thead class="bg-gray-50 dark:bg-gray-950/60">
           <tr>
-            <th class="payout-grid-sticky-left min-w-[180px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Host</th>
+            <th class="payout-grid-sticky-left min-w-[180px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Host ID / Host</th>
             <th class="min-w-[190px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total Video Room Timing</th>
             <th class="min-w-[190px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total Video Room Gifts</th>
             <th class="min-w-[180px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total PK Gifts</th>
@@ -206,7 +206,7 @@
             <th class="min-w-[210px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Agency Commission INR</th>
             <th class="min-w-[150px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Total INR</th>
             <th class="min-w-[250px] whitespace-nowrap px-4 py-3 text-left font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Admin Notes</th>
-            <th class="payout-grid-sticky-right min-w-[110px] whitespace-nowrap px-4 py-3 text-right font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Save</th>
+            <th class="payout-grid-sticky-right min-w-[190px] whitespace-nowrap px-4 py-3 text-right font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Actions</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
@@ -217,7 +217,7 @@
                 <form id="{{ $formId }}" class="js-payout-row-form" method="post" action="{{ route('admin.agency-payout-reports.items.update', [$report, $item]) }}" data-row-id="{{ $item->id }}">
                   @csrf
                 </form>
-                <div class="font-semibold text-gray-900 dark:text-white">{{ $item->host?->user?->name ?? $item->host?->stage_name ?? '—' }}</div>
+                <div class="font-semibold text-gray-900 dark:text-white">#{{ $item->host_id }} · {{ $item->host?->user?->name ?? $item->host?->stage_name ?? '—' }}</div>
                 <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">User ID: {{ $item->host?->user_id ?? '—' }} · {{ $item->host?->stage_name ?? '—' }}</div>
               </td>
               <td class="min-w-[190px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="video_room_minutes" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('video_room_minutes', $item->video_room_minutes) }}" @disabled($locked)></td>
@@ -233,8 +233,15 @@
               <td class="px-4 py-4">
                 <textarea name="admin_note" form="{{ $formId }}" rows="2" class="min-w-[220px] rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 shadow-theme-xs outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white" placeholder="Admin note" @disabled($locked)>{{ old('admin_note', $item->admin_note) }}</textarea>
               </td>
-              <td class="payout-grid-sticky-right min-w-[110px] px-4 py-4 text-right">
-                <x-ui.button data-row-save type="submit" size="sm" form="{{ $formId }}" :disabled="$locked">Save</x-ui.button>
+              <td class="payout-grid-sticky-right min-w-[190px] px-4 py-4 text-right">
+                <div class="flex justify-end gap-2">
+                  <x-ui.button data-row-save type="submit" size="sm" form="{{ $formId }}" :disabled="$locked">Save</x-ui.button>
+                  <form class="js-payout-row-delete-form" method="post" action="{{ route('admin.agency-payout-reports.items.destroy', [$report, $item]) }}" data-row-id="{{ $item->id }}" data-host-id="{{ $item->host_id }}">
+                    @csrf
+                    @method('DELETE')
+                    <x-ui.button data-row-delete type="submit" variant="danger" size="sm" :disabled="$locked">Delete</x-ui.button>
+                  </form>
+                </div>
                 <div data-row-feedback class="mt-2 min-h-4 text-xs font-medium" aria-live="polite"></div>
               </td>
             </tr>
@@ -497,6 +504,59 @@
             rowFeedback.textContent = '';
           }, 3000);
         }
+      }
+    });
+  });
+
+  document.querySelectorAll('.js-payout-row-delete-form').forEach((form) => {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!window.confirm(`Delete Host ID ${form.dataset.hostId} from this payout report?`)) return;
+
+      const row = document.getElementById(`payout-item-${form.dataset.rowId}`);
+      const button = form.querySelector('[data-row-delete]');
+      const originalLabel = button.textContent;
+      button.disabled = true;
+      button.textContent = 'Deleting…';
+      row.classList.add('opacity-60');
+      row.setAttribute('aria-busy', 'true');
+
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          body: new FormData(form),
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+        });
+        const payload = await response.json().catch(() => ({
+          message: response.status === 419
+            ? 'Your admin session expired. Refresh this page and try again.'
+            : 'The server returned an unexpected response.',
+        }));
+
+        if (!response.ok) {
+          const errors = payload.errors ? Object.values(payload.errors).flat().join(' ') : payload.message;
+          throw new Error(errors || 'Unable to delete this payout row.');
+        }
+
+        row.remove();
+        if (!grid.querySelector('tbody tr[data-payout-row]')) {
+          grid.querySelector('tbody').insertAdjacentHTML(
+            'beforeend',
+            '<tr class="bg-white dark:bg-gray-900"><td colspan="13" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No host rows in this report.</td></tr>',
+          );
+        }
+        recalculateGrid();
+        updateReport(payload.report);
+        showFeedback(payload.message);
+      } catch (error) {
+        button.disabled = false;
+        button.textContent = originalLabel;
+        row.classList.remove('opacity-60');
+        row.removeAttribute('aria-busy');
+        showFeedback(error.message || 'Unable to delete this payout row.', true);
       }
     });
   });

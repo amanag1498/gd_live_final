@@ -211,6 +211,9 @@ class LiveRoomController extends Controller
             if (array_key_exists('room_type', $data)) {
                 $updates['room_type'] = $roomType;
             }
+            if (!$room->agency_id) {
+                $updates['agency_id'] = $host->agency_id;
+            }
             if (!$room->started_at) {
                 $updates['status']     = 'live';
                 $updates['started_at'] = now();
@@ -299,6 +302,7 @@ class LiveRoomController extends Controller
 
             $room = LiveRoom::create([
                 'host_id'      => $host->id,
+                'agency_id'    => $host->agency_id,
                 'room_id'      => $roomId,
                 'title'        => $data['title'],
                 'room_type'    => $roomType,

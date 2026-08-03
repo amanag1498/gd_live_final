@@ -294,6 +294,7 @@ class RealWorldSimulationSeeder extends Seeder
             ['room_id' => $roomId],
             [
                 'host_id' => $host->id,
+                'agency_id' => $host->agency_id,
                 'title' => ucwords(str_replace('-', ' ', $roomId)),
                 'room_type' => $roomType,
                 'status' => $status,

@@ -285,41 +285,45 @@ class AgencyPayoutReportController extends Controller
                     'total_inr' => $updatedItem->total_inr,
                     'admin_note' => $updatedItem->admin_note,
                 ],
-                'report' => [
-                    'id' => $updatedReport->id,
-                    'status' => $updatedReport->status,
-                    'status_label' => str($updatedReport->status)->replace('_', ' ')->title()->toString(),
-                    'published' => (bool) $updatedReport->published_at,
-                    'visibility_label' => $updatedReport->published_at ? 'Published' : 'Draft only',
-                    'totals' => [
-                        'total_hosts' => $updatedReport->total_hosts,
-                        'active_hosts_count' => $updatedReport->active_hosts_count,
-                        'total_coins' => $updatedReport->total_coins,
-                        'final_payable' => $updatedReport->final_payable,
-                        'total_video_room_minutes' => $updatedReport->total_video_room_minutes,
-                        'total_video_gift_coins' => $updatedReport->total_video_gift_coins,
-                        'total_pk_gift_coins' => $updatedReport->total_pk_gift_coins,
-                        'total_video_call_coins' => $updatedReport->total_video_call_coins,
-                        'total_video_call_minutes' => $updatedReport->total_video_call_minutes,
-                        'total_bonus_coins' => $updatedReport->total_bonus_coins,
-                        'total_host_payout_inr' => $updatedReport->total_host_payout_inr,
-                        'total_agency_commission_inr' => $updatedReport->total_agency_commission_inr,
-                        'total_inr' => $updatedReport->total_inr,
-                    ],
-                    'actions' => [
-                        'can_review' => in_array($updatedReport->status, ['generated', 'pending_review'], true),
-                        'can_approve' => in_array($updatedReport->status, ['generated', 'pending_review'], true),
-                        'can_publish' => $updatedReport->status === 'approved' && ! $updatedReport->published_at,
-                        'can_mark_paid' => $updatedReport->status === 'approved' && (bool) $updatedReport->published_at,
-                        'can_reject' => in_array($updatedReport->status, ['generated', 'pending_review'], true),
-                    ],
-                ],
+                'report' => $this->reportPayload($updatedReport),
             ]);
         }
 
         return redirect()
             ->route('admin.agency-payout-reports.show', $agency_payout_report)
             ->with('status', 'Host payout row updated. Approved reports return to pending review after edits.');
+    }
+
+    public function destroyItem(Request $request, AgencyPayoutReport $agency_payout_report, AgencyPayoutReportItem $agency_payout_report_item)
+    {
+        try {
+            $updatedReport = $this->service->deleteItem(
+                report: $agency_payout_report,
+                item: $agency_payout_report_item,
+                actor: $request->user(),
+            );
+        } catch (InvalidArgumentException $e) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => $e->getMessage(),
+                    'errors' => ['delete_item' => [$e->getMessage()]],
+                ], 422);
+            }
+
+            return back()->withErrors(['delete_item' => $e->getMessage()]);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Host payout row deleted. Report totals were recalculated.',
+                'deleted_item_id' => $agency_payout_report_item->id,
+                'report' => $this->reportPayload($updatedReport),
+            ]);
+        }
+
+        return redirect()
+            ->route('admin.agency-payout-reports.show', $agency_payout_report)
+            ->with('status', 'Host payout row deleted. Report totals were recalculated.');
     }
 
     public function destroy(Request $request, AgencyPayoutReport $agency_payout_report)
@@ -341,5 +345,38 @@ class AgencyPayoutReportController extends Controller
         return redirect()
             ->route('admin.agency-payout-reports.index')
             ->with('status', 'Payout report deleted.');
+    }
+
+    private function reportPayload(AgencyPayoutReport $report): array
+    {
+        return [
+            'id' => $report->id,
+            'status' => $report->status,
+            'status_label' => str($report->status)->replace('_', ' ')->title()->toString(),
+            'published' => (bool) $report->published_at,
+            'visibility_label' => $report->published_at ? 'Published' : 'Draft only',
+            'totals' => [
+                'total_hosts' => $report->total_hosts,
+                'active_hosts_count' => $report->active_hosts_count,
+                'total_coins' => $report->total_coins,
+                'final_payable' => $report->final_payable,
+                'total_video_room_minutes' => $report->total_video_room_minutes,
+                'total_video_gift_coins' => $report->total_video_gift_coins,
+                'total_pk_gift_coins' => $report->total_pk_gift_coins,
+                'total_video_call_coins' => $report->total_video_call_coins,
+                'total_video_call_minutes' => $report->total_video_call_minutes,
+                'total_bonus_coins' => $report->total_bonus_coins,
+                'total_host_payout_inr' => $report->total_host_payout_inr,
+                'total_agency_commission_inr' => $report->total_agency_commission_inr,
+                'total_inr' => $report->total_inr,
+            ],
+            'actions' => [
+                'can_review' => in_array($report->status, ['generated', 'pending_review'], true),
+                'can_approve' => in_array($report->status, ['generated', 'pending_review'], true),
+                'can_publish' => $report->status === 'approved' && ! $report->published_at,
+                'can_mark_paid' => $report->status === 'approved' && (bool) $report->published_at,
+                'can_reject' => in_array($report->status, ['generated', 'pending_review'], true),
+            ],
+        ];
     }
 }
