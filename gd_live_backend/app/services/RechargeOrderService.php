@@ -640,41 +640,33 @@ class RechargeOrderService
             ];
         }
 
-        $successfulWithoutTx = PaymentOrder::query()
-            ->where('status', 'success')
-            ->get()
-            ->filter(fn (PaymentOrder $order) => ! WalletTransaction::query()
-                ->where('reference_type', 'payment_order')
-                ->where('reference_id', $order->id)
-                ->where('category', 'recharge')
-                ->exists())
-            ->count();
+        $paymentOrders = PaymentOrder::query()
+            ->get(['id', 'status', 'total_coins'])
+            ->keyBy('id');
+        $successfulOrders = $paymentOrders
+            ->filter(fn (PaymentOrder $order) => $order->status === 'success');
 
-        $txWithoutOrder = WalletTransaction::query()
+        $rechargeTransactions = WalletTransaction::query()
             ->where('category', 'recharge')
             ->where('reference_type', 'payment_order')
-            ->get()
-            ->filter(fn (WalletTransaction $transaction) => ! PaymentOrder::query()->whereKey($transaction->reference_id)->exists())
+            ->get(['id', 'reference_id', 'coins'])
+            ->groupBy('reference_id');
+
+        $successfulWithoutTx = $successfulOrders->keys()
+            ->diff($rechargeTransactions->keys())
             ->count();
 
-        $duplicates = WalletTransaction::query()
-            ->selectRaw('reference_type, reference_id, COUNT(*) as duplicate_count')
-            ->where('category', 'recharge')
-            ->where('reference_type', 'payment_order')
-            ->groupBy('reference_type', 'reference_id')
-            ->having('duplicate_count', '>', 1)
-            ->get()
+        $txWithoutOrder = $rechargeTransactions
+            ->reject(fn ($transactions, $orderId) => $paymentOrders->has($orderId))
+            ->sum(fn ($transactions) => $transactions->count());
+
+        $duplicates = $rechargeTransactions
+            ->filter(fn ($transactions) => $transactions->count() > 1)
             ->count();
 
-        $mismatchedCoins = PaymentOrder::query()
-            ->where('status', 'success')
-            ->get()
-            ->filter(function (PaymentOrder $order) {
-                $tx = WalletTransaction::query()
-                    ->where('reference_type', 'payment_order')
-                    ->where('reference_id', $order->id)
-                    ->where('category', 'recharge')
-                    ->first();
+        $mismatchedCoins = $successfulOrders
+            ->filter(function (PaymentOrder $order) use ($rechargeTransactions) {
+                $tx = $rechargeTransactions->get($order->id)?->first();
 
                 return $tx && (int) $tx->coins !== (int) $order->total_coins;
             })

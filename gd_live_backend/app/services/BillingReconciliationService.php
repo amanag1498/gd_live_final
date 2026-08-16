@@ -62,19 +62,33 @@ class BillingReconciliationService
 
     public function anomalies(): array
     {
-        $billedEndedCalls = CallSession::query()
+        $billedEndedCallIds = CallSession::query()
             ->where('status', 'ended')
             ->whereNotNull('billing_processed_at')
             ->where('total_coins_charged', '>', 0)
-            ->get(['id']);
+            ->pluck('id');
 
-        $callsMissingWallet = $billedEndedCalls->filter(function (CallSession $call) {
-            return !WalletTransaction::query()
-                ->where('reference', 'like', $this->billingReferencePattern($call->id))
-                ->exists();
-        })->count();
+        $walletBilledCallIds = WalletTransaction::query()
+            ->where('reference', 'like', 'call_billing:%')
+            ->pluck('reference')
+            ->map(function (?string $reference): ?int {
+                $segments = explode(':', (string) $reference, 3);
 
-        $callsMissingLedger = $billedEndedCalls->filter(fn (CallSession $call) => !$call->earningLedger()->exists())->count();
+                return isset($segments[1]) && ctype_digit($segments[1])
+                    ? (int) $segments[1]
+                    : null;
+            })
+            ->filter()
+            ->unique();
+
+        $callsMissingWallet = $billedEndedCallIds->diff($walletBilledCallIds)->count();
+
+        $callsMissingLedger = CallSession::query()
+            ->where('status', 'ended')
+            ->whereNotNull('billing_processed_at')
+            ->where('total_coins_charged', '>', 0)
+            ->whereDoesntHave('earningLedger')
+            ->count();
 
         $duplicateBilling = WalletTransaction::query()
             ->selectRaw('reference, COUNT(*) as duplicate_count')

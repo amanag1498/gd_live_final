@@ -43,19 +43,31 @@ class WalletAdminController extends Controller
             $q->where('is_blocked', $request->boolean('blocked'));
         }
         $users = $q->orderBy('id','desc')->paginate(20);
-        $userCoinSupply = (int) Wallet::query()->sum('balance');
+        $walletTotals = Wallet::query()
+            ->selectRaw('COALESCE(SUM(balance), 0) as coin_supply, SUM(CASE WHEN balance > 0 THEN 1 ELSE 0 END) as positive_wallets')
+            ->first();
+        $userCoinSupply = (int) $walletTotals->coin_supply;
         $agencyCoinSupply = (int) AgencyWallet::query()->sum('balance');
         $coinSupply = $userCoinSupply + $agencyCoinSupply;
         $reconciliation = $this->reconciliationService->anomalies();
+        $transactionTotals = WalletTransaction::query()
+            ->selectRaw('COALESCE(SUM(CASE WHEN type = ? THEN coins ELSE 0 END), 0) as total_credits', ['credit'])
+            ->selectRaw('COALESCE(SUM(CASE WHEN type = ? THEN coins ELSE 0 END), 0) as total_debits', ['debit'])
+            ->selectRaw('COUNT(DISTINCT CASE WHEN type = ? THEN wallet_id END) as spending_wallets', ['debit'])
+            ->first();
+        $paymentTotals = PaymentOrder::query()
+            ->selectRaw('COUNT(*) as total_orders')
+            ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as successful_orders', ['success'])
+            ->first();
         $walletSummary = [
-            'total_credits' => (int) WalletTransaction::query()->where('type', 'credit')->sum('coins'),
-            'total_debits' => (int) WalletTransaction::query()->where('type', 'debit')->sum('coins'),
-            'positive_wallets' => Wallet::query()->where('balance', '>', 0)->count(),
-            'top_spenders' => WalletTransaction::query()->where('type', 'debit')->distinct('wallet_id')->count('wallet_id'),
+            'total_credits' => (int) $transactionTotals->total_credits,
+            'total_debits' => (int) $transactionTotals->total_debits,
+            'positive_wallets' => (int) $walletTotals->positive_wallets,
+            'top_spenders' => (int) $transactionTotals->spending_wallets,
             'user_coin_supply' => $userCoinSupply,
             'agency_coin_supply' => $agencyCoinSupply,
-            'recharge_conversion' => PaymentOrder::query()->count() > 0
-                ? round((PaymentOrder::query()->where('status', 'success')->count() / max(1, PaymentOrder::query()->count())) * 100, 1)
+            'recharge_conversion' => (int) $paymentTotals->total_orders > 0
+                ? round(((int) $paymentTotals->successful_orders / (int) $paymentTotals->total_orders) * 100, 1)
                 : 0,
         ];
 

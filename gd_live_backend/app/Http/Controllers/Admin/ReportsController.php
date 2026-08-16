@@ -32,28 +32,43 @@ class ReportsController extends Controller
         $from = $from->copy()->startOfDay();
         $to = $to->copy()->endOfDay();
 
-        $hosts = Host::with(['user', 'agency'])->orderBy('id', 'desc')->limit(500)->get();
+        $hosts = Host::with(['user', 'agency'])
+            ->when($hostId, fn ($query) => $query->whereKey($hostId))
+            ->orderBy('id', 'desc')
+            ->when(! $hostId, fn ($query) => $query->limit(500))
+            ->get();
         $hostsById = $hosts->keyBy('id');
-
-        $rooms = LiveRoom::query()
-            ->when($hostId, fn ($query) => $query->where('host_id', $hostId))
-            ->whereNotNull('started_at')
-            ->where('started_at', '<=', $to)
-            ->whereRaw('COALESCE(ended_at, last_activity_at, started_at) >= ?', [$from->toDateTimeString()])
-            ->get(['id', 'host_id', 'started_at', 'ended_at', 'last_activity_at']);
-
-        $roomIds = $rooms->pluck('id');
         $reportHostIds = $hostId
             ? collect([$hostId])
             : $hosts->pluck('id')->unique()->values();
 
+        $rooms = LiveRoom::query()
+            ->whereIn('host_id', $reportHostIds)
+            ->whereNotNull('started_at')
+            ->where('started_at', '<=', $to)
+            ->where(function ($query) use ($from) {
+                $query->where('ended_at', '>=', $from)
+                    ->orWhere(function ($query) use ($from) {
+                        $query->whereNull('ended_at')
+                            ->where('last_activity_at', '>=', $from);
+                    })
+                    ->orWhere(function ($query) use ($from) {
+                        $query->whereNull('ended_at')
+                            ->whereNull('last_activity_at')
+                            ->where('started_at', '>=', $from);
+                    });
+            })
+            ->get(['id', 'host_id', 'started_at', 'ended_at', 'last_activity_at']);
+        $roomsByHost = $rooms->groupBy('host_id');
+        $emptyRooms = collect();
+
         $giftAgg = LiveRoomGiftEarningLedger::query()
-            ->when($hostId, fn ($query) => $query->where('host_id', $hostId))
+            ->whereIn('host_id', $reportHostIds)
             ->whereBetween('created_at', [$from, $to])
             ->selectRaw('host_id, DATE(created_at) as d, SUM(total_coins) as gift_coins, COUNT(*) as gift_events, SUM(host_payout_coins) as host_earnings, SUM(agency_payout_coins) as agency_earnings')
             ->groupBy('host_id', 'd')
             ->get()
-            ->groupBy('d');
+            ->keyBy(fn ($row) => $row->d.':'.$row->host_id);
 
         $pkAgg = LiveRoomGiftEarningLedger::query()
             ->join('live_room_gifts', 'live_room_gifts.id', '=', 'live_room_gift_earning_ledgers.live_room_gift_id')
@@ -61,38 +76,35 @@ class ReportsController extends Controller
                 $join->on('live_room_pk_events.wallet_transaction_id', '=', 'live_room_gifts.transaction_id')
                     ->where('live_room_pk_events.event_type', '=', 'gift');
             })
-            ->when($hostId, fn ($query) => $query->where('live_room_gift_earning_ledgers.host_id', $hostId))
+            ->whereIn('live_room_gift_earning_ledgers.host_id', $reportHostIds)
             ->whereBetween('live_room_gift_earning_ledgers.created_at', [$from, $to])
             ->selectRaw('live_room_gift_earning_ledgers.host_id as host_id, DATE(live_room_gift_earning_ledgers.created_at) as d, SUM(live_room_gift_earning_ledgers.total_coins) as pk_coins, COUNT(live_room_pk_events.id) as pk_events')
             ->groupBy('host_id', 'd')
             ->get()
-            ->groupBy('d');
+            ->keyBy(fn ($row) => $row->d.':'.$row->host_id);
 
         $callAgg = CallEarningLedger::query()
             ->join('call_sessions', 'call_sessions.id', '=', 'call_earning_ledgers.call_session_id')
-            ->when($hostId, fn ($query) => $query->where('call_earning_ledgers.host_id', $hostId))
+            ->whereIn('call_earning_ledgers.host_id', $reportHostIds)
             ->where('call_sessions.status', 'ended')
             ->where('call_earning_ledgers.total_coins', '>', 0)
             ->whereBetween('call_earning_ledgers.created_at', [$from, $to])
             ->selectRaw('call_earning_ledgers.host_id as host_id, DATE(call_earning_ledgers.created_at) as d, SUM(call_earning_ledgers.total_coins) as call_coins, COUNT(*) as call_count, SUM(call_earning_ledgers.host_earning) as host_earning, SUM(call_earning_ledgers.agency_earning) as agency_earning, SUM(CASE WHEN call_sessions.type = "video" THEN call_earning_ledgers.billable_minutes ELSE 0 END) as video_call_minutes, SUM(CASE WHEN call_sessions.type = "video" THEN call_earning_ledgers.total_coins ELSE 0 END) as video_call_coins')
             ->groupBy('call_earning_ledgers.host_id', 'd')
             ->get()
-            ->groupBy('d');
+            ->keyBy(fn ($row) => $row->d.':'.$row->host_id);
 
         $partAgg = LiveRoomParticipant::query()
-            ->when(
-                $roomIds->isNotEmpty(),
-                fn ($query) => $query->whereIn('live_room_id', $roomIds),
-                fn ($query) => $query->whereRaw('1 = 0')
-            )
             ->selectRaw('live_rooms.host_id as host_id,
                          DATE(live_room_participants.joined_at) as d,
                          COUNT(*) as participants_total,
                          COUNT(DISTINCT '.$this->participantIdentitySql().') as participants_unique')
             ->join('live_rooms', 'live_rooms.id', '=', 'live_room_participants.live_room_id')
-            ->groupBy('host_id', 'd')
+            ->whereIn('live_rooms.host_id', $reportHostIds)
+            ->whereBetween('live_room_participants.joined_at', [$from, $to])
+            ->groupBy('live_rooms.host_id', 'd')
             ->get()
-            ->groupBy('d');
+            ->keyBy(fn ($row) => $row->d.':'.$row->host_id);
 
         $days = collect();
         $period = new DatePeriod(
@@ -111,11 +123,12 @@ class ReportsController extends Controller
                     continue;
                 }
 
-                $gift = optional($giftAgg->get($key))->firstWhere('host_id', $hid);
-                $pk = optional($pkAgg->get($key))->firstWhere('host_id', $hid);
-                $call = optional($callAgg->get($key))->firstWhere('host_id', $hid);
-                $participants = optional($partAgg->get($key))->firstWhere('host_id', $hid);
-                $hostRooms = $rooms->where('host_id', $hid);
+                $aggregateKey = $key.':'.$hid;
+                $gift = $giftAgg->get($aggregateKey);
+                $pk = $pkAgg->get($aggregateKey);
+                $call = $callAgg->get($aggregateKey);
+                $participants = $partAgg->get($aggregateKey);
+                $hostRooms = $roomsByHost->get($hid, $emptyRooms);
 
                 $giftCoins = (int) ($gift->gift_coins ?? 0);
                 $pkCoins = (int) ($pk->pk_coins ?? 0);
@@ -148,13 +161,13 @@ class ReportsController extends Controller
         if ($range === 'weekly') {
             $rows = $rows
                 ->groupBy(fn ($row) => Carbon::parse($row['date'])->startOfWeek(Carbon::MONDAY)->format('Y-m-d'))
-                ->flatMap(function ($weekRows, $weekStart) use ($rooms, $from, $to) {
+                ->flatMap(function ($weekRows, $weekStart) use ($roomsByHost, $emptyRooms, $from, $to) {
                     $weekFrom = Carbon::parse($weekStart, config('app.timezone'))->startOfDay()->max($from);
                     $weekTo = $weekFrom->copy()->endOfWeek(Carbon::SUNDAY)->endOfDay()->min($to);
 
-                    return $weekRows->groupBy('host_id')->map(function ($group) use ($weekStart, $weekFrom, $weekTo, $rooms) {
+                    return $weekRows->groupBy('host_id')->map(function ($group) use ($weekStart, $weekFrom, $weekTo, $roomsByHost, $emptyRooms) {
                         $grossCoins = (int) $group->sum('gross_coins');
-                        $hostRooms = $rooms->where('host_id', $group->first()['host_id']);
+                        $hostRooms = $roomsByHost->get($group->first()['host_id'], $emptyRooms);
 
                         return [
                             'week_start' => $weekStart,
