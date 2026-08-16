@@ -215,7 +215,7 @@ class _SettingsPageState extends State<SettingsPage>
           icon: Icons.delete_forever_rounded,
           title: 'Account Deletion',
           meta: null,
-          onTap: () => _openExternal(AppUrls.accountDeletionUrl),
+          onTap: () => _confirmAccountDeletion(auth),
           tint: const [Color(0xFFE45C30), Color(0xFFFF9A69)],
         ),
       ];
@@ -315,9 +315,7 @@ class _SettingsPageState extends State<SettingsPage>
                   const SizedBox(height: 18),
                   _AnimatedEntrance(
                     index: 3,
-                    child: _SessionDock(
-                      onLogout: () => _confirmLogout(auth),
-                    ),
+                    child: _SessionDock(onLogout: () => _confirmLogout(auth)),
                   ),
                 ],
               ),
@@ -333,7 +331,7 @@ class _SettingsPageState extends State<SettingsPage>
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  Future<void> _confirmAccountDeletion() async {
+  Future<void> _confirmAccountDeletion(AuthService auth) async {
     final tokens = _settingsTokens();
     final confirmed = await showDialog<bool>(
       context: context,
@@ -383,7 +381,7 @@ class _SettingsPageState extends State<SettingsPage>
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'This opens the account deletion page so you can complete the deletion process.',
+                  'This permanently deletes your GD Live account, signs you out on every device, and removes or anonymizes associated profile data. Financial, fraud-prevention, and safety records may be retained where legally required.',
                   style: TextStyle(
                     color: tokens.textSecondary,
                     fontWeight: FontWeight.w600,
@@ -419,7 +417,7 @@ class _SettingsPageState extends State<SettingsPage>
                           ),
                         ),
                         onPressed: () => Navigator.of(dialogContext).pop(true),
-                        child: const Text('Continue'),
+                        child: const Text('Delete Account'),
                       ),
                     ),
                   ],
@@ -432,7 +430,27 @@ class _SettingsPageState extends State<SettingsPage>
     );
 
     if (confirmed == true) {
-      await _openExternal(AppUrls.accountDeletionUrl);
+      Get.dialog<void>(
+        const PopScope(
+          canPop: false,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+        barrierDismissible: false,
+      );
+      try {
+        await auth.deleteAccount();
+      } catch (error) {
+        if (Get.isDialogOpen == true) Get.back<void>();
+        if (!mounted) return;
+        Get.snackbar(
+          'Account deletion incomplete',
+          error
+              .toString()
+              .replaceFirst('Exception: ', '')
+              .replaceFirst('FirebaseAuthException', 'Apple sign-in error'),
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
     }
   }
 

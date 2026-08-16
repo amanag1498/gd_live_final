@@ -57,32 +57,6 @@
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>LSApplicationQueriesSchemes</key>
-	<array>
-		<string>tez</string>
-		<string>phonepe</string>
-		<string>paytmmp</string>
-		<string>credpay</string>
-		<string>mobikwik</string>
-		<string>in.fampay.app</string>
-		<string>bhim</string>
-		<string>amazonpay</string>
-		<string>navi</string>
-		<string>kiwi</string>
-		<string>payzapp</string>
-		<string>jupiter</string>
-		<string>omnicard</string>
-		<string>icici</string>
-		<string>popclubapp</string>
-		<string>sbiyono</string>
-		<string>myjio</string>
-		<string>slice-upi</string>
-		<string>bobupi</string>
-		<string>shriramone</string>
-		<string>indusmobile</string>
-		<string>whatsapp</string>
-		<string>kotakbank</string>
-	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>GD Live uses the camera for video calls and live video rooms.</string>
 	<key>NSMicrophoneUsageDescription</key>

@@ -971,13 +971,8 @@ class _VideoCallPageState extends State<VideoCallPage>
 
   Future<void> _exitViewerSession() async {
     if (_exiting) return;
-    final ok = await _showActionSheet(
-      title: _currentRole == 'speaker' ? 'Leave Live' : 'Leave Room',
-      message:
-          _currentRole == 'speaker'
-              ? 'You will leave the speaker stage and return to the previous screen.'
-              : 'You will leave this live room.',
-      primaryLabel: _currentRole == 'speaker' ? 'Leave Live' : 'Leave Room',
+    final ok = await _showLeaveRoomDialog(
+      leavingSpeakerStage: _currentRole == 'speaker',
     );
     if (ok != true) return;
     _exiting = true;
@@ -2356,6 +2351,112 @@ class _VideoCallPageState extends State<VideoCallPage>
                           ),
                         ),
                         child: const Text('End Live'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<bool?> _showLeaveRoomDialog({
+    required bool leavingSpeakerStage,
+  }) {
+    final title = leavingSpeakerStage ? 'Leave Live?' : 'Leave Room?';
+    final message =
+        leavingSpeakerStage
+            ? 'You will leave the speaker stage and return to the previous screen.'
+            : 'You will leave this live room.';
+    final actionLabel = leavingSpeakerStage ? 'Leave Live' : 'Leave Room';
+    final accent = _tokens.primaryButtonGradient.first;
+
+    return showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(.72),
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: GdModalSurface(
+            tokens: _tokens,
+            maxWidth: 380,
+            maxHeightFactor: .72,
+            radius: 28,
+            showHandle: false,
+            padding: const EdgeInsets.fromLTRB(22, 24, 22, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 62,
+                  height: 62,
+                  decoration: BoxDecoration(
+                    color: accent.withOpacity(.12),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: accent.withOpacity(.22)),
+                  ),
+                  child: Icon(
+                    Icons.logout_rounded,
+                    color: accent,
+                    size: 30,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _tokens.textPrimary,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 22,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _tokens.textSecondary.withOpacity(.9),
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed:
+                            () => Navigator.of(dialogContext).pop(false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _tokens.textPrimary,
+                          side: BorderSide(color: _tokens.borderColor),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(true),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: accent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: Text(actionLabel),
                       ),
                     ),
                   ],

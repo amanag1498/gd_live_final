@@ -1257,12 +1257,14 @@ class _HostPerformanceBoard extends StatelessWidget {
               children: [
                 _ReportStat(
                   label: 'Video room minutes',
-                  value: '${summary.totalVideoRoomMinutes}',
+                  value: NumberFormat.decimalPattern().format(
+                    summary.totalVideoRoomMinutes,
+                  ),
                   accent: const Color(0xFF06B430),
                 ),
                 _ReportStat(
                   label: 'Video room gifts',
-                  value: NumberFormat.compact().format(
+                  value: NumberFormat.decimalPattern().format(
                     summary.videoRoomGiftsCoins,
                   ),
                   accent: const Color(0xFFFFB400),
@@ -1270,13 +1272,13 @@ class _HostPerformanceBoard extends StatelessWidget {
                 _ReportStat(
                   label: 'Video call',
                   value:
-                      '${summary.videoCallMinutes}m / ${NumberFormat.compact().format(summary.videoCallEarnings)}',
+                      '${NumberFormat.decimalPattern().format(summary.videoCallMinutes)}m / ${NumberFormat.decimalPattern().format(summary.videoCallEarnings)}',
                   accent: const Color(0xFF1E88E5),
                 ),
                 _ReportStat(
                   label: 'PK rooms',
                   value:
-                      '${summary.pkRoomCount} / ${NumberFormat.compact().format(summary.pkEarnings)}',
+                      '${NumberFormat.decimalPattern().format(summary.pkRoomCount)} / ${NumberFormat.decimalPattern().format(summary.pkEarnings)}',
                   accent: const Color(0xFFEF7D57),
                 ),
               ],
@@ -1284,7 +1286,7 @@ class _HostPerformanceBoard extends StatelessWidget {
             const SizedBox(height: 14),
             _MiniLedgerRow(
               label: 'Grand total',
-              value: '${NumberFormat.compact().format(total)} coins',
+              value: '${NumberFormat.decimalPattern().format(total)} coins',
             ),
           ],
         ],
@@ -1323,11 +1325,19 @@ class _ReportStat extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: const Color(0xFF15351C),
-              fontWeight: FontWeight.w800,
+          SizedBox(
+            width: double.infinity,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                maxLines: 1,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: const Color(0xFF15351C),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             ),
           ),
         ],
@@ -1356,11 +1366,18 @@ class _MiniLedgerRow extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: const Color(0xFF15351C),
-              fontWeight: FontWeight.w800,
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Text(
+                value,
+                maxLines: 1,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF15351C),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             ),
           ),
         ],

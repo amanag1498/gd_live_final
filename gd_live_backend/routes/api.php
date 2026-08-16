@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AccountDeletionController;
 use App\Http\Controllers\Api\AdminModerationController;
 use App\Http\Controllers\Api\AppleIapNotificationController;
 use App\Http\Controllers\Api\ApplicationApiController;
@@ -68,6 +69,7 @@ Route::get('/levels', [LevelController::class, 'index']);
 
 // host/admin only
 Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
+    Route::delete('/account', AccountDeletionController::class)->middleware('throttle:3,60');
     Route::get('/live/rooms', [LiveRoomController::class, 'index'])->middleware('live_room_feature_enabled');
     Route::post('/live/rooms', [LiveRoomController::class, 'createOrStart'])->middleware('live_room_feature_enabled');
     Route::post('/live/rooms/{live_room:room_id}/heartbeat', [LiveRoomController::class, 'heartbeat'])->middleware('live_room_feature_enabled');

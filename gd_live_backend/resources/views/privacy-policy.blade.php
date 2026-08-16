@@ -167,7 +167,7 @@
             This Privacy Policy (the “Policy”) describes how GD Live and its affiliates (also referred to as “GD Live,”
             “Company,” “we,” “us,” or “our”), collects, stores, uses and protects your information when you use our website at
             <a href="https://gdlive.in/" target="_blank" rel="noopener">https://gdlive.in/</a> (the “Site”), and any mobile applications
-            that hyperlink to this Policy and are available for download in the Google Play Store.
+            that hyperlink to this Policy and are available through the Apple App Store or Google Play Store.
           </p>
           <p class="policy-copy">
             This Privacy Policy is part of, and is governed by, the terms and conditions set forth in our Terms of Service located at
@@ -254,9 +254,9 @@
           <p>
             We will try to limit the storage of your personal information to the time necessary to serve the purpose(s) for which your personal information was processed, to enforce our agreement, policies or terms, to resolve disputes, or as otherwise required or permitted by law. Please contact us if you have any questions about our retention periods.
           </p>
-          <p><strong>Marketing.</strong> We store information used for marketing purposes indefinitely until you unsubscribe. Once you unsubscribe from marketing communications, we add your contact information to our suppression list to ensure we respect your unsubscribe request.</p>
-          <p><strong>Your Interactions and Content on Our Services.</strong> We may store any information about your interactions on our Services or any content created, posted or shared by you on our Services (e.g., pictures, comments, support tickets, and other content) indefinitely after the closure of your account for the establishment or defense of legal claims, audit and crime prevention purposes.</p>
-          <p><strong>Web Behavior Data.</strong> We retain any information collected via cookies, clear gifs, flash cookies, webpage counters and other technical or analytics tools in our system for a certain date and time from the expiry of the cookie or the date of collection.</p>
+          <p><strong>Marketing.</strong> We retain marketing preferences while your account is active and keep only the minimum suppression record needed to honor an opt-out after you unsubscribe.</p>
+          <p><strong>Your Interactions and Content on Our Services.</strong> When you delete your account, we remove or anonymize account content and interaction data unless a limited record must be retained for financial reconciliation, fraud prevention, safety, dispute resolution, or another legal obligation. Such retained records are access-restricted and kept only as long as the applicable purpose requires.</p>
+          <p><strong>Web Behavior Data.</strong> We retain cookie and analytics information only for the period needed to operate, secure, and improve our services, or as otherwise required by law.</p>
 
           <h2>9. Additional Data Protection Information</h2>
           <p><strong>A. Our Relationship to You.</strong> GD Live is a data controller with regard to any personal information collected from users of its Services. A “user” is an individual providing personal information to us via our Services, such as by creating an account with our Apps, signing up for our newsletters, or otherwise accessing or using our Services. A “data controller” is an entity that determines the purposes for which and the manner in which any personal information is processed. Any third parties that act as our service providers are “data processors” that handle your personal information in accordance with our instructions.</p>
@@ -285,9 +285,9 @@
             <a href="mailto:admin@gdlive.in">admin@gdlive.in</a>.
           </p>
 
-          <h2>11. Automatic Log Updates</h2>
+          <h2>11. Diagnostics and Account Deletion</h2>
           <p>
-            Waiver of Rights to Upload Log. In Settings, users’ log, including all your activities in our Product, such as gifting, commenting, logging in, recharging details and chatting within 3-4 days, will be uploaded to the Company to help fix bugs, etc. After uploading, users waive any and all rights of privacy for the above personal information. With VIP Feedback, VIP users can upload log and waive the same rights of the above personal information.
+            We may process limited diagnostic and activity information needed to operate, secure, troubleshoot, and improve GD Live. We do not treat the use of GD Live as a waiver of your privacy rights. You can permanently delete your account from Settings in the mobile app. Deletion removes or anonymizes account and profile information, revokes active sessions, and removes uploaded profile media, except for records that must be retained for fraud prevention, financial reconciliation, legal compliance, safety, or dispute resolution.
           </p>
 
           <hr class="border-secondary-subtle my-4">

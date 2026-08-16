@@ -212,15 +212,19 @@ class RechargeOrderService
                 'received_at' => now()->toIso8601String(),
                 'transaction' => $appleTransaction,
             ];
-            $notificationType = strtoupper(trim((string) ($notification['notification_type'] ?? '')));
-
             WalletService::getOrCreate($order->user);
             $wallet = Wallet::query()
                 ->where('user_id', $order->user_id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if ($notificationType === 'REFUND_REVERSED') {
+            // Financial state is derived from the transaction fetched directly
+            // from Apple's authenticated Server API, never from notificationType.
+            // A reversed refund is authoritative only once Apple reports that
+            // the transaction no longer has a revocation date.
+            if (empty($appleTransaction['revocationDate'])
+                && in_array($order->status, ['refunded', 'partially_refunded'], true)
+            ) {
                 return $this->reverseAppleRefund(
                     $order,
                     $wallet,

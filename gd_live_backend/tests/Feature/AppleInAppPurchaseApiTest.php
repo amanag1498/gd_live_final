@@ -360,6 +360,73 @@ class AppleInAppPurchaseApiTest extends TestCase
         ]);
     }
 
+    public function test_notification_label_cannot_reverse_an_authoritative_apple_refund(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('user');
+        Sanctum::actingAs($user);
+        $plan = RechargePlan::query()->orderBy('sort_order')->firstOrFail();
+        $transactionId = '2000000999000018';
+        $this->fakeAppleTransaction($user, $plan, $transactionId);
+
+        $this->withHeader('X-Client-Platform', 'ios')
+            ->postJson('/api/recharge/apple/verify', [
+                'product_id' => $plan->apple_product_id,
+                'transaction_id' => $transactionId,
+            ])
+            ->assertOk();
+
+        $revokedTransaction = [
+            'transactionId' => $transactionId,
+            'bundleId' => 'com.techybugs.gdlive',
+            'productId' => $plan->apple_product_id,
+            'type' => 'CONSUMABLE',
+            'environment' => 'Sandbox',
+            'appAccountToken' => $this->accountToken($user),
+            'revocationDate' => now()->getTimestampMs(),
+        ];
+        $apple = Mockery::mock(AppleAppStoreService::class);
+        $apple->shouldReceive('notification')
+            ->twice()
+            ->andReturn(
+                [
+                    'notification_uuid' => 'authoritative-refund',
+                    'notification_type' => 'REFUND',
+                    'transaction' => $revokedTransaction,
+                ],
+                [
+                    'notification_uuid' => 'misleading-reversal-label',
+                    'notification_type' => 'REFUND_REVERSED',
+                    'transaction' => $revokedTransaction,
+                ],
+            );
+        $this->app->instance(AppleAppStoreService::class, $apple);
+
+        $this->postJson('/api/payments/apple/notifications', [
+            'signedPayload' => 'signed-notification',
+        ])->assertOk();
+        $balanceAfterRefund = (int) $user->wallet()->value('balance');
+
+        $this->postJson('/api/payments/apple/notifications', [
+            'signedPayload' => 'signed-notification',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.reason', 'refunded');
+
+        $this->assertSame(
+            $balanceAfterRefund,
+            (int) $user->wallet()->value('balance'),
+        );
+        $this->assertDatabaseHas('payment_orders', [
+            'apple_transaction_id' => $transactionId,
+            'status' => 'refunded',
+        ]);
+        $this->assertDatabaseMissing('wallet_transactions', [
+            'category' => 'recharge_refund_reversal',
+            'transaction_id' => $transactionId,
+        ]);
+    }
+
     private function fakeAppleTransaction(
         User $user,
         RechargePlan $plan,

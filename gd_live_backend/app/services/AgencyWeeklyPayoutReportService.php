@@ -17,6 +17,10 @@ use InvalidArgumentException;
 
 class AgencyWeeklyPayoutReportService
 {
+    public function __construct(private LiveRoomTimingService $roomTiming)
+    {
+    }
+
     public function resolvePeriod(?string $start = null, ?string $end = null): array
     {
         $tz = config('app.timezone');
@@ -1033,19 +1037,7 @@ class AgencyWeeklyPayoutReportService
             $videoMinutes = 0;
 
             foreach ($hostRooms as $room) {
-                $roomStart = $room->started_at?->copy();
-                $roomEnd = ($room->ended_at ?? $room->last_activity_at ?? $room->started_at)?->copy();
-                if (!$roomStart || !$roomEnd) {
-                    continue;
-                }
-
-                $effectiveStart = $roomStart->greaterThan($periodStart) ? $roomStart : $periodStart->copy();
-                $effectiveEnd = $roomEnd->lessThan($periodEnd) ? $roomEnd : $periodEnd->copy();
-                if ($effectiveEnd->lessThanOrEqualTo($effectiveStart)) {
-                    continue;
-                }
-
-                $minutes = (int) floor($effectiveStart->diffInSeconds($effectiveEnd) / 60);
+                $minutes = $this->roomTiming->overlapMinutes($room, $periodStart, $periodEnd);
                 if ($minutes <= 0) {
                     continue;
                 }

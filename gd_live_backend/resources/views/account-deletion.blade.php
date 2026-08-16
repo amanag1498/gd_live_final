@@ -184,17 +184,18 @@
       <div class="content">
         <div class="card-surface">
           <p class="copy">
-            If you would like to delete your GD Live account, you can submit a request through the support channel below.
-            This page is provided as GD Live's public account deletion resource for users who are not able to access the app.
+            You can permanently delete your GD Live account directly in the app from Settings &gt; Account Deletion.
+            This page also provides a support path for users who can no longer access the app.
           </p>
 
           <div class="action-box mt-4">
-            <p class="mb-2"><strong>Email support</strong></p>
-            <p class="mb-3">Send your account deletion request to <a href="mailto:admin@gdlive.in">admin@gdlive.in</a> with the email address or phone number linked to your GD Live account.</p>
+            <p class="mb-2"><strong>Delete in the app</strong></p>
+            <p class="mb-3">Open GD Live, go to Settings, choose Account Deletion, and confirm. The app will verify your identity when required and complete deletion without a support request.</p>
+            <p class="mb-3">If you cannot sign in, email <a href="mailto:admin@gdlive.in">admin@gdlive.in</a> from the address linked to your account.</p>
             <a
               class="mail-link"
               href="mailto:admin@gdlive.in?subject=GD Live%20account%20deletion%20request">
-              Request Account Deletion
+              Contact Deletion Support
             </a>
           </div>
 
@@ -207,8 +208,8 @@
 
           <h2>What happens next</h2>
           <p>
-            After we receive your request, GD Live support will review the request and process account deletion in accordance
-            with applicable legal, security, fraud prevention, and retention requirements.
+            In-app deletion takes effect immediately: active sessions are revoked and account/profile information is removed or anonymized.
+            Limited records may be retained only where required for legal compliance, financial reconciliation, fraud prevention, safety, or dispute resolution.
           </p>
 
           <h2>Temporary deactivation vs deletion</h2>

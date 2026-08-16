@@ -304,6 +304,70 @@ class AuthService {
     Get.offAllNamed(Routes.login);
   }
 
+  Future<void> deleteAccount() async {
+    final firebaseAuth = fb.FirebaseAuth.instance;
+    final firebaseUser = firebaseAuth.currentUser;
+    if (firebaseUser == null) {
+      throw Exception('Please sign in again before deleting your account.');
+    }
+    final usesApple =
+        isApplePlatform &&
+        (currentUser?.provider.toLowerCase() == 'apple' ||
+            firebaseUser.providerData.any(
+              (provider) => provider.providerId == 'apple.com',
+            ));
+    final usesGoogle =
+        currentUser?.provider.toLowerCase() == 'google' ||
+        firebaseUser.providerData.any(
+          (provider) => provider.providerId == 'google.com',
+        );
+
+    if (usesApple) {
+      final provider =
+          fb.AppleAuthProvider()
+            ..addScope('email')
+            ..addScope('name');
+      final credential = await firebaseUser.reauthenticateWithProvider(
+        provider,
+      );
+      final authorizationCode =
+          credential.additionalUserInfo?.authorizationCode?.trim() ?? '';
+      if (authorizationCode.isEmpty) {
+        throw Exception(
+          'Apple could not confirm account deletion. Please try again.',
+        );
+      }
+      await firebaseAuth.revokeTokenWithAuthorizationCode(authorizationCode);
+    } else if (usesGoogle) {
+      final googleUser = await _gsi.signIn();
+      if (googleUser == null) {
+        throw const AuthSignInCancelledException();
+      }
+      final googleAuth = await googleUser.authentication;
+      final credential = fb.GoogleAuthProvider.credential(
+        idToken: googleAuth.idToken,
+        accessToken: googleAuth.accessToken,
+      );
+      await firebaseUser.reauthenticateWithCredential(credential);
+    }
+
+    await PushService.instance.unregisterToken();
+    final response = await api.delete<Map<String, dynamic>>('account');
+    if (response.data?['ok'] != true) {
+      throw Exception(
+        (response.data?['message'] ?? 'Account deletion failed.').toString(),
+      );
+    }
+
+    try {
+      await firebaseUser.delete();
+    } catch (error) {
+      debugPrint('[auth] Firebase identity cleanup deferred: $error');
+    }
+    await _signOutLocalOnly();
+    Get.offAllNamed(Routes.login);
+  }
+
   Future<void> forceLogout(String reason) async {
     await PushService.instance.unregisterToken();
     await _signOutLocalOnly();

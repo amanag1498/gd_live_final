@@ -11,6 +11,10 @@ use Carbon\Carbon;
 
 class HostEarningsReportService
 {
+    public function __construct(private LiveRoomTimingService $roomTiming)
+    {
+    }
+
     public function payloadForHost(Host $host): array
     {
         $now = now($this->businessTimezone());
@@ -113,10 +117,8 @@ class HostEarningsReportService
                 continue;
             }
 
-            $minutes = $this->overlapMinutes(
-                $room->started_at?->copy(),
-                ($room->ended_at ?? $room->last_activity_at ?? $room->started_at)
-                    ?->copy(),
+            $minutes = $this->roomTiming->overlapMinutes(
+                $room,
                 $from,
                 $to
             );
@@ -143,22 +145,6 @@ class HostEarningsReportService
                 'pk_earnings' => $pkCoins,
             ],
         ];
-    }
-
-    private function overlapMinutes(?Carbon $start, ?Carbon $end, Carbon $from, Carbon $to): int
-    {
-        if ($start === null || $end === null) {
-            return 0;
-        }
-
-        $effectiveStart = $start->greaterThan($from) ? $start : $from;
-        $effectiveEnd = $end->lessThan($to) ? $end : $to;
-
-        if ($effectiveEnd->lessThanOrEqualTo($effectiveStart)) {
-            return 0;
-        }
-
-        return (int) floor($effectiveStart->diffInSeconds($effectiveEnd) / 60);
     }
 
     private function businessTimezone(): string

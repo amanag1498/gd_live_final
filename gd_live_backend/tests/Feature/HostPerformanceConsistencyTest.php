@@ -66,6 +66,7 @@ class HostPerformanceConsistencyTest extends TestCase
 
         $mondayRoom = LiveRoom::query()->create([
             'host_id' => $host->id,
+            'agency_id' => $agency->id,
             'room_id' => 'monday-room',
             'title' => 'Monday Room',
             'room_type' => 'video',
@@ -76,6 +77,7 @@ class HostPerformanceConsistencyTest extends TestCase
         ]);
         $sundayRoom = LiveRoom::query()->create([
             'host_id' => $host->id,
+            'agency_id' => $agency->id,
             'room_id' => 'sunday-room',
             'title' => 'Sunday Room',
             'room_type' => 'video',
@@ -321,7 +323,7 @@ class HostPerformanceConsistencyTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.agency-payout-reports.show', $payout))
             ->assertOk()
-            ->assertSee('User ID: '.$hostUser->id)
+            ->assertSee('#'.$hostUser->id.' · '.$hostUser->name)
             ->assertSee('min-w-[160px]', false)
             ->assertSee('payout-grid-scroll', false)
             ->assertSee('payout-grid-sticky-left', false);
