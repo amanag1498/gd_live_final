@@ -2,20 +2,18 @@
 
 namespace App\Http\Middleware;
 
-use App\Services\GameAccessService;
 use App\Services\AppSettingsService;
+use App\Services\GameAccessService;
 use Closure;
 use Illuminate\Http\Request;
 
 class EnsureFeatureEnabled
 {
-    public function __construct(private AppSettingsService $settings)
-    {
-    }
+    public function __construct(private AppSettingsService $settings) {}
 
     public function handle(Request $request, Closure $next, string $featureKey)
     {
-        if (!$this->settings->featureEnabled(
+        if (! $this->settings->featureEnabled(
             $featureKey,
             $request->header('X-Client-Platform'),
         )) {
@@ -30,13 +28,14 @@ class EnsureFeatureEnabled
         $gameKey = match ($featureKey) {
             'teen_patti_enabled' => GameAccessService::GAME_TEEN_PATTI,
             'greedy_enabled' => GameAccessService::GAME_GREEDY,
+            'fortune_wheel_enabled' => GameAccessService::GAME_FORTUNE_WHEEL,
             default => null,
         };
 
         if ($gameKey !== null) {
             $games = app(GameAccessService::class);
 
-            if (!$games->userHasAccess($request->user(), $gameKey)) {
+            if (! $games->userHasAccess($request->user(), $gameKey)) {
                 return response()->json([
                     'ok' => false,
                     'error' => 'FEATURE_DISABLED',
@@ -61,6 +60,7 @@ class EnsureFeatureEnabled
             'host_calling_enabled' => 'Host calling is currently unavailable.',
             'teen_patti_enabled' => 'Teen Patti is currently unavailable.',
             'greedy_enabled' => 'Greedy is currently unavailable.',
+            'fortune_wheel_enabled' => 'Fortune Wheel is currently unavailable.',
             'video_room_games_enabled' => 'Video room games are currently unavailable.',
             default => 'This feature is currently unavailable.',
         };
@@ -71,6 +71,7 @@ class EnsureFeatureEnabled
         return match ($featureKey) {
             'teen_patti_enabled' => 'Teen Patti is locked for this user.',
             'greedy_enabled' => 'Greedy is locked for this user.',
+            'fortune_wheel_enabled' => 'Fortune Wheel is locked for this user.',
             default => $this->messageFor($featureKey),
         };
     }

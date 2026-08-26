@@ -13,6 +13,8 @@ import '../../../../app/widgets/coin_lottie.dart';
 import '../../../../app/widgets/haptics.dart';
 import '../../../../services/app_settings_service.dart';
 import '../../../../services/storage_service.dart';
+import '../../fortune_wheel/services/fortune_wheel_preload_service.dart';
+import '../../fortune_wheel/widgets/fortune_wheel_panel.dart';
 import '../../greedy/widgets/greedy_game_panel.dart';
 import '../../../wallet/widgets/recharge_bottom_sheet.dart';
 import '../models/teen_patti_models.dart';
@@ -72,12 +74,17 @@ class _TeenPattiGamesSheetState extends State<TeenPattiGamesSheet> {
                         ? const TeenPattiGamePanel()
                         : _selectedGame == 'greedy'
                         ? const GreedyGamePanel()
+                        : _selectedGame == 'fortune_wheel'
+                        ? const FortuneWheelPanel()
                         : _GamesList(
                           onOpenTeenPatti: () {
                             setState(() => _selectedGame = 'teen_patti');
                           },
                           onOpenGreedy: () {
                             setState(() => _selectedGame = 'greedy');
+                          },
+                          onOpenFortuneWheel: () {
+                            setState(() => _selectedGame = 'fortune_wheel');
                           },
                         ),
               ),
@@ -140,16 +147,26 @@ class _SheetActionButton extends StatelessWidget {
 }
 
 class _GamesList extends StatelessWidget {
-  const _GamesList({required this.onOpenTeenPatti, required this.onOpenGreedy});
+  const _GamesList({
+    required this.onOpenTeenPatti,
+    required this.onOpenGreedy,
+    required this.onOpenFortuneWheel,
+  });
 
   final VoidCallback onOpenTeenPatti;
   final VoidCallback onOpenGreedy;
+  final VoidCallback onOpenFortuneWheel;
 
   @override
   Widget build(BuildContext context) {
     final settings = Get.find<AppSettingsService>();
     final showTeenPatti = settings.teenPattiEnabled;
     final showGreedy = settings.greedyEnabled;
+    final showFortuneWheel = settings.fortuneWheelEnabled;
+    final fortune =
+        Get.isRegistered<FortuneWheelPreloadService>()
+            ? Get.find<FortuneWheelPreloadService>()
+            : null;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(14, 6, 14, 26),
@@ -199,7 +216,52 @@ class _GamesList extends StatelessWidget {
             ),
             onTap: onOpenGreedy,
           ),
-        if (!showTeenPatti && !showGreedy)
+        if ((showTeenPatti || showGreedy) && showFortuneWheel)
+          const SizedBox(height: 14),
+        if (showFortuneWheel)
+          Obx(() {
+            final snapshot = fortune?.snapshot.value;
+            final freeSpins = snapshot?.freeSpinsRemaining ?? 0;
+            final paidCost = snapshot?.settings.paidSpinCostCoins;
+            return _GameEntryCard(
+              title: 'Fortune Wheel',
+              description:
+                  freeSpins > 0
+                      ? '$freeSpins free spin ready. Win coins, entry packs, subscriptions, or 0 coins.'
+                      : 'Spin the reward wheel for ${paidCost ?? 'coins'} and collect instant prizes.',
+              chip: freeSpins > 0 ? 'FREE SPIN READY' : 'DAILY REWARD',
+              accent: const Color(0xFFFFB84D),
+              icon: Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const SweepGradient(
+                    colors: [
+                      Color(0xFFFFD76B),
+                      Color(0xFFFF5FD2),
+                      Color(0xFF67E8F9),
+                      Color(0xFFFFD76B),
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFFD76B).withValues(alpha: .28),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.stars_rounded,
+                  color: Colors.white,
+                  size: 38,
+                ),
+              ),
+              onTap: onOpenFortuneWheel,
+            );
+          }),
+        if (!showTeenPatti && !showGreedy && !showFortuneWheel)
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -225,7 +287,7 @@ class _GamesList extends StatelessWidget {
                 ),
                 SizedBox(height: 6),
                 Text(
-                  'Enable Teen Patti or Greedy for this user to make games available in the live room.',
+                  'Enable Teen Patti, Greedy, or Fortune Wheel for this user to make games available in the live room.',
                   style: TextStyle(
                     color: Colors.white70,
                     fontWeight: FontWeight.w600,
@@ -344,9 +406,7 @@ class _GameEntryCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: accent.withValues(alpha: .18),
-                  border: Border.all(
-                    color: accent.withValues(alpha: .34),
-                  ),
+                  border: Border.all(color: accent.withValues(alpha: .34)),
                 ),
                 child: Icon(
                   Icons.arrow_forward_rounded,

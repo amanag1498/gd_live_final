@@ -8,13 +8,17 @@ use App\Models\UserGameAccess;
 class GameAccessService
 {
     public const GAME_TEEN_PATTI = 'teen_patti';
+
     public const GAME_GREEDY = 'greedy';
+
+    public const GAME_FORTUNE_WHEEL = 'fortune_wheel';
 
     public function supportedGames(): array
     {
         return [
             self::GAME_TEEN_PATTI,
             self::GAME_GREEDY,
+            self::GAME_FORTUNE_WHEEL,
         ];
     }
 
@@ -22,7 +26,7 @@ class GameAccessService
     {
         $map = array_fill_keys($this->supportedGames(), false);
 
-        if (!$user) {
+        if (! $user) {
             return $map;
         }
 
@@ -45,7 +49,7 @@ class GameAccessService
     {
         $gameKey = strtolower(trim($gameKey));
 
-        if (!$user || !in_array($gameKey, $this->supportedGames(), true)) {
+        if (! $user || ! in_array($gameKey, $this->supportedGames(), true)) {
             return false;
         }
 

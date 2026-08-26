@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Models\UserGameAccess;
 use App\Services\AppSettingsService;
+use App\Services\GameAccessService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Laravel\Sanctum\Sanctum;
@@ -15,6 +17,7 @@ class AppFeatureFlagEnforcementTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected User $member;
 
     protected function setUp(): void
@@ -42,6 +45,7 @@ class AppFeatureFlagEnforcementTest extends TestCase
             'app_features.platform.android.entry_effects_enabled' => true,
             'app_features.platform.android.wallet_recharge_enabled' => true,
             'app_features.platform.android.host_calling_enabled' => true,
+            'app_features.platform.android.fortune_wheel_enabled' => true,
             'app_features.platform.ios.video_rooms_enabled' => true,
             'app_features.platform.ios.pk_battles_enabled' => true,
             'app_features.platform.ios.gifts_enabled' => true,
@@ -49,6 +53,9 @@ class AppFeatureFlagEnforcementTest extends TestCase
             'app_features.platform.ios.entry_effects_enabled' => true,
             'app_features.platform.ios.wallet_recharge_enabled' => true,
             'app_features.platform.ios.host_calling_enabled' => true,
+            'app_features.platform.ios.fortune_wheel_enabled' => true,
+            'games.fortune_wheel.enabled' => true,
+            'games.fortune_wheel.visible_in_video_room_strip' => true,
         ]);
     }
 
@@ -231,6 +238,48 @@ class AppFeatureFlagEnforcementTest extends TestCase
             ->getJson('/api/live/rooms/example-room/pk/active')
             ->assertStatus(403)
             ->assertJsonPath('feature', 'pk_battles_enabled');
+
+        config(['app_features.platform.android.fortune_wheel_enabled' => false]);
+        $this->withHeaders($this->androidHeaders())
+            ->getJson('/api/games/fortune-wheel')
+            ->assertStatus(403)
+            ->assertJsonPath('feature', 'fortune_wheel_enabled');
+    }
+
+    public function test_app_config_exposes_fortune_wheel_only_when_platform_and_game_are_enabled(): void
+    {
+        Sanctum::actingAs($this->member);
+
+        config([
+            'app_features.platform.android.video_room_games_enabled' => true,
+            'app_features.platform.android.fortune_wheel_enabled' => true,
+            'games.fortune_wheel.enabled' => true,
+            'games.fortune_wheel.visible_in_video_room_strip' => true,
+        ]);
+
+        $this->withHeaders($this->androidHeaders())
+            ->getJson('/api/app-config')
+            ->assertOk()
+            ->assertJsonPath('data.features.fortune_wheel_enabled', false);
+
+        UserGameAccess::query()->create([
+            'user_id' => $this->member->id,
+            'game_key' => GameAccessService::GAME_FORTUNE_WHEEL,
+            'granted_by' => $this->admin->id,
+        ]);
+
+        $this->withHeaders($this->androidHeaders())
+            ->getJson('/api/app-config')
+            ->assertOk()
+            ->assertJsonPath('data.features.fortune_wheel_enabled', true)
+            ->assertJsonPath('data.features.video_room_games_enabled', true);
+
+        config(['games.fortune_wheel.visible_in_video_room_strip' => false]);
+
+        $this->withHeaders($this->androidHeaders())
+            ->getJson('/api/app-config')
+            ->assertOk()
+            ->assertJsonPath('data.features.fortune_wheel_enabled', false);
     }
 
     public function test_invalid_app_settings_values_are_rejected(): void

@@ -416,15 +416,15 @@ class _VideoCallPageState extends State<VideoCallPage>
           winnerHost?['avatar_url']?.toString() ??
           winnerHost?['avatar']?.toString();
       _pkOverlayTopSupporters = winnerSupporters
-              .map(
-                (supporter) => PkWinnerSupporter(
-                  userId: supporter.senderId,
-                  name: supporter.senderName,
-                  coins: supporter.totalCoins,
-                  avatarUrl: supporter.avatarUrl,
-                ),
-              )
-              .toList(growable: false);
+          .map(
+            (supporter) => PkWinnerSupporter(
+              userId: supporter.senderId,
+              name: supporter.senderName,
+              coins: supporter.totalCoins,
+              avatarUrl: supporter.avatarUrl,
+            ),
+          )
+          .toList(growable: false);
     });
     _clearPkOverlayLater();
   }
@@ -1110,8 +1110,8 @@ class _VideoCallPageState extends State<VideoCallPage>
           currentUser.name.trim().isNotEmpty ? currentUser.name.trim() : 'You',
       avatarUrl:
           currentUser.avatarUrl?.trim().isNotEmpty == true
-          ? currentUser.avatarUrl!.trim()
-          : null,
+              ? currentUser.avatarUrl!.trim()
+              : null,
       isHost: _isHost,
       isVip: currentUser.roles.any(
         (role) =>
@@ -1534,14 +1534,14 @@ class _VideoCallPageState extends State<VideoCallPage>
                 subtitle: 'Send a private moderation report',
                 onTap:
                     userId == _myUserId
-                    ? null
-                    : () {
-                        Navigator.of(context).pop();
-                        _showReportSheet(
-                          reportedUserId: userId,
-                          reportedName: name,
-                        );
-                      },
+                        ? null
+                        : () {
+                          Navigator.of(context).pop();
+                          _showReportSheet(
+                            reportedUserId: userId,
+                            reportedName: name,
+                          );
+                        },
               ),
               if (canModerate && !speaking && !isHost)
                 _videoParticipantActionTile(
@@ -1571,8 +1571,8 @@ class _VideoCallPageState extends State<VideoCallPage>
                   title: isBlocked ? 'Unblock user' : 'Block permanently',
                   subtitle:
                       isBlocked
-                      ? 'Allow this user to join your rooms again'
-                      : 'Remove and block from all your rooms',
+                          ? 'Allow this user to join your rooms again'
+                          : 'Remove and block from all your rooms',
                   destructive: !isBlocked,
                   onTap: () {
                     Navigator.of(context).pop();
@@ -1876,7 +1876,9 @@ class _VideoCallPageState extends State<VideoCallPage>
 
   bool get _showTeenPattiInVideoRoom {
     final settings = Get.find<AppSettingsService>();
-    return (settings.teenPattiEnabled || settings.greedyEnabled) &&
+    return (settings.teenPattiEnabled ||
+            settings.greedyEnabled ||
+            settings.fortuneWheelEnabled) &&
         settings.videoRoomGamesEnabled;
   }
 
@@ -2325,8 +2327,7 @@ class _VideoCallPageState extends State<VideoCallPage>
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed:
-                            () => Navigator.of(dialogContext).pop(false),
+                        onPressed: () => Navigator.of(dialogContext).pop(false),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: _tokens.textPrimary,
                           side: BorderSide(color: _tokens.borderColor),
@@ -2363,9 +2364,7 @@ class _VideoCallPageState extends State<VideoCallPage>
     );
   }
 
-  Future<bool?> _showLeaveRoomDialog({
-    required bool leavingSpeakerStage,
-  }) {
+  Future<bool?> _showLeaveRoomDialog({required bool leavingSpeakerStage}) {
     final title = leavingSpeakerStage ? 'Leave Live?' : 'Leave Room?';
     final message =
         leavingSpeakerStage
@@ -2400,11 +2399,7 @@ class _VideoCallPageState extends State<VideoCallPage>
                     shape: BoxShape.circle,
                     border: Border.all(color: accent.withOpacity(.22)),
                   ),
-                  child: Icon(
-                    Icons.logout_rounded,
-                    color: accent,
-                    size: 30,
-                  ),
+                  child: Icon(Icons.logout_rounded, color: accent, size: 30),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -2431,8 +2426,7 @@ class _VideoCallPageState extends State<VideoCallPage>
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed:
-                            () => Navigator.of(dialogContext).pop(false),
+                        onPressed: () => Navigator.of(dialogContext).pop(false),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: _tokens.textPrimary,
                           side: BorderSide(color: _tokens.borderColor),
@@ -2494,12 +2488,12 @@ class _VideoCallPageState extends State<VideoCallPage>
                 subtitle: message,
                 accent:
                     destructive
-                    ? _tokens.dangerColor
-                    : _tokens.primaryButtonGradient.first,
+                        ? _tokens.dangerColor
+                        : _tokens.primaryButtonGradient.first,
                 icon:
                     destructive
-                    ? Icons.warning_amber_rounded
-                    : Icons.info_outline_rounded,
+                        ? Icons.warning_amber_rounded
+                        : Icons.info_outline_rounded,
               ),
               const SizedBox(height: 18),
               Row(
@@ -2525,8 +2519,8 @@ class _VideoCallPageState extends State<VideoCallPage>
                       style: FilledButton.styleFrom(
                         backgroundColor:
                             destructive
-                            ? _tokens.dangerColor
-                            : _tokens.primaryButtonGradient.first,
+                                ? _tokens.dangerColor
+                                : _tokens.primaryButtonGradient.first,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
@@ -2716,8 +2710,8 @@ class _VideoCallPageState extends State<VideoCallPage>
                           selected: selectedReason == reason,
                           accent:
                               selectedReason == reason
-                              ? _tokens.dangerColor
-                              : _tokens.primaryButtonGradient.first,
+                                  ? _tokens.dangerColor
+                                  : _tokens.primaryButtonGradient.first,
                           onTap: () {
                             setModalState(() {
                               selectedReason = reason;
@@ -4099,13 +4093,13 @@ class _VideoCallPageState extends State<VideoCallPage>
     });
     try {
       await widget.live.cancelSpeakerRequest(widget.room.roomId, requestId);
-        setState(() {
-          _pendingRequestId = null;
-          _pendingRequestRequestedById = null;
-          _pendingRequestRequestedByName = null;
-          _requestStatus = 'cancelled';
-          _lastSeatRequestWasHostInvite = false;
-        });
+      setState(() {
+        _pendingRequestId = null;
+        _pendingRequestRequestedById = null;
+        _pendingRequestRequestedByName = null;
+        _requestStatus = 'cancelled';
+        _lastSeatRequestWasHostInvite = false;
+      });
       Haptics.light();
       await _refreshSeatSnapshot();
     } catch (e) {
@@ -4128,13 +4122,13 @@ class _VideoCallPageState extends State<VideoCallPage>
       await widget.live.acceptSpeakerRequest(widget.room.roomId, requestId);
       Haptics.success();
       if (mounted) {
-          setState(() {
-            _pendingRequestId = null;
-            _pendingRequestRequestedById = null;
-            _pendingRequestRequestedByName = null;
-            _requestStatus = 'accepted';
-            _lastSeatRequestWasHostInvite = false;
-          });
+        setState(() {
+          _pendingRequestId = null;
+          _pendingRequestRequestedById = null;
+          _pendingRequestRequestedByName = null;
+          _requestStatus = 'accepted';
+          _lastSeatRequestWasHostInvite = false;
+        });
       }
       await _refreshSeatSnapshot();
     } catch (e) {
@@ -4157,16 +4151,16 @@ class _VideoCallPageState extends State<VideoCallPage>
       await widget.live.rejectSpeakerRequest(widget.room.roomId, requestId);
       Haptics.warning();
       if (mounted) {
-          setState(() {
-            final wasHostInvite =
-                _pendingRequestRequestedById != null &&
-                _pendingRequestRequestedById != _myUserId;
-            _pendingRequestId = null;
-            _pendingRequestRequestedById = null;
-            _pendingRequestRequestedByName = null;
-            _requestStatus = 'rejected';
-            _lastSeatRequestWasHostInvite = wasHostInvite;
-          });
+        setState(() {
+          final wasHostInvite =
+              _pendingRequestRequestedById != null &&
+              _pendingRequestRequestedById != _myUserId;
+          _pendingRequestId = null;
+          _pendingRequestRequestedById = null;
+          _pendingRequestRequestedByName = null;
+          _requestStatus = 'rejected';
+          _lastSeatRequestWasHostInvite = wasHostInvite;
+        });
       }
       await _refreshSeatSnapshot();
     } catch (e) {
@@ -4379,8 +4373,8 @@ class _VideoCallPageState extends State<VideoCallPage>
     if (senderId == null) return;
     final senderName =
         (event['sender_name'] ?? event['senderName'] ?? 'Someone')
-        .toString()
-        .trim();
+            .toString()
+            .trim();
     final avatarUrl =
         (event['sender_avatar'] ?? event['senderAvatar'])?.toString().trim();
     final quantity = (_safeInt(event['quantity']) ?? 1).clamp(1, 9999);
@@ -4435,15 +4429,15 @@ class _VideoCallPageState extends State<VideoCallPage>
   List<_PkSupporterStanding> _topPkSupportersFor(String side) {
     final items =
         (_pkGiftLeadersBySide[side] ?? const <int, _PkSupporterStanding>{})
-        .values
-        .toList()
-      ..sort((a, b) {
-        final byCoins = b.totalCoins.compareTo(a.totalCoins);
-        if (byCoins != 0) return byCoins;
+            .values
+            .toList()
+          ..sort((a, b) {
+            final byCoins = b.totalCoins.compareTo(a.totalCoins);
+            if (byCoins != 0) return byCoins;
             return a.senderName.toLowerCase().compareTo(
               b.senderName.toLowerCase(),
             );
-      });
+          });
     return items.take(3).toList(growable: false);
   }
 
@@ -4465,15 +4459,15 @@ class _VideoCallPageState extends State<VideoCallPage>
           winnerHost?['avatar_url']?.toString() ??
           winnerHost?['avatar']?.toString();
       topSupporters = _topPkSupportersFor('left')
-              .map(
-                (supporter) => PkWinnerSupporter(
-                  userId: supporter.senderId,
-                  name: supporter.senderName,
-                  coins: supporter.totalCoins,
-                  avatarUrl: supporter.avatarUrl,
-                ),
-              )
-              .toList(growable: false);
+          .map(
+            (supporter) => PkWinnerSupporter(
+              userId: supporter.senderId,
+              name: supporter.senderName,
+              coins: supporter.totalCoins,
+              avatarUrl: supporter.avatarUrl,
+            ),
+          )
+          .toList(growable: false);
     } else {
       title = 'Opponent Won';
       winnerSide = -1;
@@ -4483,15 +4477,15 @@ class _VideoCallPageState extends State<VideoCallPage>
           winnerHost?['avatar_url']?.toString() ??
           winnerHost?['avatar']?.toString();
       topSupporters = _topPkSupportersFor('right')
-              .map(
-                (supporter) => PkWinnerSupporter(
-                  userId: supporter.senderId,
-                  name: supporter.senderName,
-                  coins: supporter.totalCoins,
-                  avatarUrl: supporter.avatarUrl,
-                ),
-              )
-              .toList(growable: false);
+          .map(
+            (supporter) => PkWinnerSupporter(
+              userId: supporter.senderId,
+              name: supporter.senderName,
+              coins: supporter.totalCoins,
+              avatarUrl: supporter.avatarUrl,
+            ),
+          )
+          .toList(growable: false);
     }
     final subtitle =
         battle.endReason == 'timer_expired'
@@ -4914,16 +4908,16 @@ class _VideoCallPageState extends State<VideoCallPage>
                   title: 'Start PK Battle',
                   subtitle:
                       candidates.isEmpty
-                      ? 'No active host rooms are available right now.'
-                      : 'Invite another live host into a PK battle.',
+                          ? 'No active host rooms are available right now.'
+                          : 'Invite another live host into a PK battle.',
                 ),
                 const SizedBox(height: 14),
                 _gdSheetBanner(
                   title: 'PK Matchmaking',
                   subtitle:
                       candidates.isEmpty
-                      ? 'Check back in a moment for more live hosts.'
-                      : 'Pick a live room to send a PK challenge.',
+                          ? 'Check back in a moment for more live hosts.'
+                          : 'Pick a live room to send a PK challenge.',
                   accent: _tokens.primaryButtonGradient.first,
                   icon: Icons.sports_martial_arts_rounded,
                 ),
@@ -5297,47 +5291,47 @@ class _VideoCallPageState extends State<VideoCallPage>
     return rawTiles
         .whereType<Map>()
         .map((entry) {
-      final data = Map<String, dynamic>.from(entry);
-      final brandKey = normalizeBrandVariant(
-        data['brand_key']?.toString() ?? 'midnight',
-      );
-      final label = data['label']?.toString() ?? 'Guest';
-      return _StageTileData(
-        label: label,
-        subtitle:
-            data['is_host'] == true
-                ? 'Host'
-                : (data['subtitle']?.toString() ?? 'Guest'),
-        isLocal: data['is_local'] == true,
-        brandKey: brandKey,
-        isHost: data['is_host'] == true,
-        isVip: data['is_vip'] == true,
-        isSpeaking: data['is_speaking'] == true,
-        userId: _safeInt(data['user_id']),
+          final data = Map<String, dynamic>.from(entry);
+          final brandKey = normalizeBrandVariant(
+            data['brand_key']?.toString() ?? 'midnight',
+          );
+          final label = data['label']?.toString() ?? 'Guest';
+          return _StageTileData(
+            label: label,
+            subtitle:
+                data['is_host'] == true
+                    ? 'Host'
+                    : (data['subtitle']?.toString() ?? 'Guest'),
+            isLocal: data['is_local'] == true,
+            brandKey: brandKey,
+            isHost: data['is_host'] == true,
+            isVip: data['is_vip'] == true,
+            isSpeaking: data['is_speaking'] == true,
+            userId: _safeInt(data['user_id']),
             avatarUrl:
                 data['avatar_url']?.toString() ?? data['avatar']?.toString(),
-        level: _safeInt(data['level']),
-        onProfileTap:
-            _safeInt(data['user_id']) == null
-                ? null
-                : () => _showParticipantProfileCard(
-                  userId: _safeInt(data['user_id'])!,
-                  name: label,
-                  subtitle:
-                      data['is_host'] == true
-                          ? 'Host'
-                          : (data['subtitle']?.toString() ?? 'Guest'),
-                  brandKey: brandKey,
-                  isVip: data['is_vip'] == true,
-                  isHost: data['is_host'] == true,
-                  speaking: data['is_speaking'] == true,
-                  level: _safeInt(data['level']),
-                  avatarUrl:
-                      data['avatar_url']?.toString() ??
-                      data['avatar']?.toString(),
-                ),
+            level: _safeInt(data['level']),
+            onProfileTap:
+                _safeInt(data['user_id']) == null
+                    ? null
+                    : () => _showParticipantProfileCard(
+                      userId: _safeInt(data['user_id'])!,
+                      name: label,
+                      subtitle:
+                          data['is_host'] == true
+                              ? 'Host'
+                              : (data['subtitle']?.toString() ?? 'Guest'),
+                      brandKey: brandKey,
+                      isVip: data['is_vip'] == true,
+                      isHost: data['is_host'] == true,
+                      speaking: data['is_speaking'] == true,
+                      level: _safeInt(data['level']),
+                      avatarUrl:
+                          data['avatar_url']?.toString() ??
+                          data['avatar']?.toString(),
+                    ),
             child: _DevVideoTilePlaceholder(label: label, brandKey: brandKey),
-      );
+          );
         })
         .toList(growable: false);
   }
@@ -5387,293 +5381,293 @@ class _VideoCallPageState extends State<VideoCallPage>
             backgroundColor: _tokens.backgroundGradient.first,
             body: Stack(
               children: [
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      _tokens.backgroundGradient.first,
-                      _tokens.cardGradient.first,
-                      _tokens.backgroundGradient.last,
-                    ],
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          _tokens.backgroundGradient.first,
+                          _tokens.cardGradient.first,
+                          _tokens.backgroundGradient.last,
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            Positioned(
-              top: -40,
-              right: -30,
-              child: Container(
-                width: 180,
-                height: 180,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
+                Positioned(
+                  top: -40,
+                  right: -30,
+                  child: Container(
+                    width: 180,
+                    height: 180,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
                       color: _tokens.primaryButtonGradient.first.withOpacity(
                         .12,
                       ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            Positioned(
-              left: -34,
-              bottom: 84,
-              child: Container(
-                width: 150,
-                height: 150,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: _tokens.glowColor.withOpacity(.10),
+                Positioned(
+                  left: -34,
+                  bottom: 84,
+                  child: Container(
+                    width: 150,
+                    height: 150,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _tokens.glowColor.withOpacity(.10),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            Positioned.fill(
-              child:
-                  (_error != null && !_connecting)
-                      ? Center(
-                        child: Text(
-                          _error!,
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      )
-                      : (_connecting)
-                      ? const Center(
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                      : KeyedSubtree(
+                Positioned.fill(
+                  child:
+                      (_error != null && !_connecting)
+                          ? Center(
+                            child: Text(
+                              _error!,
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          )
+                          : (_connecting)
+                          ? const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : KeyedSubtree(
                             key: _giftAnchors.keyFor(
                               GiftAnchorRegistry.stageCenter,
                             ),
-                        child:
-                            _pkCapable && _pkActive
-                                ? _buildPkVideoStage(
-                                  topInset: pkStageTopInset,
-                                )
-                                : _DynamicStageGrid(tiles: stageTiles),
-                      ),
-            ),
-            Positioned.fill(
-              child: _AnimatedVeil(
-                glow: _glow,
-                speaking: _canPublishMedia ? _localSpeaking : false,
-              ),
-            ),
-            SafeArea(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  isCompactDevice ? 10 : 14,
-                  isCompactDevice ? 2 : 4,
-                  isCompactDevice ? 10 : 14,
-                  0,
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth:
-                                  _pkCapable && _pkActive
-                                      ? (isCompactDevice ? 240 : 300)
-                                      : double.infinity,
-                            ),
-                            child: _LiveRoomInfoPill(
-                              hostName: _hostDisplayName,
-                              hostAvatarUrl: _hostAvatarUrl,
-                              liveLabel: _timerText,
-                              participantCount: _viewerCount,
-                              onHostTap: _openHostProfileFromPill,
-                              onViewerTap: _showViewerListSheet,
-                            ),
+                            child:
+                                _pkCapable && _pkActive
+                                    ? _buildPkVideoStage(
+                                      topInset: pkStageTopInset,
+                                    )
+                                    : _DynamicStageGrid(tiles: stageTiles),
                           ),
-                        ),
-                        SizedBox(width: isNarrowScreen ? 5 : 8),
-                        _TopRightExitPill(
-                          label:
-                              _isHost
-                                  ? (isNarrowScreen ? 'End' : 'End Live')
-                                  : 'Leave',
-                          accent: _isHost ? Colors.redAccent : null,
-                          onTap: () async {
-                            if (_isHost) {
-                              await _endSession();
-                              return;
-                            }
-                            await _exitViewerSession();
-                          },
-                        ),
-                      ],
+                ),
+                Positioned.fill(
+                  child: _AnimatedVeil(
+                    glow: _glow,
+                    speaking: _canPublishMedia ? _localSpeaking : false,
+                  ),
+                ),
+                SafeArea(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      isCompactDevice ? 10 : 14,
+                      isCompactDevice ? 2 : 4,
+                      isCompactDevice ? 10 : 14,
+                      0,
                     ),
-                    if (_recentGiftMessage != null) ...[
-                      SizedBox(height: isCompactDevice ? 8 : 10),
-                      _FloatingTickerBanner(
-                        icon: Icons.redeem_rounded,
-                        message: _recentGiftMessage!,
-                        onDismiss:
-                            () => setState(() => _recentGiftMessage = null),
-                      ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxWidth:
+                                      _pkCapable && _pkActive
+                                          ? (isCompactDevice ? 240 : 300)
+                                          : double.infinity,
+                                ),
+                                child: _LiveRoomInfoPill(
+                                  hostName: _hostDisplayName,
+                                  hostAvatarUrl: _hostAvatarUrl,
+                                  liveLabel: _timerText,
+                                  participantCount: _viewerCount,
+                                  onHostTap: _openHostProfileFromPill,
+                                  onViewerTap: _showViewerListSheet,
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: isNarrowScreen ? 5 : 8),
+                            _TopRightExitPill(
+                              label:
+                                  _isHost
+                                      ? (isNarrowScreen ? 'End' : 'End Live')
+                                      : 'Leave',
+                              accent: _isHost ? Colors.redAccent : null,
+                              onTap: () async {
+                                if (_isHost) {
+                                  await _endSession();
+                                  return;
+                                }
+                                await _exitViewerSession();
+                              },
+                            ),
+                          ],
+                        ),
+                        if (_recentGiftMessage != null) ...[
+                          SizedBox(height: isCompactDevice ? 8 : 10),
+                          _FloatingTickerBanner(
+                            icon: Icons.redeem_rounded,
+                            message: _recentGiftMessage!,
+                            onDismiss:
+                                () => setState(() => _recentGiftMessage = null),
+                          ),
                         ] else if (_viewerStatusText != null &&
                             !_canModerate) ...[
-                      SizedBox(height: isCompactDevice ? 8 : 10),
-                      _FloatingTickerBanner(
-                        icon:
-                            _requestStatus == 'pending'
-                                ? Icons.hourglass_top_rounded
-                                : (_requestStatus == 'accepted'
-                                    ? Icons.videocam_rounded
-                                    : Icons.info_outline_rounded),
-                        message: _viewerStatusText!,
-                        accent:
-                            _requestStatus == 'rejected' ||
-                                    _requestStatus == 'removed'
-                                ? Colors.orangeAccent
-                                : const Color(0xFF7B50C5),
+                          SizedBox(height: isCompactDevice ? 8 : 10),
+                          _FloatingTickerBanner(
+                            icon:
+                                _requestStatus == 'pending'
+                                    ? Icons.hourglass_top_rounded
+                                    : (_requestStatus == 'accepted'
+                                        ? Icons.videocam_rounded
+                                        : Icons.info_outline_rounded),
+                            message: _viewerStatusText!,
+                            accent:
+                                _requestStatus == 'rejected' ||
+                                        _requestStatus == 'removed'
+                                    ? Colors.orangeAccent
+                                    : const Color(0xFF7B50C5),
                             onDismiss:
                                 () => setState(() => _requestStatus = null),
-                      ),
-                    ],
-                  ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            if (inlineError != null && inlineError.isNotEmpty)
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: 82 + pad.bottom,
-                child: _InlineErrorBanner(message: inlineError),
-              ),
-            Positioned.fill(
-              child: Obx(() {
+                if (inlineError != null && inlineError.isNotEmpty)
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 82 + pad.bottom,
+                    child: _InlineErrorBanner(message: inlineError),
+                  ),
+                Positioned.fill(
+                  child: Obx(() {
                     final viewerBrandKey = 'midnight';
-                return LiveRoomChatOverlay(
-                  key: ValueKey('video-room-chat-$viewerBrandKey'),
-                  messagesListenable: _chatMessages,
-                  viewerBrandKey: viewerBrandKey,
-                  roomId: widget.room.roomId,
-                  roomType: widget.room.roomType,
-                  maxWidth: _isHost ? 360 : media.size.width,
-                  topOffset: _pkCapable && _pkActive ? pkChatTopOffset : 0,
-                  bottomOffset:
-                      (_pkCapable && _pkActive
-                                  ? (isCompactDevice ? 8 : 14)
-                                  : (isCompactDevice ? 10 : 18)) +
-                              pad.bottom,
-                  maxHeightFactor:
-                      _pkCapable && _pkActive
-                          ? (isCompactDevice ? 0.38 : 0.54)
-                          : (isCompactDevice ? 0.28 : 0.4),
-                  showEmptyPrompt: false,
-                  stickMessagesToBottom: true,
-                  compactBubbles: _pkCapable && _pkActive,
-                  inputActions: const <Widget>[],
-                  footerActions: _buildChatInputActions(),
-                  trailingActions: _buildChatTrailingActions(),
-                  showSendButton: false,
-                  onSend: _sendChatMessage,
-                  onMessageSenderTap: (message) {
-                    if (message.isSystem || message.senderId <= 0) return;
-                    _showParticipantProfileCard(
-                      userId: message.senderId,
-                      name: message.senderName,
+                    return LiveRoomChatOverlay(
+                      key: ValueKey('video-room-chat-$viewerBrandKey'),
+                      messagesListenable: _chatMessages,
+                      viewerBrandKey: viewerBrandKey,
+                      roomId: widget.room.roomId,
+                      roomType: widget.room.roomType,
+                      maxWidth: _isHost ? 360 : media.size.width,
+                      topOffset: _pkCapable && _pkActive ? pkChatTopOffset : 0,
+                      bottomOffset:
+                          (_pkCapable && _pkActive
+                              ? (isCompactDevice ? 8 : 14)
+                              : (isCompactDevice ? 10 : 18)) +
+                          pad.bottom,
+                      maxHeightFactor:
+                          _pkCapable && _pkActive
+                              ? (isCompactDevice ? 0.38 : 0.54)
+                              : (isCompactDevice ? 0.28 : 0.4),
+                      showEmptyPrompt: false,
+                      stickMessagesToBottom: true,
+                      compactBubbles: _pkCapable && _pkActive,
+                      inputActions: const <Widget>[],
+                      footerActions: _buildChatInputActions(),
+                      trailingActions: _buildChatTrailingActions(),
+                      showSendButton: false,
+                      onSend: _sendChatMessage,
+                      onMessageSenderTap: (message) {
+                        if (message.isSystem || message.senderId <= 0) return;
+                        _showParticipantProfileCard(
+                          userId: message.senderId,
+                          name: message.senderName,
                           subtitle:
                               message.senderIsHost
-                          ? 'Host'
+                                  ? 'Host'
                                   : (message.senderIsVip
                                       ? 'VIP Participant'
                                       : 'Participant'),
-                      brandKey: kGdLiveBrandKey,
-                      isVip: message.senderIsVip,
-                      isHost: message.senderIsHost,
-                      speaking: false,
-                      level: message.senderLevel,
-                      avatarUrl: message.senderAvatar,
+                          brandKey: kGdLiveBrandKey,
+                          isVip: message.senderIsVip,
+                          isHost: message.senderIsHost,
+                          speaking: false,
+                          level: message.senderLevel,
+                          avatarUrl: message.senderAvatar,
+                        );
+                      },
                     );
-                  },
-                );
-              }),
-            ),
-            Positioned.fill(
-              child: IgnorePointer(
-                child: RepaintBoundary(child: _EmojiBurst(key: _emojiKey)),
-              ),
-            ),
-            Positioned.fill(
-              child: EntryEffectOverlay(
-                roomId: widget.room.roomId,
-                initialEffect: widget.room.entryEffect,
-                events:
-                    Get.isRegistered<RoomsSocketService>()
-                        ? Get.find<RoomsSocketService>().entryEffectEvents
-                        : null,
-              ),
-            ),
-            Positioned.fill(
-              child: GiftAnimationLayer(
-                manager: _giftAnimationOverlay,
-                anchors: _giftAnchors,
+                  }),
+                ),
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: RepaintBoundary(child: _EmojiBurst(key: _emojiKey)),
+                  ),
+                ),
+                Positioned.fill(
+                  child: EntryEffectOverlay(
+                    roomId: widget.room.roomId,
+                    initialEffect: widget.room.entryEffect,
+                    events:
+                        Get.isRegistered<RoomsSocketService>()
+                            ? Get.find<RoomsSocketService>().entryEffectEvents
+                            : null,
+                  ),
+                ),
+                Positioned.fill(
+                  child: GiftAnimationLayer(
+                    manager: _giftAnimationOverlay,
+                    anchors: _giftAnchors,
                     currentBrandKey: 'midnight',
-                receiverAnchorName: GiftAnchorRegistry.videoHostTile,
-                stageCenterAnchorName: GiftAnchorRegistry.stageCenter,
-                pkLeftAnchorName:
+                    receiverAnchorName: GiftAnchorRegistry.videoHostTile,
+                    stageCenterAnchorName: GiftAnchorRegistry.stageCenter,
+                    pkLeftAnchorName:
                         _pkCapable && _pkActive
                             ? GiftAnchorRegistry.pkLeft
                             : null,
-                pkRightAnchorName:
-                    _pkCapable && _pkActive
-                        ? GiftAnchorRegistry.pkRight
-                        : null,
-              ),
-            ),
-            if (_pkCapable && _incomingPkInvite != null)
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: 116 + pad.bottom,
-                child: _PkInvitePrompt(
-                  battle: _incomingPkInvite!,
-                  busy: _pkBusy,
-                  onAccept: () => _respondToIncomingPk(true),
-                  onReject: () => _respondToIncomingPk(false),
+                    pkRightAnchorName:
+                        _pkCapable && _pkActive
+                            ? GiftAnchorRegistry.pkRight
+                            : null,
+                  ),
                 ),
-              ),
-            if (_pkCapable &&
-                _pkOverlayTitle != null &&
-                _pkOverlaySubtitle != null)
-              PkWinnerOverlay(
-                title: _pkOverlayTitle!,
-                subtitle: _pkOverlaySubtitle!,
-                winnerSide: _pkOverlayWinnerSide,
-                winnerName: _pkOverlayWinnerName,
-                winnerAvatarUrl: _pkOverlayWinnerAvatarUrl,
-                topSupporters: _pkOverlayTopSupporters,
-                onSupporterTap: (supporter) {
-                  _openPkSupporterProfile(
-                    _PkSupporterStanding(
-                      senderId: supporter.userId,
-                      senderName: supporter.name,
-                      totalCoins: supporter.coins,
-                      avatarUrl: supporter.avatarUrl,
+                if (_pkCapable && _incomingPkInvite != null)
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 116 + pad.bottom,
+                    child: _PkInvitePrompt(
+                      battle: _incomingPkInvite!,
+                      busy: _pkBusy,
+                      onAccept: () => _respondToIncomingPk(true),
+                      onReject: () => _respondToIncomingPk(false),
                     ),
-                  );
-                },
-              ),
-            if (widget.devMode)
-              Positioned(
-                right: 16,
-                bottom: 132 + pad.bottom,
-                child: _DevPkControlPad(
-                  pkActive: _pkActive,
-                  onStart: _mockDevEnterPkBattle,
-                  onReset: _mockDevExitPkBattle,
-                  onLeftGift: () => _mockDevGiftToSide('left'),
-                  onRightGift: () => _mockDevGiftToSide('right'),
-                  onLeftWin: () => _mockDevResolvePk(1),
-                  onRightWin: () => _mockDevResolvePk(-1),
-                ),
-              ),
+                  ),
+                if (_pkCapable &&
+                    _pkOverlayTitle != null &&
+                    _pkOverlaySubtitle != null)
+                  PkWinnerOverlay(
+                    title: _pkOverlayTitle!,
+                    subtitle: _pkOverlaySubtitle!,
+                    winnerSide: _pkOverlayWinnerSide,
+                    winnerName: _pkOverlayWinnerName,
+                    winnerAvatarUrl: _pkOverlayWinnerAvatarUrl,
+                    topSupporters: _pkOverlayTopSupporters,
+                    onSupporterTap: (supporter) {
+                      _openPkSupporterProfile(
+                        _PkSupporterStanding(
+                          senderId: supporter.userId,
+                          senderName: supporter.name,
+                          totalCoins: supporter.coins,
+                          avatarUrl: supporter.avatarUrl,
+                        ),
+                      );
+                    },
+                  ),
+                if (widget.devMode)
+                  Positioned(
+                    right: 16,
+                    bottom: 132 + pad.bottom,
+                    child: _DevPkControlPad(
+                      pkActive: _pkActive,
+                      onStart: _mockDevEnterPkBattle,
+                      onReset: _mockDevExitPkBattle,
+                      onLeftGift: () => _mockDevGiftToSide('left'),
+                      onRightGift: () => _mockDevGiftToSide('right'),
+                      onLeftWin: () => _mockDevResolvePk(1),
+                      onRightWin: () => _mockDevResolvePk(-1),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -5974,25 +5968,25 @@ class _VideoParticipantProfileFallbackSheet extends StatelessWidget {
                         ),
                         child:
                             avatarUrl?.trim().isNotEmpty == true
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(26),
-                                child: Image.network(
-                                  avatarUrl!.trim(),
-                                  fit: BoxFit.cover,
-                                ),
-                              )
-                            : Center(
-                                child: Text(
-                                  name.isNotEmpty
-                                      ? name.characters.first.toUpperCase()
-                                      : '?',
-                                  style: TextStyle(
-                                    color: frameTokens.textPrimary,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 28,
+                                ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(26),
+                                  child: Image.network(
+                                    avatarUrl!.trim(),
+                                    fit: BoxFit.cover,
+                                  ),
+                                )
+                                : Center(
+                                  child: Text(
+                                    name.isNotEmpty
+                                        ? name.characters.first.toUpperCase()
+                                        : '?',
+                                    style: TextStyle(
+                                      color: frameTokens.textPrimary,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 28,
+                                    ),
                                   ),
                                 ),
-                              ),
                       ),
                     ),
                     const SizedBox(width: 14),
@@ -6250,9 +6244,7 @@ class _FooterCircleAction extends StatelessWidget {
     final tokens = getBrandTokens('midnight');
     final tint =
         accent ??
-        (active
-            ? tokens.primaryButtonGradient.first
-            : const Color(0xFF183047));
+        (active ? tokens.primaryButtonGradient.first : const Color(0xFF183047));
     final canTap = onTap != null && !disabled && !busy;
     final surface =
         Color.lerp(
@@ -6299,11 +6291,7 @@ class _FooterCircleAction extends StatelessWidget {
                         )
                         : Opacity(
                           opacity: disabled ? .42 : 1,
-                          child: Icon(
-                            icon,
-                            size: 20,
-                            color: Colors.white,
-                          ),
+                          child: Icon(icon, size: 20, color: Colors.white),
                         ),
               ),
             ),
@@ -6620,9 +6608,7 @@ class _ExpandableFooterClusterState extends State<_ExpandableFooterCluster> {
                     decoration: BoxDecoration(
                       color: const Color(0xFF081725),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(.72),
-                      ),
+                      border: Border.all(color: Colors.white.withOpacity(.72)),
                       boxShadow: const [
                         BoxShadow(
                           color: Color(0x80000000),
@@ -7609,8 +7595,8 @@ class _LiveRoomPillAvatar extends StatelessWidget {
     final size = compact ? 34.0 : 42.0;
     final initial =
         name.trim().isNotEmpty
-        ? name.trim().characters.first.toUpperCase()
-        : 'H';
+            ? name.trim().characters.first.toUpperCase()
+            : 'H';
     return SizedBox(
       width: size,
       height: size,
@@ -7979,9 +7965,9 @@ class _DynamicStageGrid extends StatelessWidget {
 
     if (tiles.length == 2) {
       final ordered = List<_StageTileData>.from(tiles)..sort((a, b) {
-          if (a.isHost == b.isHost) return 0;
-          return a.isHost ? -1 : 1;
-        });
+        if (a.isHost == b.isHost) return 0;
+        return a.isHost ? -1 : 1;
+      });
       return Column(
         children: [
           Expanded(child: _StageTile(tile: ordered[0])),

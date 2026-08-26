@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AdminActionAudit;
 use App\Models\CallSession;
+use App\Models\DeviceBlock;
 use App\Models\EntryPack;
 use App\Models\HostFollower;
 use App\Models\LiveRoom;
@@ -24,7 +25,6 @@ use App\Services\GameAccessService;
 use App\Services\UserLevelService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use App\Models\DeviceBlock;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 
@@ -34,8 +34,7 @@ class UserAdminController extends Controller
         private UserLevelService $levels,
         private AdminAuditService $audits,
         private GameAccessService $gameAccess,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request)
     {
@@ -48,7 +47,7 @@ class UserAdminController extends Controller
             } else {
                 $q->where(function ($qq) use ($s) {
                     $qq->where('name', 'like', "%{$s}%")
-                       ->orWhere('email', 'like', "%{$s}%");
+                        ->orWhere('email', 'like', "%{$s}%");
                 });
             }
         }
@@ -215,16 +214,16 @@ class UserAdminController extends Controller
     public function block(User $user)
     {
         $before = $user->only(['id', 'is_blocked']);
-        $user->update(['is_blocked'=>true]);
+        $user->update(['is_blocked' => true]);
         if (method_exists($user, 'tokens')) {
-        $user->tokens()->delete();
-    }
+            $user->tokens()->delete();
+        }
 
-    // Notify presence WS (Redis pubsub)
-    try {
-        Redis::publish('users:block', json_encode(['user_id' => $user->id]));
-    } catch (\Throwable $e) {
-    }
+        // Notify presence WS (Redis pubsub)
+        try {
+            Redis::publish('users:block', json_encode(['user_id' => $user->id]));
+        } catch (\Throwable $e) {
+        }
         $this->audits->log(
             area: 'users',
             action: 'user_blocked',
@@ -235,6 +234,7 @@ class UserAdminController extends Controller
             after: $user->fresh()->only(['id', 'is_blocked']),
             reason: request('reason'),
         );
+
         return back()->with('ok', 'User blocked.');
     }
 
@@ -252,93 +252,101 @@ class UserAdminController extends Controller
             after: $user->fresh()->only(['id', 'is_blocked']),
             reason: request('reason'),
         );
+
         return back()->with('ok', 'User unblocked.');
     }
 
     public function deviceBlock(Request $request, User $user)
-{
-    $deviceId = $user->device_id;
-    if (!$deviceId) {
-        return back()->with('error', 'User has no device_id on file.');
+    {
+        $deviceId = $user->device_id;
+        if (! $deviceId) {
+            return back()->with('error', 'User has no device_id on file.');
+        }
+
+        // 1) Upsert device-level block (permanent unless expires_at provided)
+        $existingBlock = DeviceBlock::where('device_id', $deviceId)->first();
+        DeviceBlock::updateOrCreate(
+            ['device_id' => $deviceId],
+            [
+                'reason' => $request->input('reason'),
+                'expires_at' => $request->filled('expires_at') ? now()->parse($request->input('expires_at')) : null,
+                'created_by' => $request->user()->id ?? null,
+            ]
+        );
+
+        // 2) Find all users with this device_id
+        $ids = \App\Models\User::where('device_id', $deviceId)->pluck('id')->all();
+
+        if (! empty($ids)) {
+            // 3) Bulk mark blocked
+            \App\Models\User::whereIn('id', $ids)->update(['is_blocked' => true]);
+
+            // 4) Revoke tokens + kick via Redis for each user (chunk to be safe)
+            \App\Models\User::whereIn('id', $ids)->chunkById(100, function ($users) {
+                foreach ($users as $u) {
+                    try {
+                        $u->tokens()->delete();
+                    } catch (\Throwable $e) {
+                    }
+                    try {
+                        \Illuminate\Support\Facades\Redis::publish('users:block', json_encode(['user_id' => $u->id]));
+                    } catch (\Throwable $e) {
+                    }
+                }
+            });
+        }
+
+        $this->audits->log(
+            area: 'users',
+            action: 'device_blocked',
+            admin: $request->user(),
+            targetUser: $user,
+            entity: $user,
+            before: $existingBlock?->toArray(),
+            after: DeviceBlock::where('device_id', $deviceId)->first()?->toArray(),
+            reason: $request->input('reason'),
+            meta: ['device_id' => $deviceId, 'affected_user_ids' => $ids],
+        );
+
+        return back()->with('ok', "Device blocked: $deviceId (affected ".count($ids).' account(s))');
     }
 
-    // 1) Upsert device-level block (permanent unless expires_at provided)
-    $existingBlock = DeviceBlock::where('device_id', $deviceId)->first();
-    DeviceBlock::updateOrCreate(
-        ['device_id' => $deviceId],
-        [
-            'reason'     => $request->input('reason'),
-            'expires_at' => $request->filled('expires_at') ? now()->parse($request->input('expires_at')) : null,
-            'created_by' => $request->user()->id ?? null,
-        ]
-    );
+    public function deviceUnblock(User $user)
+    {
+        $deviceId = $user->device_id;
+        if (! $deviceId) {
+            return back()->with('error', 'User has no device_id on file.');
+        }
 
-    // 2) Find all users with this device_id
-    $ids = \App\Models\User::where('device_id', $deviceId)->pluck('id')->all();
+        // 1) Remove device-level block
+        DeviceBlock::where('device_id', $deviceId)->delete();
 
-    if (!empty($ids)) {
-        // 3) Bulk mark blocked
-        \App\Models\User::whereIn('id', $ids)->update(['is_blocked' => true]);
+        // 2) Unblock ALL users sharing this device_id (symmetry)
+        $ids = \App\Models\User::where('device_id', $deviceId)->pluck('id')->all();
+        if (! empty($ids)) {
+            \App\Models\User::whereIn('id', $ids)->update(['is_blocked' => false]);
+        }
 
-        // 4) Revoke tokens + kick via Redis for each user (chunk to be safe)
-        \App\Models\User::whereIn('id', $ids)->chunkById(100, function ($users) {
-            foreach ($users as $u) {
-                try { $u->tokens()->delete(); } catch (\Throwable $e) {}
-                try { \Illuminate\Support\Facades\Redis::publish('users:block', json_encode(['user_id' => $u->id])); } catch (\Throwable $e) {}
-            }
-        });
+        $this->audits->log(
+            area: 'users',
+            action: 'device_unblocked',
+            admin: request()->user(),
+            targetUser: $user,
+            entity: $user,
+            before: ['device_id' => $deviceId, 'affected_user_ids' => $ids],
+            after: null,
+            meta: ['device_id' => $deviceId, 'affected_user_ids' => $ids],
+        );
+
+        return back()->with('ok', "Device unblocked: $deviceId (affected ".count($ids).' account(s))');
     }
-
-    $this->audits->log(
-        area: 'users',
-        action: 'device_blocked',
-        admin: $request->user(),
-        targetUser: $user,
-        entity: $user,
-        before: $existingBlock?->toArray(),
-        after: DeviceBlock::where('device_id', $deviceId)->first()?->toArray(),
-        reason: $request->input('reason'),
-        meta: ['device_id' => $deviceId, 'affected_user_ids' => $ids],
-    );
-
-    return back()->with('ok', "Device blocked: $deviceId (affected ".count($ids)." account(s))");
-}
-
-public function deviceUnblock(User $user)
-{
-    $deviceId = $user->device_id;
-    if (!$deviceId) {
-        return back()->with('error', 'User has no device_id on file.');
-    }
-
-    // 1) Remove device-level block
-    DeviceBlock::where('device_id', $deviceId)->delete();
-
-    // 2) Unblock ALL users sharing this device_id (symmetry)
-    $ids = \App\Models\User::where('device_id', $deviceId)->pluck('id')->all();
-    if (!empty($ids)) {
-        \App\Models\User::whereIn('id', $ids)->update(['is_blocked' => false]);
-    }
-
-    $this->audits->log(
-        area: 'users',
-        action: 'device_unblocked',
-        admin: request()->user(),
-        targetUser: $user,
-        entity: $user,
-        before: ['device_id' => $deviceId, 'affected_user_ids' => $ids],
-        after: null,
-        meta: ['device_id' => $deviceId, 'affected_user_ids' => $ids],
-    );
-
-    return back()->with('ok', "Device unblocked: $deviceId (affected ".count($ids)." account(s))");
-}
 
     public function updateGameAccess(Request $request, User $user)
     {
         $data = $request->validate([
             'teen_patti' => 'nullable|boolean',
             'greedy' => 'nullable|boolean',
+            'fortune_wheel' => 'nullable|boolean',
             'reason' => 'nullable|string|max:500',
         ]);
 
@@ -346,6 +354,7 @@ public function deviceUnblock(User $user)
         $after = $this->gameAccess->syncUserAccess($user, [
             GameAccessService::GAME_TEEN_PATTI => (bool) ($data['teen_patti'] ?? false),
             GameAccessService::GAME_GREEDY => (bool) ($data['greedy'] ?? false),
+            GameAccessService::GAME_FORTUNE_WHEEL => (bool) ($data['fortune_wheel'] ?? false),
         ], $request->user());
 
         $this->audits->log(
@@ -376,8 +385,8 @@ public function deviceUnblock(User $user)
         ]);
 
         $plan = SubscriptionPlan::query()->findOrFail($data['plan_id']);
-        $startsAt = !empty($data['starts_at']) ? Carbon::parse($data['starts_at']) : now();
-        $endsAt = !empty($data['ends_at']) ? Carbon::parse($data['ends_at']) : $startsAt->copy()->addDays((int) $plan->duration_days);
+        $startsAt = ! empty($data['starts_at']) ? Carbon::parse($data['starts_at']) : now();
+        $endsAt = ! empty($data['ends_at']) ? Carbon::parse($data['ends_at']) : $startsAt->copy()->addDays((int) $plan->duration_days);
 
         $subscription = UserSubscription::query()->create([
             'user_id' => $user->id,
@@ -456,8 +465,8 @@ public function deviceUnblock(User $user)
                 'user_id' => $user->id,
                 'entry_pack_id' => $pack->id,
                 'is_active' => $activate,
-                'purchased_at' => !empty($data['purchased_at']) ? Carbon::parse($data['purchased_at']) : now(),
-                'expires_at' => !empty($data['expires_at']) ? Carbon::parse($data['expires_at']) : now()->addDays((int) ($pack->duration_days ?? 30)),
+                'purchased_at' => ! empty($data['purchased_at']) ? Carbon::parse($data['purchased_at']) : now(),
+                'expires_at' => ! empty($data['expires_at']) ? Carbon::parse($data['expires_at']) : now()->addDays((int) ($pack->duration_days ?? 30)),
                 'purchase_key' => 'admin-user-360-'.uniqid(),
             ]);
 
@@ -518,5 +527,4 @@ public function deviceUnblock(User $user)
 
         return back()->with('ok', 'User level updated.');
     }
-
 }

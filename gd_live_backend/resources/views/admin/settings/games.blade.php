@@ -3,7 +3,7 @@
 
 @php
   $selectedGame = request('game', 'teen_patti');
-  if (!in_array($selectedGame, ['teen_patti', 'greedy'], true)) {
+  if (!in_array($selectedGame, ['teen_patti', 'greedy', 'fortune_wheel'], true)) {
     $selectedGame = 'teen_patti';
   }
 
@@ -19,6 +19,12 @@
       'subtitle' => 'Spinner timing, fake bets, weighted pots, multipliers, and sector distribution.',
       'dashboard_route' => 'admin.games.greedy.dashboard',
       'settings_route' => route('admin.settings.games.edit', ['game' => 'greedy']),
+    ],
+    'fortune_wheel' => [
+      'label' => 'Fortune Wheel',
+      'subtitle' => 'Daily free spin, paid spin cost, weighted rewards, and timed entitlement prizes.',
+      'dashboard_route' => 'admin.games.fortune-wheel.dashboard',
+      'settings_route' => route('admin.settings.games.edit', ['game' => 'fortune_wheel']),
     ],
   ];
 
@@ -40,6 +46,9 @@
   $durationKey = "games.{$selectedGame}.round_duration_seconds";
   $lockKey = "games.{$selectedGame}.betting_lock_seconds";
   $displayKey = "games.{$selectedGame}.result_display_seconds";
+  $freeSpinsKey = "games.{$selectedGame}.free_spins_per_day";
+  $paidSpinCostKey = "games.{$selectedGame}.paid_spin_cost_coins";
+  $paidSpinsEnabledKey = "games.{$selectedGame}.paid_spins_enabled";
   $inputClass = 'h-10 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 shadow-theme-xs outline-hidden placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder:text-gray-500';
 @endphp
 
@@ -54,11 +63,12 @@
             <x-ui.badge color="brand">Games</x-ui.badge>
           </div>
           <h2 class="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">Game Settings</h2>
-          <p class="mt-3 text-sm text-gray-600 dark:text-gray-300">Separate control surfaces for Teen Patti and Greedy. Keep round engines, fake bets, timing, and payout controls isolated.</p>
+          <p class="mt-3 text-sm text-gray-600 dark:text-gray-300">Separate control surfaces for Teen Patti, Greedy, and Fortune Wheel. Keep round engines, spin rewards, fake bets, timing, and payout controls isolated.</p>
         </div>
         <div class="flex flex-wrap gap-2">
           <x-ui.button variant="outline" size="sm" href="{{ route('admin.games.teen-patti.dashboard') }}">Teen Patti Dashboard</x-ui.button>
           <x-ui.button variant="outline" size="sm" href="{{ route('admin.games.greedy.dashboard') }}">Greedy Dashboard</x-ui.button>
+          <x-ui.button variant="outline" size="sm" href="{{ route('admin.games.fortune-wheel.dashboard') }}">Fortune Wheel Dashboard</x-ui.button>
         </div>
       </div>
     </div>
@@ -75,8 +85,13 @@
   <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
     <x-admin.stat-card label="Current Game" :value="$selectedMeta['label']" :meta="$selectedMeta['subtitle']" />
     <x-admin.stat-card label="Status" :value="!empty($values[$enabledKey]) ? 'Enabled' : 'Disabled'" :meta="!empty($values[$visibleKey]) ? 'Visible in video room strip' : 'Hidden from room strip'" tone="success" />
-    <x-admin.stat-card label="Bet Window" :value="($values[$durationKey] ?? '—') . 's'" :meta="'Lock ' . ($values[$lockKey] ?? '—') . 's, display ' . ($values[$displayKey] ?? '—') . 's'" tone="warning" />
-    <x-admin.stat-card label="Bet Range" :value="number_format((int) ($values[$minKey] ?? 0)) . ' - ' . number_format((int) ($values[$maxKey] ?? 0))" :meta="!empty($values[$fakeKey]) ? 'Fake bets enabled' : 'Fake bets disabled'" tone="dark" />
+    @if($selectedGame === 'fortune_wheel')
+      <x-admin.stat-card label="Free Spins" :value="number_format((int) ($values[$freeSpinsKey] ?? 0)) . ' / day'" :meta="!empty($values[$paidSpinsEnabledKey]) ? 'Paid spins enabled' : 'Paid spins disabled'" tone="warning" />
+      <x-admin.stat-card label="Paid Spin Cost" :value="number_format((int) ($values[$paidSpinCostKey] ?? 0))" meta="Coins charged after free spins" tone="dark" />
+    @else
+      <x-admin.stat-card label="Bet Window" :value="($values[$durationKey] ?? '—') . 's'" :meta="'Lock ' . ($values[$lockKey] ?? '—') . 's, display ' . ($values[$displayKey] ?? '—') . 's'" tone="warning" />
+      <x-admin.stat-card label="Bet Range" :value="number_format((int) ($values[$minKey] ?? 0)) . ' - ' . number_format((int) ($values[$maxKey] ?? 0))" :meta="!empty($values[$fakeKey]) ? 'Fake bets enabled' : 'Fake bets disabled'" tone="dark" />
+    @endif
   </section>
 
   <form method="post" action="{{ route('admin.settings.games.update', ['game' => $selectedGame]) }}" class="space-y-6">

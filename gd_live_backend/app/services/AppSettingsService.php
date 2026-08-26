@@ -11,7 +11,7 @@ class AppSettingsService
 {
     private const SETTINGS_CACHE_KEY = 'app_settings:all:v1';
 
-    private const PUBLIC_APP_CONFIG_CACHE_KEY = 'app_config:public:v3';
+    private const PUBLIC_APP_CONFIG_CACHE_KEY = 'app_config:public:v4';
 
     public const APP_DEFINITIONS = [
         'app_features.maintenance_mode_enabled' => [
@@ -126,6 +126,12 @@ class AppSettingsService
             'group' => 'android',
             'default' => false,
         ],
+        'app_features.platform.android.fortune_wheel_enabled' => [
+            'label' => 'Fortune Wheel',
+            'type' => 'boolean',
+            'group' => 'android',
+            'default' => false,
+        ],
         'app_features.platform.android.video_room_games_enabled' => [
             'label' => 'Video Room Games Strip',
             'type' => 'boolean',
@@ -183,6 +189,12 @@ class AppSettingsService
         ],
         'app_features.platform.ios.greedy_enabled' => [
             'label' => 'Greedy',
+            'type' => 'boolean',
+            'group' => 'ios',
+            'default' => false,
+        ],
+        'app_features.platform.ios.fortune_wheel_enabled' => [
+            'label' => 'Fortune Wheel',
             'type' => 'boolean',
             'group' => 'ios',
             'default' => false,
@@ -464,6 +476,52 @@ class AppSettingsService
             'min' => 1,
             'hint' => 'How many weighted wheel sectors map to pot D.',
         ],
+        'games.fortune_wheel.enabled' => [
+            'label' => 'Enable Fortune Wheel',
+            'type' => 'boolean',
+            'group' => 'availability',
+            'default' => false,
+            'hint' => 'Server-side master switch for Fortune Wheel snapshot and spin APIs.',
+        ],
+        'games.fortune_wheel.visible_in_video_room_strip' => [
+            'label' => 'Show In Video Room Strip',
+            'type' => 'boolean',
+            'group' => 'availability',
+            'default' => true,
+            'hint' => 'Controls whether Fortune Wheel appears in the games surface.',
+        ],
+        'games.fortune_wheel.free_spins_per_day' => [
+            'label' => 'Free Spins Per Day',
+            'type' => 'integer',
+            'group' => 'limits',
+            'default' => 1,
+            'min' => 0,
+            'max' => 10,
+            'hint' => 'Number of free spins each user gets per configured day.',
+        ],
+        'games.fortune_wheel.paid_spin_cost_coins' => [
+            'label' => 'Paid Spin Cost',
+            'type' => 'integer',
+            'group' => 'economy',
+            'default' => 50,
+            'min' => 0,
+            'hint' => 'Coin cost after free daily spins are used.',
+        ],
+        'games.fortune_wheel.paid_spins_enabled' => [
+            'label' => 'Enable Paid Spins',
+            'type' => 'boolean',
+            'group' => 'availability',
+            'default' => true,
+            'hint' => 'When disabled, users cannot spin after free spins are consumed.',
+        ],
+        'games.fortune_wheel.timezone' => [
+            'label' => 'Daily Reset Timezone',
+            'type' => 'string',
+            'group' => 'timing',
+            'default' => 'Asia/Kolkata',
+            'options' => ['Asia/Kolkata', 'UTC'],
+            'hint' => 'Timezone used to decide the daily free-spin date.',
+        ],
     ];
 
     public function loadCallSettingsIntoConfig(): void
@@ -595,8 +653,12 @@ class AppSettingsService
             && (bool) ($access[GameAccessService::GAME_TEEN_PATTI] ?? false);
         $greedyEnabled = (bool) config("{$prefix}.greedy_enabled", false)
             && (bool) ($access[GameAccessService::GAME_GREEDY] ?? false);
+        $fortuneWheelEnabled = (bool) config("{$prefix}.fortune_wheel_enabled", false)
+            && (bool) config('games.fortune_wheel.enabled', false)
+            && (bool) config('games.fortune_wheel.visible_in_video_room_strip', true)
+            && (bool) ($access[GameAccessService::GAME_FORTUNE_WHEEL] ?? false);
         $videoRoomGamesEnabled = (bool) config("{$prefix}.video_room_games_enabled", false)
-            && ($teenPattiEnabled || $greedyEnabled);
+            && ($teenPattiEnabled || $greedyEnabled || $fortuneWheelEnabled);
 
         return [
             'video_rooms_enabled' => (bool) config("{$prefix}.video_rooms_enabled", true),
@@ -611,6 +673,7 @@ class AppSettingsService
             'host_calling_enabled' => (bool) config("{$prefix}.host_calling_enabled", true),
             'teen_patti_enabled' => $teenPattiEnabled,
             'greedy_enabled' => $greedyEnabled,
+            'fortune_wheel_enabled' => $fortuneWheelEnabled,
             'video_room_games_enabled' => $videoRoomGamesEnabled,
         ];
     }

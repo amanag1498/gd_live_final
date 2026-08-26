@@ -17,6 +17,7 @@ class CommonSeeder extends Seeder
             GiftSeeder::class,
             ModerationRuleSeeder::class,
             EntryPackSeeder::class,
+            FortuneWheelSeeder::class,
         ]);
     }
 }

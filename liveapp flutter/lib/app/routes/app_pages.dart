@@ -35,6 +35,8 @@ import '../../modules/entry_packs/services/entry_pack_api.dart';
 import '../../modules/entry_packs/views/entry_pack_catalog_page.dart';
 import '../../modules/games/greedy/services/greedy_api.dart';
 import '../../modules/games/greedy/services/greedy_socket_service.dart';
+import '../../modules/games/fortune_wheel/services/fortune_wheel_api.dart';
+import '../../modules/games/fortune_wheel/services/fortune_wheel_preload_service.dart';
 import '../../modules/games/teen_patti/services/teen_patti_api.dart';
 import '../../modules/games/teen_patti/services/teen_patti_socket_service.dart';
 import '../../modules/subscriptions/controllers/viewer_gate_controller.dart';
@@ -122,6 +124,14 @@ class AppPages {
       );
     }
     Get.put<EntryPackApi>(EntryPackApi(api), permanent: true);
+    final fortuneWheelApi = Get.put<FortuneWheelApi>(
+      FortuneWheelApi(api),
+      permanent: true,
+    );
+    Get.put<FortuneWheelPreloadService>(
+      FortuneWheelPreloadService(api: fortuneWheelApi, settings: appSettings),
+      permanent: true,
+    );
     Get.put<DashboardApi>(DashboardApi(api), permanent: true);
     Get.put<BannerService>(
       BannerService(api: api, auth: authService),

@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\CallController;
 use App\Http\Controllers\Api\CallReportApiController;
 use App\Http\Controllers\Api\DashboardLeaderboardController;
 use App\Http\Controllers\Api\EntryPackController;
+use App\Http\Controllers\Api\FortuneWheelController;
 use App\Http\Controllers\Api\GreedyGameController;
 use App\Http\Controllers\Api\HostFollowController;
 use App\Http\Controllers\Api\HostModerationController;
@@ -136,6 +137,9 @@ Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
     Route::get('/games/greedy', [GreedyGameController::class, 'snapshot'])->middleware('feature_enabled:greedy_enabled');
     Route::get('/games/greedy/history', [GreedyGameController::class, 'history'])->middleware('feature_enabled:greedy_enabled');
     Route::post('/games/greedy/bets', [GreedyGameController::class, 'placeBet'])->middleware('feature_enabled:greedy_enabled');
+    Route::get('/games/fortune-wheel', [FortuneWheelController::class, 'snapshot'])->middleware('feature_enabled:fortune_wheel_enabled');
+    Route::post('/games/fortune-wheel/spin', [FortuneWheelController::class, 'spin'])->middleware('feature_enabled:fortune_wheel_enabled');
+    Route::get('/games/fortune-wheel/history', [FortuneWheelController::class, 'history'])->middleware('feature_enabled:fortune_wheel_enabled');
     Route::get('/entry-packs', [EntryPackController::class, 'index'])->middleware('feature_enabled:entry_effects_enabled');
     Route::post('/entry-packs/{entryPack}/purchase', [EntryPackController::class, 'purchase'])->middleware('feature_enabled:entry_effects_enabled');
     Route::get('/me/entry-pack', [EntryPackController::class, 'mine'])->middleware('feature_enabled:entry_effects_enabled');
