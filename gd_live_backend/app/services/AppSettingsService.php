@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Schema;
 class AppSettingsService
 {
     private const SETTINGS_CACHE_KEY = 'app_settings:all:v1';
+
     private const PUBLIC_APP_CONFIG_CACHE_KEY = 'app_config:public:v3';
 
     public const APP_DEFINITIONS = [
@@ -326,8 +327,8 @@ class AppSettingsService
             'label' => 'Winning Strategy',
             'type' => 'string',
             'group' => 'economy',
-            'default' => 'probability',
-            'options' => ['random', 'minimum_bet', 'highest_bet', 'probability'],
+            'default' => 'treasury_affordable',
+            'options' => ['random', 'minimum_bet', 'highest_bet', 'probability', 'treasury_affordable'],
             'hint' => 'Server-side winner selection strategy for round settlement.',
         ],
         'games.greedy.enabled' => [
@@ -549,8 +550,7 @@ class AppSettingsService
         ?User $user = null,
         ?int $appVersionCode = null,
         ?string $platform = null,
-    ): array
-    {
+    ): array {
         $base = Cache::rememberForever(self::PUBLIC_APP_CONFIG_CACHE_KEY, function (): array {
             return [
                 'maintenance_mode_enabled' => (bool) config('app_features.maintenance_mode_enabled', false),
@@ -640,6 +640,7 @@ class AppSettingsService
     public function featureEnabled(string $featureKey, ?string $platform): bool
     {
         $platform = $this->normalizeClientPlatform($platform);
+
         return (bool) config("app_features.platform.{$platform}.{$featureKey}", true);
     }
 
@@ -722,6 +723,7 @@ class AppSettingsService
             $fullPath = str_starts_with($key, "{$path}.") ? $key : "{$path}.{$key}";
             if (is_array($value)) {
                 $this->flattenSettingsPayload($value, $fullPath, $normalized);
+
                 continue;
             }
 
@@ -731,7 +733,7 @@ class AppSettingsService
 
     private function loadDefinitionsIntoConfig(array $definitions): void
     {
-        if (!Schema::hasTable('app_settings')) {
+        if (! Schema::hasTable('app_settings')) {
             return;
         }
 
@@ -740,10 +742,11 @@ class AppSettingsService
         });
 
         foreach ($definitions as $key => $definition) {
-            if (!array_key_exists($key, $stored)) {
+            if (! array_key_exists($key, $stored)) {
                 if (array_key_exists('default', $definition)) {
                     config([$key => $definition['default']]);
                 }
+
                 continue;
             }
 
@@ -756,7 +759,7 @@ class AppSettingsService
         $normalized = $this->normalizeSettingsPayload($validated, $prefix);
 
         foreach ($definitions as $key => $definition) {
-            if (!array_key_exists($key, $normalized)) {
+            if (! array_key_exists($key, $normalized)) {
                 continue;
             }
 

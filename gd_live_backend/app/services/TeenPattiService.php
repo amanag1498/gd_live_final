@@ -3,26 +3,34 @@
 namespace App\Services;
 
 use App\Models\TeenPattiBet;
+use App\Models\TeenPattiFinancialAccount;
+use App\Models\TeenPattiFinancialLedgerEntry;
 use App\Models\TeenPattiPayout;
 use App\Models\TeenPattiRound;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
-use Carbon\CarbonInterface;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class TeenPattiService
 {
     private const CARD_SUITS = ['hearts', 'spades', 'diamonds', 'clubs'];
+
     private const CARD_VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'jack', 'queen', 'king', 'ace'];
+
     private const ACTIVITY_LEASE_KEY = 'games:teen_patti:active_lease';
+
     private const ACTIVITY_LEASE_SECONDS = 180;
+
+    public function __construct(private TeenPattiFinancialService $financials) {}
 
     public function publicSettings(): array
     {
@@ -95,15 +103,16 @@ class TeenPattiService
 
     public function winningStrategyMode(): string
     {
-        $mode = strtolower(trim((string) config('games.teen_patti.winning_strategy_mode', 'probability')));
-        return in_array($mode, ['random', 'minimum_bet', 'highest_bet', 'probability'], true)
+        $mode = strtolower(trim((string) config('games.teen_patti.winning_strategy_mode', 'treasury_affordable')));
+
+        return in_array($mode, ['random', 'minimum_bet', 'highest_bet', 'probability', 'treasury_affordable'], true)
             ? $mode
             : 'probability';
     }
 
     public function snapshotForUser(User $user): array
     {
-        if (!$this->enabled()) {
+        if (! $this->enabled()) {
             throw new HttpException(403, 'Teen Patti is currently unavailable.');
         }
 
@@ -122,7 +131,7 @@ class TeenPattiService
 
     public function publicRoundSnapshot(): array
     {
-        if (!$this->enabled()) {
+        if (! $this->enabled()) {
             return [
                 'ok' => false,
                 'enabled' => false,
@@ -156,12 +165,12 @@ class TeenPattiService
 
     public function placeBet(User $user, string $pot, int $amount, ?string $idempotencyKey = null): array
     {
-        if (!$this->enabled()) {
+        if (! $this->enabled()) {
             throw new HttpException(403, 'Teen Patti is currently unavailable.');
         }
 
         $pot = strtoupper(trim($pot));
-        if (!in_array($pot, ['A', 'B', 'C'], true)) {
+        if (! in_array($pot, ['A', 'B', 'C'], true)) {
             throw new HttpException(422, 'Invalid pot selection.');
         }
         if ($amount < $this->minBet() || $amount > $this->maxBet()) {
@@ -170,7 +179,7 @@ class TeenPattiService
 
         $this->touchActivityLease();
         $round = $this->resolveCurrentRound(createIfIdle: true);
-        if (!$round) {
+        if (! $round) {
             throw new HttpException(409, 'Teen Patti is idle. Open the game again and retry.');
         }
 
@@ -226,7 +235,7 @@ class TeenPattiService
                 'type' => 'debit',
                 'coins' => $amount,
                 'category' => 'game_bet_debit',
-                'reference' => 'teen_patti_bet:' . $bet->id,
+                'reference' => 'teen_patti_bet:'.$bet->id,
                 'reference_type' => 'teen_patti_bet',
                 'reference_id' => $bet->id,
                 'description' => "Teen Patti bet on pot {$pot}",
@@ -241,6 +250,8 @@ class TeenPattiService
             ]);
 
             $bet->forceFill(['wallet_transaction_id' => $walletTx->id])->save();
+
+            $this->financials->recordBet($bet);
 
             $column = match ($pot) {
                 'A' => 'total_bet_a',
@@ -288,6 +299,8 @@ class TeenPattiService
             'settings' => $this->publicSettings(),
             'current_round' => $round ? $this->roundPayload($round) : null,
             'company_summary' => $this->adminCompanySummary(),
+            'financial_account' => $this->adminFinancialAccountPayload(),
+            'recent_financial_ledger_entries' => $this->adminFinancialLedgerEntries(),
             'recent_rounds' => TeenPattiRound::query()->latest('id')->limit(15)->get(),
             'recent_bets' => TeenPattiBet::query()->with(['user', 'round'])->latest('id')->limit(50)->get(),
             'recent_payouts' => TeenPattiPayout::query()->with(['user', 'bet', 'round'])->latest('id')->limit(50)->get(),
@@ -311,6 +324,38 @@ class TeenPattiService
         return TeenPattiPayout::query()
             ->with(['user', 'bet', 'round', 'walletTransaction'])
             ->latest('id');
+    }
+
+    private function adminFinancialAccountPayload(): array
+    {
+        if (! Schema::hasTable('teen_patti_financial_accounts')) {
+            return [
+                'treasury_balance_coins' => 0,
+                'company_commission_balance_coins' => 0,
+            ];
+        }
+
+        $account = TeenPattiFinancialAccount::query()
+            ->where('game_key', TeenPattiFinancialService::GAME_KEY)
+            ->first();
+
+        return [
+            'treasury_balance_coins' => (int) ($account?->treasury_balance_coins ?? 0),
+            'company_commission_balance_coins' => (int) ($account?->company_commission_balance_coins ?? 0),
+        ];
+    }
+
+    private function adminFinancialLedgerEntries(): Collection
+    {
+        if (! Schema::hasTable('teen_patti_financial_ledger_entries')) {
+            return collect();
+        }
+
+        return TeenPattiFinancialLedgerEntry::query()
+            ->with(['round', 'bet.user', 'payout'])
+            ->latest('id')
+            ->limit(12)
+            ->get();
     }
 
     public function adminUserReportPayload(array $filters = []): array
@@ -349,7 +394,7 @@ class TeenPattiService
             ->leftJoinSub($betAgg, 'bet_agg', fn ($join) => $join->on('bet_agg.user_id', '=', 'users.id'))
             ->leftJoinSub($payoutAgg, 'payout_agg', fn ($join) => $join->on('payout_agg.user_id', '=', 'users.id'))
             ->leftJoinSub($refundAgg, 'refund_agg', fn ($join) => $join->on('refund_agg.user_id', '=', 'users.id'))
-            ->selectRaw("
+            ->selectRaw('
                 users.id as user_id,
                 users.name,
                 users.email,
@@ -360,7 +405,7 @@ class TeenPattiService
                 COALESCE(refund_agg.total_refunds_count, 0) as total_refunds_count,
                 COALESCE(refund_agg.refunded_amount, 0) as refunded_amount,
                 (COALESCE(bet_agg.total_bet_amount, 0) - COALESCE(payout_agg.total_win_amount, 0) - COALESCE(refund_agg.refunded_amount, 0)) as profit_amount
-            ")
+            ')
             ->distinct();
 
         if ($search !== '') {
@@ -414,7 +459,7 @@ class TeenPattiService
 
     public function tick(?TeenPattiRound $round = null): ?TeenPattiRound
     {
-        if (!$this->enabled()) {
+        if (! $this->enabled()) {
             throw new HttpException(403, 'Teen Patti is currently unavailable.');
         }
 
@@ -515,7 +560,7 @@ class TeenPattiService
                 'type' => 'credit',
                 'coins' => $refundCoins,
                 'category' => 'game_refund_credit',
-                'reference' => 'teen_patti_bet:' . $lockedBet->id,
+                'reference' => 'teen_patti_bet:'.$lockedBet->id,
                 'reference_type' => 'teen_patti_bet',
                 'reference_id' => $lockedBet->id,
                 'description' => 'Teen Patti bet refund',
@@ -538,6 +583,8 @@ class TeenPattiService
                     'refund_note' => $note,
                 ], static fn ($value) => $value !== null && $value !== ''),
             ])->save();
+
+            $this->financials->recordRefund($lockedBet);
 
             $remainingBets = TeenPattiBet::query()
                 ->where('teen_patti_round_id', $lockedBet->teen_patti_round_id)
@@ -564,13 +611,13 @@ class TeenPattiService
 
     public function ensureCurrentRound(): TeenPattiRound
     {
-        if (!$this->enabled()) {
+        if (! $this->enabled()) {
             throw new HttpException(403, 'Teen Patti is currently unavailable.');
         }
 
         for ($attempt = 0; $attempt < 5; $attempt++) {
             $round = TeenPattiRound::query()->latest('id')->first();
-            if (!$round) {
+            if (! $round) {
                 return $this->createRound(CarbonImmutable::now());
             }
 
@@ -611,13 +658,13 @@ class TeenPattiService
 
     private function resolveCurrentRound(bool $createIfIdle): ?TeenPattiRound
     {
-        if (!$this->enabled()) {
+        if (! $this->enabled()) {
             throw new HttpException(403, 'Teen Patti is currently unavailable.');
         }
 
         for ($attempt = 0; $attempt < 5; $attempt++) {
             $round = TeenPattiRound::query()->latest('id')->first();
-            if (!$round) {
+            if (! $round) {
                 return $createIfIdle || $this->hasRecentActivityLease()
                     ? $this->createRound(CarbonImmutable::now())
                     : null;
@@ -631,7 +678,7 @@ class TeenPattiService
 
             $displayUntil = $this->displayUntil($round);
             if (now()->greaterThanOrEqualTo($displayUntil)) {
-                if (!$createIfIdle && !$this->hasRecentActivityLease()) {
+                if (! $createIfIdle && ! $this->hasRecentActivityLease()) {
                     return $round;
                 }
 
@@ -678,6 +725,7 @@ class TeenPattiService
                         'round_key' => $locked->round_key,
                     ]);
                 }
+
                 return $locked->fresh();
             });
         }
@@ -704,7 +752,10 @@ class TeenPattiService
             }
 
             $bets = $lockedRound->bets;
-            $winner = $this->determineWinningPot($lockedRound, $bets);
+            $winnerResult = $this->determineWinningPot($lockedRound, $bets);
+            $winner = $winnerResult['pot'];
+            $strategyMeta = $winnerResult['meta'];
+
             $cards = $this->buildCardReveal();
 
             foreach ($bets as $bet) {
@@ -730,6 +781,10 @@ class TeenPattiService
                 'losing_hand_one' => $cards['losing_hand_one'],
                 'losing_hand_two' => $cards['losing_hand_two'],
                 'settled_at' => now(),
+                'meta' => array_filter([
+                    ...($lockedRound->meta ?? []),
+                    'winning_decision' => $strategyMeta,
+                ]),
             ])->save();
 
             $payload = $this->roundPayload($lockedRound->fresh());
@@ -750,7 +805,7 @@ class TeenPattiService
         $displayUntil = $endsAt->addSeconds($this->resultDisplaySeconds());
 
         $round = TeenPattiRound::query()->create([
-            'round_key' => 'tpr_' . Str::lower((string) Str::ulid()),
+            'round_key' => 'tpr_'.Str::lower((string) Str::ulid()),
             'status' => 'open',
             'starts_at' => $startsAt,
             'locks_at' => $lockAt,
@@ -774,7 +829,7 @@ class TeenPattiService
         return $round;
     }
 
-    private function determineWinningPot(TeenPattiRound $round, Collection $bets): string
+    private function determineWinningPot(TeenPattiRound $round, Collection $bets): array
     {
         $totals = [
             'A' => (int) $round->total_bet_a,
@@ -784,15 +839,145 @@ class TeenPattiService
 
         $mode = $this->winningStrategyMode();
         if ($bets->isEmpty()) {
-            return ['A', 'B', 'C'][random_int(0, 2)];
+            return [
+                'pot' => ['A', 'B', 'C'][random_int(0, 2)],
+                'meta' => [
+                    'mode' => $mode,
+                    'reason' => 'empty_round_random',
+                ],
+            ];
         }
 
-        return match ($mode) {
+        $pot = match ($mode) {
             'minimum_bet' => collect($totals)->sort()->keys()->first(),
             'highest_bet' => collect($totals)->sortDesc()->keys()->first(),
             'probability' => $this->probabilityWeightedPot($totals),
+            'treasury_affordable' => null,
             default => ['A', 'B', 'C'][random_int(0, 2)],
         };
+
+        if ($mode === 'treasury_affordable') {
+            return $this->treasuryAffordableWinningPot($totals);
+        }
+
+        return [
+            'pot' => $pot,
+            'meta' => [
+                'mode' => $mode,
+            ],
+        ];
+    }
+
+    private function treasuryAffordableWinningPot(array $totals): array
+    {
+        $treasuryBalance = (int) $this->financials->account()->treasury_balance_coins;
+        $multiplier = $this->payoutMultiplier();
+        $payouts = collect($totals)
+            ->map(fn (int $total) => $total * $multiplier)
+            ->all();
+        $potsWithBets = collect($totals)
+            ->filter(fn (int $total) => $total > 0)
+            ->keys()
+            ->values()
+            ->all();
+        $eligiblePots = collect($potsWithBets)
+            ->filter(fn (string $pot) => (int) $payouts[$pot] < $treasuryBalance)
+            ->values()
+            ->all();
+
+        $meta = [
+            'mode' => 'treasury_affordable',
+            'treasury_balance_before_settlement' => $treasuryBalance,
+            'payout_multiplier' => $multiplier,
+            'pot_totals' => $totals,
+            'pot_payouts' => $payouts,
+            'eligible_pots' => $eligiblePots,
+        ];
+
+        if ($treasuryBalance <= 0) {
+            return [
+                'pot' => $this->minimumRealBetPot($totals),
+                'meta' => [
+                    ...$meta,
+                    'reason' => 'treasury_recovery_minimum_bet',
+                ],
+            ];
+        }
+
+        if (count($potsWithBets) === 1) {
+            $onlyPot = $potsWithBets[0];
+            if (! in_array($onlyPot, $eligiblePots, true)) {
+                return [
+                    'pot' => $this->emptyPotFallback($totals),
+                    'meta' => [
+                        ...$meta,
+                        'single_pot_roll' => null,
+                        'reason' => 'single_pot_not_affordable',
+                    ],
+                ];
+            }
+
+            $roll = random_int(1, 100);
+            if ($roll <= 75) {
+                return [
+                    'pot' => $onlyPot,
+                    'meta' => [
+                        ...$meta,
+                        'single_pot_roll' => $roll,
+                        'single_pot_win_probability_percent' => 75,
+                    ],
+                ];
+            }
+
+            return [
+                'pot' => $this->emptyPotFallback($totals),
+                'meta' => [
+                    ...$meta,
+                    'single_pot_roll' => $roll,
+                    'single_pot_win_probability_percent' => 75,
+                    'reason' => 'single_pot_probability_miss',
+                ],
+            ];
+        }
+
+        if ($eligiblePots === []) {
+            if ($this->allPotsHaveBets($totals)) {
+                return [
+                    'pot' => $this->minimumRealBetPot($totals),
+                    'meta' => [
+                        ...$meta,
+                        'reason' => 'treasury_overdraft_minimum_bet',
+                    ],
+                ];
+            }
+
+            return [
+                'pot' => $this->emptyPotFallback($totals),
+                'meta' => [
+                    ...$meta,
+                    'reason' => 'no_eligible_pot',
+                ],
+            ];
+        }
+
+        return [
+            'pot' => $eligiblePots[random_int(0, count($eligiblePots) - 1)],
+            'meta' => $meta,
+        ];
+    }
+
+    private function minimumRealBetPot(array $totals): string
+    {
+        return (string) collect($totals)
+            ->filter(fn (int $total) => $total > 0)
+            ->sort()
+            ->keys()
+            ->first();
+    }
+
+    private function allPotsHaveBets(array $totals): bool
+    {
+        return collect($totals)->every(fn (int $total) => $total > 0);
     }
 
     private function probabilityWeightedPot(array $totals): string
@@ -806,6 +991,21 @@ class TeenPattiService
         }
 
         return $roll <= 60 ? $others[0] : $others[1];
+    }
+
+    private function emptyPotFallback(array $totals): ?string
+    {
+        $emptyPots = collect($totals)
+            ->filter(fn (int $total) => $total === 0)
+            ->keys()
+            ->values()
+            ->all();
+
+        if ($emptyPots === []) {
+            return null;
+        }
+
+        return $emptyPots[random_int(0, count($emptyPots) - 1)];
     }
 
     private function roundPayload(TeenPattiRound $round, ?User $viewer = null): array
@@ -905,7 +1105,7 @@ class TeenPattiService
             'type' => 'credit',
             'coins' => $payoutCoins,
             'category' => 'game_payout_credit',
-            'reference' => 'teen_patti_bet:' . $bet->id,
+            'reference' => 'teen_patti_bet:'.$bet->id,
             'reference_type' => 'teen_patti_bet',
             'reference_id' => $bet->id,
             'description' => "Teen Patti payout for pot {$winner}",
@@ -919,7 +1119,7 @@ class TeenPattiService
             ],
         ]);
 
-        TeenPattiPayout::query()->create([
+        $payout = TeenPattiPayout::query()->create([
             'teen_patti_round_id' => $round->id,
             'teen_patti_bet_id' => $bet->id,
             'user_id' => $user->id,
@@ -931,6 +1131,8 @@ class TeenPattiService
                 'winning_pot' => $winner,
             ],
         ]);
+
+        $this->financials->recordPayout($payout);
     }
 
     private function betPayload(TeenPattiBet $bet): array
@@ -964,9 +1166,9 @@ class TeenPattiService
         $band = max($this->minBet(), (int) floor($maxBet * 1.8));
 
         return [
-            'A' => $this->fakePotValue($seed . '|A', $band),
-            'B' => $this->fakePotValue($seed . '|B', $band),
-            'C' => $this->fakePotValue($seed . '|C', $band),
+            'A' => $this->fakePotValue($seed.'|A', $band),
+            'B' => $this->fakePotValue($seed.'|B', $band),
+            'C' => $this->fakePotValue($seed.'|C', $band),
         ];
     }
 
@@ -975,6 +1177,7 @@ class TeenPattiService
         $hash = abs(crc32($seed));
         $multiplier = 3 + ($hash % 9);
         $step = max($this->minBet(), (int) floor($band / 6));
+
         return $multiplier * $step;
     }
 
@@ -983,9 +1186,9 @@ class TeenPattiService
         $cards = [];
         for ($i = 0; $i < $count; $i++) {
             $cards[] = self::CARD_VALUES[random_int(0, count(self::CARD_VALUES) - 1)]
-                . '_of_'
-                . self::CARD_SUITS[random_int(0, count(self::CARD_SUITS) - 1)]
-                . '.png';
+                .'_of_'
+                .self::CARD_SUITS[random_int(0, count(self::CARD_SUITS) - 1)]
+                .'.png';
         }
 
         return $cards;
@@ -995,7 +1198,7 @@ class TeenPattiService
     {
         $period = strtolower(trim((string) ($filters['period'] ?? '7d')));
         $allowed = ['today', '7d', '30d', 'this_month', 'last_month', 'custom'];
-        if (!in_array($period, $allowed, true)) {
+        if (! in_array($period, $allowed, true)) {
             $period = '7d';
         }
 
@@ -1040,6 +1243,7 @@ class TeenPattiService
 
         try {
             $date = CarbonImmutable::parse($value);
+
             return $endOfDay ? $date->endOfDay() : $date->startOfDay();
         } catch (\Throwable) {
             return $endOfDay ? $fallback->endOfDay() : $fallback->startOfDay();
