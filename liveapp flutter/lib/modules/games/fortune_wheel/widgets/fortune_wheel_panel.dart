@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,6 +17,10 @@ import '../services/fortune_wheel_preload_service.dart';
 const _fortuneBgAsset = 'assets/games/fortune_wheel/fortune_bg.png';
 const _fortuneWheelFrameAsset = 'assets/games/fortune_wheel/wheel_frame.png';
 const _fortuneSpinButtonAsset = 'assets/games/fortune_wheel/spin_button.png';
+const _fortunePremiumSpinButtonAsset =
+    'assets/games/fortune_wheel/spin_button_premium.png';
+const _fortunePremiumRewardAsset =
+    'assets/games/fortune_wheel/reward_treasure_premium.png';
 const _fortuneTitleAsset = 'assets/games/fortune_wheel/spin_and_win_title.png';
 const _fortuneSpinSoundAsset = 'games/fortune_wheel/wheel_spin.mp3';
 
@@ -224,15 +229,18 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
       useRootNavigator: true,
       barrierDismissible: true,
       barrierLabel: 'Close reward',
-      barrierColor: Colors.black.withValues(alpha: .72),
+      barrierColor: Colors.black.withValues(alpha: .91),
       transitionDuration: const Duration(milliseconds: 320),
       pageBuilder:
-          (_, __, ___) => Center(
-            child: Material(
-              color: Colors.transparent,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: _FortuneRewardSheet(spin: spin),
+          (_, __, ___) => BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+            child: Center(
+              child: Material(
+                color: Colors.transparent,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: _FortuneRewardSheet(spin: spin),
+                ),
               ),
             ),
           ),
@@ -1020,10 +1028,274 @@ class _SpinButton extends StatefulWidget {
   final VoidCallback onPressed;
 
   @override
-  State<_SpinButton> createState() => _SpinButtonState();
+  State<_SpinButton> createState() => _PremiumSpinButtonState();
 }
 
-class _SpinButtonState extends State<_SpinButton> {
+class _PremiumSpinButtonState extends State<_SpinButton> {
+  bool _pressed = false;
+
+  bool get _enabled => !widget.spinning && widget.snapshot.segments.isNotEmpty;
+
+  @override
+  Widget build(BuildContext context) {
+    final isFree = widget.snapshot.canFreeSpin;
+    final pulse = .5 + (.5 * math.sin(widget.ambient * math.pi * 2));
+    final label =
+        widget.spinning ? 'SPINNING' : (isFree ? 'FREE SPIN' : 'SPIN NOW');
+
+    return Center(
+      child: Semantics(
+        button: true,
+        enabled: _enabled,
+        label: isFree ? 'Use free spin' : 'Spin for coins',
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: _enabled ? (_) => setState(() => _pressed = true) : null,
+          onTapCancel: _enabled ? () => setState(() => _pressed = false) : null,
+          onTapUp:
+              _enabled
+                  ? (_) {
+                    setState(() => _pressed = false);
+                    Haptics.selection();
+                    widget.onPressed();
+                  }
+                  : null,
+          child: AnimatedScale(
+            duration: const Duration(milliseconds: 100),
+            curve: Curves.easeOutBack,
+            scale: _pressed ? .94 : 1 + (pulse * .025),
+            child: SizedBox(
+              width: 226,
+              height: 92,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Positioned(
+                    left: 15,
+                    right: 15,
+                    bottom: 5,
+                    height: 30,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(
+                              0xFFFF29C7,
+                            ).withValues(alpha: .28 + pulse * .24),
+                            blurRadius: 28 + pulse * 14,
+                            spreadRadius: 4,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 100),
+                    curve: Curves.easeOut,
+                    left: 0,
+                    right: 0,
+                    top: _pressed ? 8 : 0,
+                    bottom: _pressed ? 0 : 8,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      alignment: Alignment.center,
+                      children: [
+                        Image.asset(
+                          _fortunePremiumSpinButtonAsset,
+                          fit: BoxFit.fill,
+                          filterQuality: FilterQuality.high,
+                        ),
+                        Positioned.fill(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(999),
+                            child: CustomPaint(
+                              painter: _ButtonShimmerPainter(widget.ambient),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(42, 7, 42, 18),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (widget.spinning)
+                                const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.4,
+                                    color: Color(0xFFFFF2A3),
+                                  ),
+                                )
+                              else
+                                Icon(
+                                  isFree
+                                      ? Icons.auto_awesome_rounded
+                                      : Icons.bolt_rounded,
+                                  color: const Color(0xFFFFF09B),
+                                  size: 22,
+                                  shadows: const [
+                                    Shadow(
+                                      color: Color(0xFFFF8C00),
+                                      blurRadius: 8,
+                                    ),
+                                  ],
+                                ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: _ArcadeLabel(
+                                    text: label,
+                                    fontSize: 20,
+                                    letterSpacing: 1.3,
+                                    strokeWidth: 4.2,
+                                  ),
+                                ),
+                              ),
+                              if (!widget.spinning && !isFree) ...[
+                                const SizedBox(width: 7),
+                                CoinLottie(size: 19),
+                                const SizedBox(width: 2),
+                                _ArcadeLabel(
+                                  text:
+                                      '${widget.snapshot.settings.paidSpinCostCoins}',
+                                  fontSize: 14,
+                                  strokeWidth: 2.7,
+                                  fillColors: const [
+                                    Color(0xFFFFFFFF),
+                                    Color(0xFFFFE470),
+                                    Color(0xFFFFA800),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ArcadeLabel extends StatelessWidget {
+  const _ArcadeLabel({
+    required this.text,
+    required this.fontSize,
+    this.letterSpacing = .8,
+    this.strokeWidth = 3.5,
+    this.strokeColor = const Color(0xFF4A0038),
+    this.fillColors = const [
+      Color(0xFFFFFFFF),
+      Color(0xFFFFF0A2),
+      Color(0xFFFFB000),
+    ],
+    this.maxLines = 1,
+  });
+
+  final String text;
+  final double fontSize;
+  final double letterSpacing;
+  final double strokeWidth;
+  final Color strokeColor;
+  final List<Color> fillColors;
+  final int maxLines;
+
+  TextStyle _style({Paint? foreground, List<Shadow>? shadows}) => TextStyle(
+    foreground: foreground,
+    color: foreground == null ? Colors.white : null,
+    fontSize: fontSize,
+    height: .98,
+    fontWeight: FontWeight.w900,
+    letterSpacing: letterSpacing,
+    decoration: TextDecoration.none,
+    shadows: shadows,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final label = Stack(
+      alignment: Alignment.center,
+      children: [
+        Text(
+          text,
+          maxLines: maxLines,
+          overflow: TextOverflow.visible,
+          textAlign: TextAlign.center,
+          style: _style(
+            foreground:
+                Paint()
+                  ..style = PaintingStyle.stroke
+                  ..strokeJoin = StrokeJoin.round
+                  ..strokeWidth = strokeWidth
+                  ..color = strokeColor,
+            shadows: const [
+              Shadow(
+                color: Color(0xCC210015),
+                blurRadius: 2,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+        ),
+        ShaderMask(
+          blendMode: BlendMode.srcIn,
+          shaderCallback:
+              (bounds) => LinearGradient(
+                colors: fillColors,
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ).createShader(bounds),
+          child: Text(
+            text,
+            maxLines: maxLines,
+            overflow: TextOverflow.visible,
+            textAlign: TextAlign.center,
+            style: _style(
+              shadows: const [
+                Shadow(color: Color(0xFFFF2EC5), blurRadius: 12),
+                Shadow(color: Colors.white54, blurRadius: 1),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+
+    return Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.identity()..setEntry(0, 1, -.07),
+      child: label,
+    );
+  }
+}
+
+class _LegacySpinButton extends StatefulWidget {
+  const _LegacySpinButton({
+    required this.snapshot,
+    required this.spinning,
+    required this.ambient,
+    required this.onPressed,
+  });
+
+  final FortuneWheelSnapshot snapshot;
+  final bool spinning;
+  final double ambient;
+  final VoidCallback onPressed;
+
+  @override
+  State<_LegacySpinButton> createState() => _SpinButtonState();
+}
+
+class _SpinButtonState extends State<_LegacySpinButton> {
   bool _pressed = false;
 
   bool get _enabled => !widget.spinning && widget.snapshot.segments.isNotEmpty;
@@ -1454,10 +1726,520 @@ class _FortuneRewardSheet extends StatefulWidget {
   final FortuneWheelSpin spin;
 
   @override
-  State<_FortuneRewardSheet> createState() => _FortuneRewardSheetState();
+  State<_FortuneRewardSheet> createState() => _PremiumRewardDialogState();
 }
 
-class _FortuneRewardSheetState extends State<_FortuneRewardSheet>
+class _PremiumRewardDialogState extends State<_FortuneRewardSheet>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2600),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isZeroCoins =
+        widget.spin.rewardType == 'coins' && widget.spin.rewardValueCoins == 0;
+    final title = isZeroCoins ? 'SPIN COMPLETE' : 'YOU WON!';
+
+    return SafeArea(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          final pulse = .5 + (.5 * math.sin(_controller.value * math.pi * 2));
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: .76, end: 1),
+              duration: const Duration(milliseconds: 700),
+              curve: Curves.easeOutBack,
+              builder:
+                  (context, scale, child) =>
+                      Transform.scale(scale: scale, child: child),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 360),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.topCenter,
+                  children: [
+                    Container(
+                      margin: EdgeInsets.only(top: isZeroCoins ? 54 : 92),
+                      padding: const EdgeInsets.all(2.5),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(30),
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFFFFF3A8),
+                            Color(0xFFFFBD24),
+                            Color(0xFF7B2B00),
+                            Color(0xFFFFD966),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(
+                              0xFFFFB51C,
+                            ).withValues(alpha: .24 + pulse * .16),
+                            blurRadius: 46 + pulse * 16,
+                            spreadRadius: 2,
+                          ),
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: .70),
+                            blurRadius: 34,
+                            offset: const Offset(0, 20),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(27.5),
+                        child: Stack(
+                          children: [
+                            const Positioned.fill(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Color(0xFF501064),
+                                      Color(0xFF21062F),
+                                      Color(0xFF08020D),
+                                    ],
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Positioned.fill(
+                              child: CustomPaint(
+                                painter: _RewardBurstPainter(_controller.value),
+                              ),
+                            ),
+                            Padding(
+                              padding: EdgeInsets.fromLTRB(
+                                24,
+                                isZeroCoins ? 56 : 66,
+                                24,
+                                14,
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _PremiumRewardBadge(label: 'FORTUNE WHEEL'),
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const _RewardTitleSparkle(),
+                                      const SizedBox(width: 8),
+                                      Flexible(
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: _ArcadeLabel(
+                                            text: title,
+                                            fontSize: isZeroCoins ? 27 : 32,
+                                            letterSpacing: 1.5,
+                                            strokeWidth: 5.5,
+                                            strokeColor: const Color(
+                                              0xFF6B2100,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const _RewardTitleSparkle(),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      minHeight: 44,
+                                    ),
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: _ArcadeLabel(
+                                        text: _rewardText(widget.spin),
+                                        fontSize: isZeroCoins ? 34 : 28,
+                                        maxLines: 2,
+                                        letterSpacing: .2,
+                                        strokeWidth: 4.4,
+                                        strokeColor: const Color(0xFF2A083A),
+                                        fillColors:
+                                            isZeroCoins
+                                                ? const [
+                                                  Color(0xFFFFFFFF),
+                                                  Color(0xFFD8C9FF),
+                                                  Color(0xFF9A73E8),
+                                                ]
+                                                : const [
+                                                  Color(0xFFFFFFFF),
+                                                  Color(0xFFFF8FE7),
+                                                  Color(0xFFFF2EBE),
+                                                ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  _PremiumRewardStatus(spin: widget.spin),
+                                  const SizedBox(height: 10),
+                                  _PremiumImageActionButton(
+                                    label: 'COLLECT',
+                                    pulse: pulse,
+                                    icon: Icons.card_giftcard_rounded,
+                                    onPressed: () {
+                                      Haptics.selection();
+                                      Navigator.of(context).maybePop();
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: isZeroCoins ? 2 : -8,
+                      child: IgnorePointer(
+                        child: Transform.scale(
+                          scale: 1 + pulse * .035,
+                          child:
+                              isZeroCoins
+                                  ? _ZeroRewardEmblem(pulse: pulse)
+                                  : Image.asset(
+                                    _fortunePremiumRewardAsset,
+                                    width: 148,
+                                    height: 164,
+                                    fit: BoxFit.contain,
+                                    filterQuality: FilterQuality.high,
+                                  ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: 9,
+                      top: isZeroCoins ? 61 : 99,
+                      child: Material(
+                        color: const Color(0xFF110519).withValues(alpha: .88),
+                        shape: const CircleBorder(
+                          side: BorderSide(color: Color(0xFFFFD968), width: 1),
+                        ),
+                        child: IconButton(
+                          tooltip: 'Close reward',
+                          onPressed: () => Navigator.of(context).maybePop(),
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          color: Colors.white,
+                          constraints: const BoxConstraints.tightFor(
+                            width: 34,
+                            height: 34,
+                          ),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ZeroRewardEmblem extends StatelessWidget {
+  const _ZeroRewardEmblem({required this.pulse});
+
+  final double pulse;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 88,
+      height: 88,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const SweepGradient(
+          colors: [
+            Color(0xFFFFE987),
+            Color(0xFF8F52DD),
+            Color(0xFF39155F),
+            Color(0xFFFFC238),
+            Color(0xFFFFE987),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF9E5AF1).withValues(alpha: .26 + pulse * .18),
+            blurRadius: 20 + pulse * 8,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const RadialGradient(
+            colors: [Color(0xFF4D2670), Color(0xFF16071F)],
+          ),
+          border: Border.all(color: const Color(0xFFFFE9A0), width: 1.2),
+        ),
+        child: const Icon(
+          Icons.flare_rounded,
+          color: Color(0xFFFFE58C),
+          size: 38,
+          shadows: [Shadow(color: Color(0xFFFFB226), blurRadius: 12)],
+        ),
+      ),
+    );
+  }
+}
+
+class _PremiumRewardBadge extends StatelessWidget {
+  const _PremiumRewardBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(99),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF7A1A89), Color(0xFF330849)],
+        ),
+        border: Border.all(color: const Color(0xFFFFD968), width: 1.2),
+        boxShadow: const [BoxShadow(color: Color(0x66FFBE27), blurRadius: 12)],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.auto_awesome_rounded,
+            color: Color(0xFFFFE77A),
+            size: 12,
+          ),
+          const SizedBox(width: 7),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFFFFED9C),
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.7,
+              decoration: TextDecoration.none,
+            ),
+          ),
+          const SizedBox(width: 7),
+          const Icon(
+            Icons.auto_awesome_rounded,
+            color: Color(0xFFFFE77A),
+            size: 12,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RewardTitleSparkle extends StatelessWidget {
+  const _RewardTitleSparkle();
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.rotate(
+      angle: math.pi / 4,
+      child: Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(
+          gradient: const RadialGradient(
+            colors: [Colors.white, Color(0xFFFFD43B)],
+          ),
+          borderRadius: BorderRadius.circular(2),
+          boxShadow: const [
+            BoxShadow(color: Color(0xFFFFC42D), blurRadius: 9, spreadRadius: 2),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PremiumRewardStatus extends StatelessWidget {
+  const _PremiumRewardStatus({required this.spin});
+
+  final FortuneWheelSpin spin;
+
+  @override
+  Widget build(BuildContext context) {
+    final isZero = spin.rewardType == 'coins' && spin.rewardValueCoins == 0;
+    final isCoin = spin.rewardType == 'coins';
+    final label =
+        isZero
+            ? 'ROUND COMPLETE'
+            : isCoin
+            ? 'CREDITED TO YOUR WALLET'
+            : 'ACTIVATED INSTANTLY';
+    final icon =
+        isZero
+            ? Icons.auto_awesome_rounded
+            : isCoin
+            ? Icons.account_balance_wallet_rounded
+            : Icons.verified_rounded;
+    final accent = isZero ? const Color(0xFFD9B4FF) : const Color(0xFF75F1C0);
+    final glow = isZero ? const Color(0xFF9F5DEA) : const Color(0xFF16B984);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 6, 14, 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(99),
+        gradient: LinearGradient(
+          colors: [
+            accent.withValues(alpha: .16),
+            (isZero ? const Color(0xFF21112F) : const Color(0xFF0B1E22))
+                .withValues(alpha: .58),
+          ],
+        ),
+        border: Border.all(color: accent.withValues(alpha: .36)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 25,
+            height: 25,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: accent.withValues(alpha: .13),
+              border: Border.all(color: accent.withValues(alpha: .28)),
+            ),
+            child: Icon(icon, color: accent, size: 14),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: isZero ? const Color(0xFFF4E9FF) : const Color(0xFFE9FFF8),
+              fontSize: 9.5,
+              fontWeight: FontWeight.w900,
+              letterSpacing: .7,
+              decoration: TextDecoration.none,
+              shadows: [Shadow(color: glow, blurRadius: 7)],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PremiumImageActionButton extends StatefulWidget {
+  const _PremiumImageActionButton({
+    required this.label,
+    required this.pulse,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String label;
+  final double pulse;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  State<_PremiumImageActionButton> createState() =>
+      _PremiumImageActionButtonState();
+}
+
+class _PremiumImageActionButtonState extends State<_PremiumImageActionButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onPressed();
+      },
+      child: Semantics(
+        button: true,
+        label: widget.label,
+        child: AnimatedScale(
+          duration: const Duration(milliseconds: 90),
+          scale: _pressed ? .94 : 1 + widget.pulse * .018,
+          child: SizedBox(
+            width: 220,
+            height: 82,
+            child: Stack(
+              fit: StackFit.expand,
+              alignment: Alignment.center,
+              children: [
+                Image.asset(
+                  _fortunePremiumSpinButtonAsset,
+                  fit: BoxFit.fill,
+                  filterQuality: FilterQuality.high,
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(34, 6, 34, 17),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        widget.icon,
+                        color: const Color(0xFFFFF1A4),
+                        size: 20,
+                        shadows: const [
+                          Shadow(color: Color(0xFFFF9F00), blurRadius: 8),
+                        ],
+                      ),
+                      const SizedBox(width: 8),
+                      _ArcadeLabel(
+                        text: widget.label,
+                        fontSize: 18,
+                        letterSpacing: 1.4,
+                        strokeWidth: 4,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LegacyFortuneRewardSheet extends StatefulWidget {
+  const _LegacyFortuneRewardSheet({required this.spin});
+
+  final FortuneWheelSpin spin;
+
+  @override
+  State<_LegacyFortuneRewardSheet> createState() => _FortuneRewardSheetState();
+}
+
+class _FortuneRewardSheetState extends State<_LegacyFortuneRewardSheet>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 

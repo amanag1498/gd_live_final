@@ -6,7 +6,9 @@ use App\Models\EntryPack;
 use App\Models\FortuneWheelSegment;
 use App\Models\User;
 use App\Services\FortuneWheelService;
+use Database\Seeders\EntryPackSeeder;
 use Database\Seeders\FortuneWheelSeeder;
+use Database\Seeders\SubscriptionPlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -34,7 +36,11 @@ class FortuneWheelAdminTest extends TestCase
 
     public function test_dashboard_shows_runtime_odds_and_seeded_catalog_rewards(): void
     {
-        $this->seed(FortuneWheelSeeder::class);
+        $this->seed([
+            EntryPackSeeder::class,
+            SubscriptionPlanSeeder::class,
+            FortuneWheelSeeder::class,
+        ]);
 
         $response = $this->actingAs($this->admin)
             ->get(route('admin.games.fortune-wheel.dashboard'));
@@ -43,7 +49,7 @@ class FortuneWheelAdminTest extends TestCase
             ->assertSee('Fortune Wheel Control Room')
             ->assertSee('Reward Mix')
             ->assertSee('Catalog Readiness')
-            ->assertSee('Basic Entry 1 Day')
+            ->assertSee('Royal Entry 1 Day')
             ->assertSee('Bronze 1 Day')
             ->assertSee('% chance');
     }

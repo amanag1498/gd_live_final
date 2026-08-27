@@ -11,14 +11,9 @@ class FortuneWheelSeeder extends Seeder
 {
     public function run(): void
     {
-        // Keep this seeder safe to run directly in production. Reward segments
-        // must never disappear only because the prerequisite catalog seeders
-        // were not executed first.
-        $this->call([
-            EntryPackSeeder::class,
-            SubscriptionPlanSeeder::class,
-        ]);
-
+        // Catalog rows are managed independently by the admin. This seeder
+        // only links rewards to matching active rows and must never create or
+        // overwrite production entry packs or subscription plans.
         $this->seedCoinRewards();
         $this->seedEntryPackRewards();
         $this->seedSubscriptionRewards();
@@ -106,8 +101,13 @@ class FortuneWheelSeeder extends Seeder
     private function seedEntryPackRewards(): void
     {
         $packs = [
-            ['name' => 'Basic Entry', 'label' => 'Basic Entry 1 Day', 'weight' => 2, 'color' => '#FACC15', 'sort_order' => 90],
-            ['name' => 'VIP Entry', 'label' => 'VIP Entry 1 Day', 'weight' => 1, 'color' => '#EC4899', 'sort_order' => 100],
+            ['name' => 'Royal Entry', 'label' => 'Royal Entry 1 Day', 'weight' => 4, 'color' => '#F59E0B', 'sort_order' => 90],
+            ['name' => 'CAR', 'label' => 'CAR 1 Day', 'weight' => 2, 'color' => '#0EA5E9', 'sort_order' => 100],
+            ['name' => 'CAR 2', 'label' => 'CAR 2 1 Day', 'weight' => 2, 'color' => '#2563EB', 'sort_order' => 110],
+            ['name' => 'CAR 3', 'label' => 'CAR 3 1 Day', 'weight' => 2, 'color' => '#4F46E5', 'sort_order' => 120],
+            ['name' => 'SPACESHIP', 'label' => 'Spaceship 1 Day', 'weight' => 1, 'color' => '#7C3AED', 'sort_order' => 130],
+            ['name' => 'DRAGON', 'label' => 'Dragon 1 Day', 'weight' => 1, 'color' => '#DC2626', 'sort_order' => 140],
+            ['name' => 'Leopard', 'label' => 'Leopard 1 Day', 'weight' => 1, 'color' => '#D97706', 'sort_order' => 150],
         ];
 
         foreach ($packs as $config) {
@@ -117,6 +117,12 @@ class FortuneWheelSeeder extends Seeder
                 ->first();
 
             if (! $pack) {
+                $this->deactivateUnavailableSeededReward(
+                    FortuneWheelSegment::REWARD_ENTRY_PACK,
+                    $config['label'],
+                    'default_entry_pack_reward',
+                );
+
                 continue;
             }
 
@@ -141,12 +147,22 @@ class FortuneWheelSeeder extends Seeder
                 ],
             );
         }
+
+        $this->deactivateRemovedSeededRewards(
+            FortuneWheelSegment::REWARD_ENTRY_PACK,
+            array_column($packs, 'label'),
+            'default_entry_pack_reward',
+        );
     }
 
     private function seedSubscriptionRewards(): void
     {
         $plans = [
-            ['name' => 'Bronze', 'label' => 'Bronze 1 Day', 'weight' => 1, 'color' => '#CD7F32', 'sort_order' => 110],
+            ['name' => 'Base', 'label' => 'Base 1 Day', 'weight' => 3, 'color' => '#64748B', 'sort_order' => 160],
+            ['name' => 'Bronze', 'label' => 'Bronze 1 Day', 'weight' => 2, 'color' => '#CD7F32', 'sort_order' => 170],
+            ['name' => 'Silver', 'label' => 'Silver 1 Day', 'weight' => 1, 'color' => '#94A3B8', 'sort_order' => 180],
+            ['name' => 'Gold', 'label' => 'Gold 1 Day', 'weight' => 1, 'color' => '#EAB308', 'sort_order' => 190],
+            ['name' => 'Platinum', 'label' => 'Platinum 1 Day', 'weight' => 1, 'color' => '#06B6D4', 'sort_order' => 200],
         ];
 
         foreach ($plans as $config) {
@@ -156,6 +172,12 @@ class FortuneWheelSeeder extends Seeder
                 ->first();
 
             if (! $plan) {
+                $this->deactivateUnavailableSeededReward(
+                    FortuneWheelSegment::REWARD_SUBSCRIPTION,
+                    $config['label'],
+                    'default_subscription_reward',
+                );
+
                 continue;
             }
 
@@ -179,6 +201,39 @@ class FortuneWheelSeeder extends Seeder
                     ],
                 ],
             );
+        }
+
+        $this->deactivateRemovedSeededRewards(
+            FortuneWheelSegment::REWARD_SUBSCRIPTION,
+            array_column($plans, 'label'),
+            'default_subscription_reward',
+        );
+    }
+
+    private function deactivateRemovedSeededRewards(string $rewardType, array $currentLabels, string $profile): void
+    {
+        FortuneWheelSegment::query()
+            ->where('reward_type', $rewardType)
+            ->whereNotIn('label', $currentLabels)
+            ->get()
+            ->filter(fn (FortuneWheelSegment $segment) => data_get($segment->meta, 'seeded') === true
+                && data_get($segment->meta, 'profile') === $profile)
+            ->each->update(['is_active' => false]);
+    }
+
+    private function deactivateUnavailableSeededReward(string $rewardType, string $label, string $profile): void
+    {
+        $segment = FortuneWheelSegment::query()
+            ->where('reward_type', $rewardType)
+            ->where('label', $label)
+            ->first();
+
+        if (
+            $segment
+            && data_get($segment->meta, 'seeded') === true
+            && data_get($segment->meta, 'profile') === $profile
+        ) {
+            $segment->update(['is_active' => false]);
         }
     }
 }
