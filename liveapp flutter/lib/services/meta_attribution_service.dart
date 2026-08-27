@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 
 import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:facebook_app_events/facebook_app_events.dart';
+import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:uuid/uuid.dart';
 
@@ -26,11 +27,34 @@ class MetaAttributionService {
     _initialized = true;
     _version = (await PackageInfo.fromPlatform()).version;
     if (!_enabled) return;
-    try {
+
+    await _runMeta('configure debug logging', () async {
+      await _meta.setDebugLoggingEnabled(kDebugMode);
+    });
+
+    // Android has no ATT prompt. Enable advertiser-ID collection before the
+    // first activation so Meta can match a fresh Play install to the ad click.
+    // On iOS, preserve the current ATT decision and never collect IDFA before
+    // the user has authorized tracking.
+    final trackingAllowed =
+        Platform.isAndroid ||
+        (Platform.isIOS &&
+            await AppTrackingTransparency.trackingAuthorizationStatus ==
+                TrackingStatus.authorized);
+    await _runMeta('configure advertiser tracking', () async {
+      await _meta.setAdvertiserTracking(
+        enabled: trackingAllowed,
+        collectId: trackingAllowed,
+      );
+    });
+    await _runMeta('activate app', () async {
       await _meta.setAutoLogAppEventsEnabled(true);
       await _meta.activateApp();
-      if (hasAuthenticatedSession) await logLifecycleEvent('app_launch');
-    } catch (_) {}
+      // Make first-open diagnostics deterministic instead of waiting for the
+      // SDK's normal event batching window.
+      await _meta.flush();
+    });
+    if (hasAuthenticatedSession) await logLifecycleEvent('app_launch');
   }
 
   Future<void> requestTrackingConsent() async {
@@ -44,10 +68,14 @@ class MetaAttributionService {
               : current;
       allowed = status == TrackingStatus.authorized;
     }
-    try {
+    await _runMeta('update advertiser tracking consent', () async {
       await _meta.setAdvertiserTracking(enabled: allowed, collectId: allowed);
       await _meta.setAutoLogAppEventsEnabled(true);
-    } catch (_) {}
+      // Re-activate and flush after an ATT decision so queued iOS events carry
+      // the latest advertiser-tracking state.
+      await _meta.activateApp();
+      await _meta.flush();
+    });
     await _audit(
       'advertiser_tracking_consent',
       trackingAllowed: allowed,
@@ -65,9 +93,10 @@ class MetaAttributionService {
       if (provider != null) 'login_provider': provider,
       if (isNewUser == true) 'is_new_user': '1',
     };
-    try {
+    await _runMeta('log $eventName', () async {
       await _meta.logEvent(name: _metaName(eventName), parameters: properties);
-    } catch (_) {}
+      if (kDebugMode) await _meta.flush();
+    });
     // Registration is written by the Firebase login endpoint so this client
     // notification cannot create a second conversion in the audit trail.
     if (eventName != 'complete_registration') {
@@ -80,13 +109,14 @@ class MetaAttributionService {
     required String orderId,
   }) async {
     if (!_enabled) return;
-    try {
+    await _runMeta('log purchase', () async {
       await _meta.logPurchase(
         amount: amountInr,
         currency: 'INR',
         parameters: {'order_id': orderId},
       );
-    } catch (_) {}
+      if (kDebugMode) await _meta.flush();
+    });
   }
 
   Future<void> _audit(
@@ -116,4 +146,18 @@ class MetaAttributionService {
     'login' => 'fb_mobile_login',
     _ => eventName,
   };
+
+  Future<void> _runMeta(
+    String operation,
+    Future<void> Function() action,
+  ) async {
+    try {
+      await action();
+    } catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('[meta] $operation failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+    }
+  }
 }

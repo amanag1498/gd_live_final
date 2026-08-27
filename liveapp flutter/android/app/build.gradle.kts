@@ -24,7 +24,9 @@ if (metaPropertiesFile.exists()) {
 android {
     namespace = "com.techybugs.gdlive"
     compileSdk = 36
-    ndkVersion = "27.0.12077973"
+    // Use the highest NDK required by Flutter plugins (notably package:jni).
+    // Newer NDK releases remain backward compatible with native dependencies.
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
