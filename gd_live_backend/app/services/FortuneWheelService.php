@@ -190,6 +190,11 @@ class FortuneWheelService
             'spin' => $this->spinPayload($spin),
             'free_spins_remaining' => $this->freeSpinsRemaining($user, $this->spunForDate()),
             'wallet_balance' => (int) Wallet::query()->where('user_id', $user->id)->value('balance'),
+            'segments' => $this->activeSegments()
+                ->get()
+                ->map(fn (FortuneWheelSegment $segment) => $this->segmentPayload($segment))
+                ->values()
+                ->all(),
         ];
     }
 
@@ -211,14 +216,41 @@ class FortuneWheelService
         $today = $this->spunForDate();
         $todaySpins = FortuneWheelSpin::query()->whereDate('spun_for_date', $today);
         $paidSpins = (clone $todaySpins)->where('spin_type', FortuneWheelSpin::TYPE_PAID);
+        $segments = FortuneWheelSegment::query()
+            ->with(['entryPack', 'subscriptionPlan'])
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+        $eligibleSegments = $this->activeSegments()->get();
+        $eligibleSegmentIds = $eligibleSegments->pluck('id')->map(fn ($id) => (int) $id)->values();
+        $entryPacks = EntryPack::query()->where('is_active', true)->orderBy('sort_order')->orderBy('id')->get();
+        $subscriptionPlans = SubscriptionPlan::query()->where('is_active', true)->orderBy('price_coins')->orderBy('id')->get();
+        $expectedValue = $this->expectedValuePayload($eligibleSegments);
+        $activeConfigured = $segments->where('is_active', true);
+        $ineligibleActive = $activeConfigured->reject(
+            fn (FortuneWheelSegment $segment) => $eligibleSegmentIds->contains((int) $segment->id),
+        );
+        $healthWarnings = [];
+
+        if ($this->enabled() && $eligibleSegments->isEmpty()) {
+            $healthWarnings[] = 'The game is enabled but has no selectable reward segments.';
+        }
+        if ($ineligibleActive->isNotEmpty()) {
+            $healthWarnings[] = $ineligibleActive->count().' active segment(s) are excluded because their linked catalog reward is missing or inactive.';
+        }
+        if ($entryPacks->isEmpty()) {
+            $healthWarnings[] = 'No active entry packs are available for Fortune Wheel rewards.';
+        }
+        if ($subscriptionPlans->isEmpty()) {
+            $healthWarnings[] = 'No active subscription plans are available for Fortune Wheel rewards.';
+        }
+        if ($this->paidSpinsEnabled() && (float) $expectedValue['estimated_coin_margin'] <= 0) {
+            $healthWarnings[] = 'Paid spin coin margin is zero or negative before valuing entry-pack and subscription rewards.';
+        }
 
         return [
             'settings' => $this->publicSettings(),
-            'segments' => FortuneWheelSegment::query()
-                ->with(['entryPack', 'subscriptionPlan'])
-                ->orderBy('sort_order')
-                ->orderBy('id')
-                ->get(),
+            'segments' => $segments,
             'recent_spins' => FortuneWheelSpin::query()
                 ->with(['user', 'segment', 'entryPack', 'subscriptionPlan'])
                 ->latest('id')
@@ -231,11 +263,16 @@ class FortuneWheelService
                 'paid_spins_today' => (int) (clone $paidSpins)->count(),
                 'coins_collected_today' => (int) (clone $paidSpins)->sum('spin_cost_coins'),
                 'coins_rewarded_today' => (int) (clone $todaySpins)->where('reward_type', FortuneWheelSegment::REWARD_COINS)->sum('reward_value_coins'),
-                'active_segments' => (int) FortuneWheelSegment::query()->where('is_active', true)->count(),
+                'configured_segments' => $segments->count(),
+                'active_segments' => $activeConfigured->count(),
+                'eligible_segments' => $eligibleSegments->count(),
+                'ineligible_active_segments' => $ineligibleActive->count(),
             ],
-            'expected_value' => $this->expectedValuePayload(),
-            'entry_packs' => EntryPack::query()->where('is_active', true)->orderBy('sort_order')->orderBy('id')->get(),
-            'subscription_plans' => SubscriptionPlan::query()->where('is_active', true)->orderBy('price_coins')->orderBy('id')->get(),
+            'expected_value' => $expectedValue,
+            'eligible_segment_ids' => $eligibleSegmentIds->all(),
+            'health_warnings' => $healthWarnings,
+            'entry_packs' => $entryPacks,
+            'subscription_plans' => $subscriptionPlans,
         ];
     }
 
@@ -419,12 +456,9 @@ class FortuneWheelService
         return CarbonImmutable::now($this->timezone())->toDateString();
     }
 
-    private function expectedValuePayload(): array
+    private function expectedValuePayload(?Collection $segments = null): array
     {
-        $segments = FortuneWheelSegment::query()
-            ->where('is_active', true)
-            ->where('weight', '>', 0)
-            ->get();
+        $segments ??= $this->activeSegments()->get();
         $totalWeight = (int) $segments->sum('weight');
         $coinExpected = $totalWeight > 0
             ? (float) $segments
@@ -432,11 +466,29 @@ class FortuneWheelService
                 ->sum(fn (FortuneWheelSegment $segment) => (int) $segment->reward_value_coins * (int) $segment->weight) / $totalWeight
             : 0.0;
 
+        $paidSpinCost = $this->paidSpinCostCoins();
+        $estimatedMargin = $paidSpinCost - $coinExpected;
+        $weightFor = fn (string $rewardType): int => (int) $segments
+            ->where('reward_type', $rewardType)
+            ->sum('weight');
+        $probabilityForWeight = fn (int $weight): float => $totalWeight > 0
+            ? round(($weight / $totalWeight) * 100, 2)
+            : 0.0;
+
         return [
             'total_weight' => $totalWeight,
             'average_coin_reward' => round($coinExpected, 2),
-            'paid_spin_cost_coins' => $this->paidSpinCostCoins(),
-            'estimated_coin_margin' => round($this->paidSpinCostCoins() - $coinExpected, 2),
+            'paid_spin_cost_coins' => $paidSpinCost,
+            'estimated_coin_margin' => round($estimatedMargin, 2),
+            'estimated_coin_margin_percent' => $paidSpinCost > 0
+                ? round(($estimatedMargin / $paidSpinCost) * 100, 2)
+                : 0.0,
+            'zero_coin_probability' => $probabilityForWeight((int) $segments
+                ->where('reward_type', FortuneWheelSegment::REWARD_COINS)
+                ->where('reward_value_coins', 0)
+                ->sum('weight')),
+            'entry_pack_probability' => $probabilityForWeight($weightFor(FortuneWheelSegment::REWARD_ENTRY_PACK)),
+            'subscription_probability' => $probabilityForWeight($weightFor(FortuneWheelSegment::REWARD_SUBSCRIPTION)),
         ];
     }
 

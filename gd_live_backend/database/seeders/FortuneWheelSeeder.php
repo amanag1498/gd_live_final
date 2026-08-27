@@ -11,6 +11,14 @@ class FortuneWheelSeeder extends Seeder
 {
     public function run(): void
     {
+        // Keep this seeder safe to run directly in production. Reward segments
+        // must never disappear only because the prerequisite catalog seeders
+        // were not executed first.
+        $this->call([
+            EntryPackSeeder::class,
+            SubscriptionPlanSeeder::class,
+        ]);
+
         $this->seedCoinRewards();
         $this->seedEntryPackRewards();
         $this->seedSubscriptionRewards();

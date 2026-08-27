@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\FortuneWheelSegment;
 use Database\Seeders\CommonSeeder;
+use Database\Seeders\FortuneWheelSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -57,5 +58,29 @@ class FortuneWheelSeederTest extends TestCase
                 ])
                 ->exists(),
         );
+    }
+
+    public function test_fortune_wheel_seeder_directly_creates_catalog_backed_rewards(): void
+    {
+        $this->seed(FortuneWheelSeeder::class);
+
+        $this->assertDatabaseHas('fortune_wheel_segments', [
+            'label' => 'Basic Entry 1 Day',
+            'reward_type' => FortuneWheelSegment::REWARD_ENTRY_PACK,
+            'reward_duration_hours' => 24,
+            'is_active' => true,
+        ]);
+        $this->assertDatabaseHas('fortune_wheel_segments', [
+            'label' => 'VIP Entry 1 Day',
+            'reward_type' => FortuneWheelSegment::REWARD_ENTRY_PACK,
+            'reward_duration_hours' => 24,
+            'is_active' => true,
+        ]);
+        $this->assertDatabaseHas('fortune_wheel_segments', [
+            'label' => 'Bronze 1 Day',
+            'reward_type' => FortuneWheelSegment::REWARD_SUBSCRIPTION,
+            'reward_duration_hours' => 24,
+            'is_active' => true,
+        ]);
     }
 }

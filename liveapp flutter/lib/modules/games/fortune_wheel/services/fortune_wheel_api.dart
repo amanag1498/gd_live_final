@@ -55,11 +55,13 @@ class FortuneWheelSpinResult {
     required this.spin,
     required this.freeSpinsRemaining,
     required this.walletBalance,
+    required this.segments,
   });
 
   final FortuneWheelSpin spin;
   final int freeSpinsRemaining;
   final int walletBalance;
+  final List<FortuneWheelSegment> segments;
 
   factory FortuneWheelSpinResult.fromJson(Map<String, dynamic> json) {
     return FortuneWheelSpinResult(
@@ -68,6 +70,15 @@ class FortuneWheelSpinResult {
       ),
       freeSpinsRemaining: _toInt(json['free_spins_remaining'], 0),
       walletBalance: _toInt(json['wallet_balance'], 0),
+      segments:
+          (json['segments'] as List? ?? const [])
+              .whereType<Map>()
+              .map(
+                (row) => FortuneWheelSegment.fromJson(
+                  Map<String, dynamic>.from(row),
+                ),
+              )
+              .toList(),
     );
   }
 }

@@ -90,6 +90,7 @@ class FortuneWheelPreloadService extends GetxService
       snapshot.value = current.copyWith(
         walletBalance: result.walletBalance,
         freeSpinsRemaining: result.freeSpinsRemaining,
+        segments: result.segments.isEmpty ? current.segments : result.segments,
         recentSpins: [result.spin, ...current.recentSpins].take(10).toList(),
       );
     } else {

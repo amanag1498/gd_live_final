@@ -74,6 +74,11 @@ class FortuneWheelServiceTest extends TestCase
         $this->assertSame(20, data_get($freeSpin, 'spin.reward_value_coins'));
         $this->assertSame(520, data_get($freeSpin, 'wallet_balance'));
         $this->assertSame(0, data_get($freeSpin, 'free_spins_remaining'));
+        $this->assertCount(1, data_get($freeSpin, 'segments'));
+        $this->assertSame(
+            data_get($freeSpin, 'spin.segment.id'),
+            data_get($freeSpin, 'segments.0.id'),
+        );
 
         $paidSpin = $service->spin($user, 'fortune-paid-1');
         $this->assertSame(FortuneWheelSpin::TYPE_PAID, data_get($paidSpin, 'spin.spin_type'));

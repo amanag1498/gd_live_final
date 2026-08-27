@@ -22,6 +22,7 @@ class FortuneWheelSnapshot {
   FortuneWheelSnapshot copyWith({
     int? walletBalance,
     int? freeSpinsRemaining,
+    List<FortuneWheelSegment>? segments,
     List<FortuneWheelSpin>? recentSpins,
   }) {
     return FortuneWheelSnapshot(
@@ -29,7 +30,7 @@ class FortuneWheelSnapshot {
       walletBalance: walletBalance ?? this.walletBalance,
       spunForDate: spunForDate,
       freeSpinsRemaining: freeSpinsRemaining ?? this.freeSpinsRemaining,
-      segments: segments,
+      segments: segments ?? this.segments,
       recentSpins: recentSpins ?? this.recentSpins,
     );
   }
