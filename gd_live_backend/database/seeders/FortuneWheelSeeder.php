@@ -27,32 +27,53 @@ class FortuneWheelSeeder extends Seeder
                 'sort_order' => 10,
             ],
             [
+                'label' => '5 Coins',
+                'reward_value_coins' => 5,
+                'weight' => 24,
+                'color' => '#14B8A6',
+                'sort_order' => 20,
+            ],
+            [
                 'label' => '10 Coins',
                 'reward_value_coins' => 10,
                 'weight' => 28,
                 'color' => '#22C55E',
-                'sort_order' => 20,
+                'sort_order' => 30,
             ],
             [
                 'label' => '25 Coins',
                 'reward_value_coins' => 25,
                 'weight' => 16,
                 'color' => '#38BDF8',
-                'sort_order' => 30,
+                'sort_order' => 40,
             ],
             [
                 'label' => '50 Coins',
                 'reward_value_coins' => 50,
                 'weight' => 8,
                 'color' => '#A855F7',
-                'sort_order' => 40,
+                'sort_order' => 50,
+            ],
+            [
+                'label' => '75 Coins',
+                'reward_value_coins' => 75,
+                'weight' => 3,
+                'color' => '#EC4899',
+                'sort_order' => 60,
             ],
             [
                 'label' => '100 Coins',
                 'reward_value_coins' => 100,
                 'weight' => 3,
                 'color' => '#F97316',
-                'sort_order' => 50,
+                'sort_order' => 70,
+            ],
+            [
+                'label' => '200 Coins',
+                'reward_value_coins' => 200,
+                'weight' => 1,
+                'color' => '#EAB308',
+                'sort_order' => 80,
             ],
         ];
 
@@ -77,8 +98,8 @@ class FortuneWheelSeeder extends Seeder
     private function seedEntryPackRewards(): void
     {
         $packs = [
-            ['name' => 'Basic Entry', 'label' => 'Basic Entry 1 Day', 'weight' => 2, 'color' => '#FACC15', 'sort_order' => 60],
-            ['name' => 'VIP Entry', 'label' => 'VIP Entry 1 Day', 'weight' => 1, 'color' => '#EC4899', 'sort_order' => 70],
+            ['name' => 'Basic Entry', 'label' => 'Basic Entry 1 Day', 'weight' => 2, 'color' => '#FACC15', 'sort_order' => 90],
+            ['name' => 'VIP Entry', 'label' => 'VIP Entry 1 Day', 'weight' => 1, 'color' => '#EC4899', 'sort_order' => 100],
         ];
 
         foreach ($packs as $config) {
@@ -117,7 +138,7 @@ class FortuneWheelSeeder extends Seeder
     private function seedSubscriptionRewards(): void
     {
         $plans = [
-            ['name' => 'Bronze', 'label' => 'Bronze 1 Day', 'weight' => 1, 'color' => '#CD7F32', 'sort_order' => 80],
+            ['name' => 'Bronze', 'label' => 'Bronze 1 Day', 'weight' => 1, 'color' => '#CD7F32', 'sort_order' => 110],
         ];
 
         foreach ($plans as $config) {

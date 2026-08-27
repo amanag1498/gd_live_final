@@ -31,6 +31,24 @@ class FortuneWheelSeederTest extends TestCase
             'reward_value_coins' => 10,
             'is_active' => true,
         ]);
+        $this->assertDatabaseHas('fortune_wheel_segments', [
+            'label' => '5 Coins',
+            'reward_type' => FortuneWheelSegment::REWARD_COINS,
+            'reward_value_coins' => 5,
+            'is_active' => true,
+        ]);
+        $this->assertDatabaseHas('fortune_wheel_segments', [
+            'label' => '75 Coins',
+            'reward_type' => FortuneWheelSegment::REWARD_COINS,
+            'reward_value_coins' => 75,
+            'is_active' => true,
+        ]);
+        $this->assertDatabaseHas('fortune_wheel_segments', [
+            'label' => '200 Coins',
+            'reward_type' => FortuneWheelSegment::REWARD_COINS,
+            'reward_value_coins' => 200,
+            'is_active' => true,
+        ]);
         $this->assertTrue(
             FortuneWheelSegment::query()
                 ->whereIn('reward_type', [

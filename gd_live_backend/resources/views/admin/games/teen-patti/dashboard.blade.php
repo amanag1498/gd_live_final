@@ -178,50 +178,111 @@
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-header d-flex justify-content-between align-items-center">
+    <div class="card tp-ledger-card">
+      <div class="card-header tp-ledger-header">
         <div>
-          <h5 class="mb-1">Financial Ledger Audit</h5>
-          <div class="small text-muted">Immutable Teen Patti treasury and commission movements.</div>
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="tp-ledger-icon"><i class="ti ti-list-details"></i></span>
+            <h5 class="mb-0">Financial Ledger Audit</h5>
+          </div>
+          <div class="small text-muted">Immutable treasury and commission movements. Values below are stored coin amounts.</div>
+        </div>
+        <div class="tp-ledger-header-balances">
+          <span><small>Treasury</small><strong class="{{ $treasuryBalance >= 0 ? 'text-success' : 'text-danger' }}">{{ number_format($treasuryBalance) }}</strong></span>
+          <span><small>Commission</small><strong>{{ number_format($companyCommissionBalance) }}</strong></span>
         </div>
       </div>
-      <div class="table-responsive">
-        <table class="table align-middle mb-0">
+
+      <div class="tp-ledger-desktop table-responsive d-none d-lg-block">
+        <table class="table align-middle mb-0 tp-ledger-table">
+          <colgroup>
+            <col class="tp-col-event">
+            <col class="tp-col-round">
+            <col class="tp-col-reference">
+            <col class="tp-col-money">
+            <col class="tp-col-money">
+            <col class="tp-col-money">
+            <col class="tp-col-money">
+            <col class="tp-col-time">
+          </colgroup>
           <thead>
             <tr>
               <th>Event</th>
               <th>Round</th>
-              <th>Bet/Payout</th>
+              <th>References</th>
               <th class="text-end">Treasury Δ</th>
               <th class="text-end">Commission Δ</th>
               <th class="text-end">Treasury After</th>
               <th class="text-end">Commission After</th>
-              <th>Time</th>
+              <th>Occurred At</th>
             </tr>
           </thead>
           <tbody>
             @forelse($recentFinancialLedgerEntries as $entry)
+              @php
+                $eventLabel = ucfirst(str_replace('_', ' ', $entry->event_type));
+                $eventTone = match ($entry->event_type) {
+                  'bet_allocation' => 'success',
+                  'payout_debit' => 'danger',
+                  'bet_refund_reversal' => 'warning',
+                  default => 'neutral',
+                };
+              @endphp
               <tr>
                 <td>
-                  <div class="fw-semibold">{{ ucfirst(str_replace('_', ' ', $entry->event_type)) }}</div>
-                  <div class="small text-muted">#{{ $entry->id }}</div>
+                  <span class="tp-ledger-event tp-ledger-event-{{ $eventTone }}">{{ $eventLabel }}</span>
+                  <div class="tp-ledger-id">Entry #{{ $entry->id }}</div>
                 </td>
-                <td>{{ $entry->round?->round_key ?? '—' }}</td>
+                <td><span class="tp-ledger-round">{{ $entry->round?->round_key ?? '—' }}</span></td>
                 <td>
-                  <div>Bet #{{ $entry->teen_patti_bet_id ?? '—' }}</div>
-                  <div class="small text-muted">Payout #{{ $entry->teen_patti_payout_id ?? '—' }}</div>
+                  <div class="tp-ledger-refs">
+                    <span>Bet <strong>#{{ $entry->teen_patti_bet_id ?? '—' }}</strong></span>
+                    <span>Payout <strong>#{{ $entry->teen_patti_payout_id ?? '—' }}</strong></span>
+                  </div>
                 </td>
-                <td class="text-end {{ (int) $entry->treasury_delta_coins >= 0 ? 'text-success' : 'text-danger' }}">{{ number_format((int) $entry->treasury_delta_coins) }}</td>
-                <td class="text-end {{ (int) $entry->commission_delta_coins >= 0 ? 'text-success' : 'text-danger' }}">{{ number_format((int) $entry->commission_delta_coins) }}</td>
-                <td class="text-end fw-semibold">{{ number_format((int) $entry->treasury_balance_after_coins) }}</td>
-                <td class="text-end fw-semibold">{{ number_format((int) $entry->commission_balance_after_coins) }}</td>
-                <td>{{ optional($entry->occurred_at)->format('d M H:i:s') ?? '—' }}</td>
+                <td class="text-end"><span class="tp-ledger-amount {{ (int) $entry->treasury_delta_coins >= 0 ? 'is-positive' : 'is-negative' }}">{{ (int) $entry->treasury_delta_coins > 0 ? '+' : '' }}{{ number_format((int) $entry->treasury_delta_coins) }}</span></td>
+                <td class="text-end"><span class="tp-ledger-amount {{ (int) $entry->commission_delta_coins >= 0 ? 'is-positive' : 'is-negative' }}">{{ (int) $entry->commission_delta_coins > 0 ? '+' : '' }}{{ number_format((int) $entry->commission_delta_coins) }}</span></td>
+                <td class="text-end"><span class="tp-ledger-balance">{{ number_format((int) $entry->treasury_balance_after_coins) }}</span></td>
+                <td class="text-end"><span class="tp-ledger-balance">{{ number_format((int) $entry->commission_balance_after_coins) }}</span></td>
+                <td><time class="tp-ledger-time" datetime="{{ optional($entry->occurred_at)->toIso8601String() }}">{{ optional($entry->occurred_at)->format('d M Y') ?? '—' }}<small>{{ optional($entry->occurred_at)->format('H:i:s') ?? '' }}</small></time></td>
               </tr>
             @empty
               <tr><td colspan="8" class="text-center text-muted py-5">No financial ledger entries yet.</td></tr>
             @endforelse
           </tbody>
         </table>
+      </div>
+
+      <div class="tp-ledger-mobile d-lg-none">
+        @forelse($recentFinancialLedgerEntries as $entry)
+          @php
+            $eventLabel = ucfirst(str_replace('_', ' ', $entry->event_type));
+            $eventTone = match ($entry->event_type) {
+              'bet_allocation' => 'success',
+              'payout_debit' => 'danger',
+              'bet_refund_reversal' => 'warning',
+              default => 'neutral',
+            };
+          @endphp
+          <article class="tp-ledger-mobile-entry">
+            <div class="tp-ledger-mobile-head">
+              <div><span class="tp-ledger-event tp-ledger-event-{{ $eventTone }}">{{ $eventLabel }}</span><div class="tp-ledger-id">Entry #{{ $entry->id }}</div></div>
+              <time class="tp-ledger-time">{{ optional($entry->occurred_at)->format('d M Y') ?? '—' }}<small>{{ optional($entry->occurred_at)->format('H:i:s') ?? '' }}</small></time>
+            </div>
+            <div class="tp-ledger-mobile-context">
+              <div><small>Round</small><strong>{{ $entry->round?->round_key ?? '—' }}</strong></div>
+              <div><small>Bet / Payout</small><strong>#{{ $entry->teen_patti_bet_id ?? '—' }} / #{{ $entry->teen_patti_payout_id ?? '—' }}</strong></div>
+            </div>
+            <div class="tp-ledger-money-grid">
+              <div><small>Treasury Δ</small><strong class="{{ (int) $entry->treasury_delta_coins >= 0 ? 'text-success' : 'text-danger' }}">{{ (int) $entry->treasury_delta_coins > 0 ? '+' : '' }}{{ number_format((int) $entry->treasury_delta_coins) }}</strong></div>
+              <div><small>Commission Δ</small><strong class="{{ (int) $entry->commission_delta_coins >= 0 ? 'text-success' : 'text-danger' }}">{{ (int) $entry->commission_delta_coins > 0 ? '+' : '' }}{{ number_format((int) $entry->commission_delta_coins) }}</strong></div>
+              <div><small>Treasury After</small><strong>{{ number_format((int) $entry->treasury_balance_after_coins) }}</strong></div>
+              <div><small>Commission After</small><strong>{{ number_format((int) $entry->commission_balance_after_coins) }}</strong></div>
+            </div>
+          </article>
+        @empty
+          <div class="text-center text-muted py-5">No financial ledger entries yet.</div>
+        @endforelse
       </div>
     </div>
 
@@ -526,6 +587,243 @@
       border-radius: 14px;
       padding: .85rem .95rem;
       background: rgba(248, 250, 252, 0.72);
+    }
+
+    .teen-patti-admin .tp-ledger-card {
+      overflow: hidden;
+      border-radius: 20px;
+    }
+
+    .teen-patti-admin .tp-ledger-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      padding: 1rem 1.15rem;
+    }
+
+    .teen-patti-admin .tp-ledger-icon {
+      display: inline-grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 11px;
+      color: #4f46e5;
+      background: rgba(79, 70, 229, .10);
+      flex: 0 0 auto;
+    }
+
+    .teen-patti-admin .tp-ledger-header-balances {
+      display: flex;
+      align-items: stretch;
+      flex-wrap: wrap;
+      gap: .55rem;
+    }
+
+    .teen-patti-admin .tp-ledger-header-balances > span {
+      display: grid;
+      gap: .1rem;
+      min-width: 112px;
+      padding: .5rem .7rem;
+      border: 1px solid rgba(148, 163, 184, .20);
+      border-radius: 12px;
+      background: rgba(148, 163, 184, .07);
+    }
+
+    .teen-patti-admin .tp-ledger-header-balances small,
+    .teen-patti-admin .tp-ledger-money-grid small,
+    .teen-patti-admin .tp-ledger-mobile-context small {
+      color: var(--admin-muted);
+      font-size: .68rem;
+      font-weight: 800;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .teen-patti-admin .tp-ledger-header-balances strong {
+      font-size: .95rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .teen-patti-admin .tp-ledger-desktop {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .teen-patti-admin .tp-ledger-table {
+      width: 100%;
+      min-width: 1180px;
+      table-layout: fixed;
+    }
+
+    .teen-patti-admin .tp-ledger-table .tp-col-event { width: 15%; }
+    .teen-patti-admin .tp-ledger-table .tp-col-round { width: 15%; }
+    .teen-patti-admin .tp-ledger-table .tp-col-reference { width: 13%; }
+    .teen-patti-admin .tp-ledger-table .tp-col-money { width: 11%; }
+    .teen-patti-admin .tp-ledger-table .tp-col-time { width: 13%; }
+
+    .teen-patti-admin .tp-ledger-table th {
+      padding: .75rem .8rem;
+      color: var(--admin-muted);
+      font-size: .68rem;
+      font-weight: 800;
+      letter-spacing: .045em;
+      line-height: 1.25;
+      text-transform: uppercase;
+      white-space: normal;
+      vertical-align: bottom;
+    }
+
+    .teen-patti-admin .tp-ledger-table td {
+      padding: .9rem .8rem;
+      vertical-align: middle;
+      overflow: hidden;
+    }
+
+    .teen-patti-admin .tp-ledger-event {
+      display: inline-flex;
+      align-items: center;
+      max-width: 100%;
+      padding: .3rem .55rem;
+      border-radius: 999px;
+      font-size: .72rem;
+      font-weight: 800;
+      line-height: 1.2;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .teen-patti-admin .tp-ledger-event-success { color: #047857; background: rgba(16, 185, 129, .12); }
+    .teen-patti-admin .tp-ledger-event-danger { color: #b91c1c; background: rgba(239, 68, 68, .12); }
+    .teen-patti-admin .tp-ledger-event-warning { color: #b45309; background: rgba(245, 158, 11, .14); }
+    .teen-patti-admin .tp-ledger-event-neutral { color: #475569; background: rgba(100, 116, 139, .12); }
+
+    .teen-patti-admin .tp-ledger-id {
+      margin-top: .35rem;
+      color: var(--admin-muted);
+      font-size: .72rem;
+      white-space: nowrap;
+    }
+
+    .teen-patti-admin .tp-ledger-round {
+      display: block;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: .76rem;
+      font-weight: 700;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .teen-patti-admin .tp-ledger-refs {
+      display: grid;
+      gap: .3rem;
+      font-size: .75rem;
+      white-space: nowrap;
+    }
+
+    .teen-patti-admin .tp-ledger-refs span {
+      color: var(--admin-muted);
+    }
+
+    .teen-patti-admin .tp-ledger-refs strong {
+      color: var(--admin-text);
+    }
+
+    .teen-patti-admin .tp-ledger-amount,
+    .teen-patti-admin .tp-ledger-balance {
+      display: inline-block;
+      font-size: .84rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .teen-patti-admin .tp-ledger-amount.is-positive { color: #059669; }
+    .teen-patti-admin .tp-ledger-amount.is-negative { color: #dc2626; }
+
+    .teen-patti-admin .tp-ledger-time {
+      display: grid;
+      gap: .15rem;
+      font-size: .78rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .teen-patti-admin .tp-ledger-time small {
+      color: var(--admin-muted);
+      font-size: .72rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .teen-patti-admin .tp-ledger-mobile {
+      padding: .85rem;
+      background: rgba(148, 163, 184, .04);
+    }
+
+    .teen-patti-admin .tp-ledger-mobile-entry {
+      padding: .9rem;
+      border: 1px solid rgba(148, 163, 184, .18);
+      border-radius: 16px;
+      background: var(--admin-surface, #fff);
+    }
+
+    .teen-patti-admin .tp-ledger-mobile-entry + .tp-ledger-mobile-entry {
+      margin-top: .75rem;
+    }
+
+    .teen-patti-admin .tp-ledger-mobile-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: .75rem;
+    }
+
+    .teen-patti-admin .tp-ledger-mobile-context {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: .6rem;
+      margin-top: .75rem;
+    }
+
+    .teen-patti-admin .tp-ledger-mobile-context > div,
+    .teen-patti-admin .tp-ledger-money-grid > div {
+      display: grid;
+      min-width: 0;
+      gap: .2rem;
+      padding: .6rem;
+      border-radius: 11px;
+      background: rgba(148, 163, 184, .08);
+    }
+
+    .teen-patti-admin .tp-ledger-mobile-context strong {
+      font-size: .76rem;
+      overflow-wrap: anywhere;
+    }
+
+    .teen-patti-admin .tp-ledger-money-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: .55rem;
+      margin-top: .55rem;
+    }
+
+    .teen-patti-admin .tp-ledger-money-grid strong {
+      font-size: .88rem;
+      font-variant-numeric: tabular-nums;
+      overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 575.98px) {
+      .teen-patti-admin .tp-ledger-header-balances {
+        width: 100%;
+      }
+
+      .teen-patti-admin .tp-ledger-header-balances > span {
+        flex: 1 1 calc(50% - .3rem);
+        min-width: 0;
+      }
     }
   </style>
 @endsection

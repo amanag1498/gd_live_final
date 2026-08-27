@@ -8,7 +8,8 @@ import 'package:gd_live/services/app_settings_service.dart';
 import '../../../../app/brand/brand.dart';
 import '../../../../app/routes/app_routes.dart';
 import '../../../../app/widgets/haptics.dart';
-import '../../../../app/widgets/gd_modal_surface.dart';
+import '../../games/fortune_wheel/services/fortune_wheel_preload_service.dart';
+import '../../games/fortune_wheel/widgets/fortune_wheel_panel.dart';
 import '../../Live/views/live_preflight_sheet.dart';
 import '../../dashboard/views/dashboard_page.dart';
 import '../pages/rooms_page.dart';
@@ -75,6 +76,29 @@ class _HomeShellState extends State<_HomeShell> {
   int _index = 0;
   int _previousIndex = 0;
   bool _handlingExitPrompt = false;
+  bool _fortuneDialogVisible = false;
+  bool _fortuneAutoOpenHandled = false;
+  Worker? _fortuneSnapshotWorker;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !Get.isRegistered<FortuneWheelPreloadService>()) return;
+      final fortune = Get.find<FortuneWheelPreloadService>();
+      _fortuneSnapshotWorker = ever(
+        fortune.snapshot,
+        (_) => _scheduleFortuneWheelAutoOpen(),
+      );
+      _scheduleFortuneWheelAutoOpen();
+    });
+  }
+
+  @override
+  void dispose() {
+    _fortuneSnapshotWorker?.dispose();
+    super.dispose();
+  }
 
   void _setTabIndex(int nextIndex) {
     if (!mounted || nextIndex == _index) return;
@@ -100,6 +124,31 @@ class _HomeShellState extends State<_HomeShell> {
   BrandTokens _tokens() {
     final settings = Get.find<AppSettingsService>();
     return getBrandTokens(settings.brandKey);
+  }
+
+  void _scheduleFortuneWheelAutoOpen() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _fortuneAutoOpenHandled || _fortuneDialogVisible) return;
+      if (!Get.isRegistered<FortuneWheelPreloadService>()) return;
+
+      final settings = Get.find<AppSettingsService>();
+      final snapshot = Get.find<FortuneWheelPreloadService>().snapshot.value;
+      if (!settings.fortuneWheelEnabled ||
+          snapshot == null ||
+          snapshot.freeSpinsRemaining <= 0) {
+        return;
+      }
+
+      _fortuneAutoOpenHandled = true;
+      _openFortuneWheelDialog();
+    });
+  }
+
+  Future<void> _openFortuneWheelDialog() async {
+    if (!mounted || _fortuneDialogVisible) return;
+    _fortuneDialogVisible = true;
+    await showFortuneWheelDialog(context, freeSpinOnly: true);
+    _fortuneDialogVisible = false;
   }
 
   @override
@@ -134,25 +183,26 @@ class _HomeShellState extends State<_HomeShell> {
         },
         child: Scaffold(
           backgroundColor: tokens.backgroundGradient.first,
-          floatingActionButton: widget.canGoLive
-              ? Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 0, 12, 16),
-                  child: FloatingActionButton.extended(
-                    onPressed: widget.onGoLive,
-                    backgroundColor: tokens.primaryButtonGradient.first,
-                    foregroundColor: Colors.white,
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
+          floatingActionButton:
+              widget.canGoLive
+                  ? Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 0, 12, 16),
+                    child: FloatingActionButton.extended(
+                      onPressed: widget.onGoLive,
+                      backgroundColor: tokens.primaryButtonGradient.first,
+                      foregroundColor: Colors.white,
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      icon: const Icon(Icons.wifi_tethering_rounded),
+                      label: const Text(
+                        'Go Live',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
                     ),
-                    icon: const Icon(Icons.wifi_tethering_rounded),
-                    label: const Text(
-                      'Go Live',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                )
-              : null,
+                  )
+                  : null,
           floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
           body: Stack(
             children: [
@@ -178,8 +228,9 @@ class _HomeShellState extends State<_HomeShell> {
                   Expanded(
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
-                      onHorizontalDragEnd: (details) =>
-                          _handleHorizontalSwipe(details, tabs.length),
+                      onHorizontalDragEnd:
+                          (details) =>
+                              _handleHorizontalSwipe(details, tabs.length),
                       child: Stack(
                         children: [
                           for (var i = 0; i < tabs.length; i++)
@@ -226,9 +277,7 @@ class _HomeShellState extends State<_HomeShell> {
                     ],
                   ),
                   borderRadius: BorderRadius.circular(30),
-                  border: Border.all(
-                    color: tokens.borderColor.withOpacity(.9),
-                  ),
+                  border: Border.all(color: tokens.borderColor.withOpacity(.9)),
                   boxShadow: [
                     BoxShadow(
                       color: tokens.glowColor.withOpacity(.18),
@@ -348,10 +397,7 @@ class _HomeShellState extends State<_HomeShell> {
       icon: Icons.workspace_premium_rounded,
       label: 'Dashboard',
       pageBuilder:
-          (isActive) => DashboardPage(
-            bottomPadding: 120,
-            isActive: isActive,
-          ),
+          (isActive) => DashboardPage(bottomPadding: 120, isActive: isActive),
     );
 
     addTab(
@@ -377,9 +423,8 @@ class _AnimatedHomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hiddenOffset = movingForward
-        ? const Offset(0.05, 0)
-        : const Offset(-0.05, 0);
+    final hiddenOffset =
+        movingForward ? const Offset(0.05, 0) : const Offset(-0.05, 0);
 
     return IgnorePointer(
       ignoring: !active,
@@ -404,9 +449,7 @@ class _AnimatedHomePage extends StatelessWidget {
 }
 
 class _HomeBackdrop extends StatelessWidget {
-  const _HomeBackdrop({
-    required this.tokens,
-  });
+  const _HomeBackdrop({required this.tokens});
 
   final BrandTokens tokens;
 
@@ -451,10 +494,7 @@ class _HomeBackdrop extends StatelessWidget {
 }
 
 class _HomeGlow extends StatelessWidget {
-  const _HomeGlow({
-    required this.size,
-    required this.color,
-  });
+  const _HomeGlow({required this.size, required this.color});
 
   final double size;
   final Color color;
@@ -468,11 +508,7 @@ class _HomeGlow extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: RadialGradient(
-            colors: [
-              color,
-              color.withOpacity(.18),
-              Colors.transparent,
-            ],
+            colors: [color, color.withOpacity(.18), Colors.transparent],
           ),
         ),
       ),
@@ -520,9 +556,10 @@ class _HomeTopTabs extends StatelessWidget {
                   duration: const Duration(milliseconds: 260),
                   curve: Curves.easeOutCubic,
                   style: TextStyle(
-                    color: selected
-                        ? const Color(0xFF102715)
-                        : const Color(0xFF1E3B25).withOpacity(.44),
+                    color:
+                        selected
+                            ? const Color(0xFF102715)
+                            : const Color(0xFF1E3B25).withOpacity(.44),
                     fontSize: selected ? 25 : 15,
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                     letterSpacing: selected ? -0.65 : -0.05,
@@ -555,7 +592,8 @@ class _HomeTopTabs extends StatelessWidget {
                         borderRadius: BorderRadius.circular(999),
                         boxShadow: [
                           BoxShadow(
-                            color: tokens.primaryButtonGradient.first.withOpacity(.16),
+                            color: tokens.primaryButtonGradient.first
+                                .withOpacity(.16),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),

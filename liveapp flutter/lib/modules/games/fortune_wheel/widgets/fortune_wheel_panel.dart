@@ -4,8 +4,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:audioplayers/audioplayers.dart';
 
-import '../../../../app/brand/brand.dart';
+import '../../../../app/widgets/coin_lottie.dart';
 import '../../../../app/widgets/haptics.dart';
 import '../../../wallet/widgets/recharge_bottom_sheet.dart';
 import '../models/fortune_wheel_models.dart';
@@ -13,12 +14,68 @@ import '../services/fortune_wheel_preload_service.dart';
 
 const _fortuneBgAsset = 'assets/games/fortune_wheel/fortune_bg.png';
 const _fortuneWheelFrameAsset = 'assets/games/fortune_wheel/wheel_frame.png';
-const _fortuneWheelPointerAsset =
-    'assets/games/fortune_wheel/wheel_pointer.png';
 const _fortuneSpinButtonAsset = 'assets/games/fortune_wheel/spin_button.png';
+const _fortuneTitleAsset = 'assets/games/fortune_wheel/spin_and_win_title.png';
+const _fortuneSpinSoundAsset = 'games/fortune_wheel/wheel_spin.mp3';
+
+Future<void> showFortuneWheelDialog(
+  BuildContext context, {
+  bool freeSpinOnly = false,
+}) {
+  return showGeneralDialog<void>(
+    context: context,
+    useRootNavigator: true,
+    barrierDismissible: true,
+    barrierLabel: 'Close Fortune Wheel',
+    barrierColor: Colors.black.withValues(alpha: .66),
+    transitionDuration: const Duration(milliseconds: 360),
+    pageBuilder: (dialogContext, _, __) {
+      final size = MediaQuery.sizeOf(dialogContext);
+      final width = math.min(size.width - 24, 480.0);
+      final height = math.min(size.height - 48, 720.0);
+      return SafeArea(
+        minimum: const EdgeInsets.all(12),
+        child: Center(
+          child: SizedBox(
+            width: width,
+            height: height,
+            child: FortuneWheelPanel(
+              showCloseButton: true,
+              freeSpinOnly: freeSpinOnly,
+              onClose: () => Navigator.of(dialogContext).pop(),
+            ),
+          ),
+        ),
+      );
+    },
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      return FadeTransition(
+        opacity: animation,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: .94, end: 1).animate(curved),
+          child: child,
+        ),
+      );
+    },
+  );
+}
 
 class FortuneWheelPanel extends StatefulWidget {
-  const FortuneWheelPanel({super.key});
+  const FortuneWheelPanel({
+    super.key,
+    this.showCloseButton = false,
+    this.freeSpinOnly = false,
+    this.onClose,
+  });
+
+  final bool showCloseButton;
+  final bool freeSpinOnly;
+  final VoidCallback? onClose;
 
   @override
   State<FortuneWheelPanel> createState() => _FortuneWheelPanelState();
@@ -30,10 +87,10 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
   late final AnimationController _ambientController;
   late final AnimationController _entranceController;
   late Animation<double> _spinAnimation;
+  late final AudioPlayer _spinAudioPlayer;
 
   bool _spinning = false;
   String? _error;
-  FortuneWheelSpin? _latestWin;
   double _rotation = 0;
 
   FortuneWheelPreloadService get _service =>
@@ -42,9 +99,10 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
   @override
   void initState() {
     super.initState();
+    _spinAudioPlayer = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
     _spinController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 4200),
+      duration: const Duration(milliseconds: 3680),
     );
     _spinAnimation = AlwaysStoppedAnimation<double>(_rotation);
     _spinController.addListener(() {
@@ -63,6 +121,8 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
 
   @override
   void dispose() {
+    unawaited(_spinAudioPlayer.stop());
+    unawaited(_spinAudioPlayer.dispose());
     _spinController.dispose();
     _ambientController.dispose();
     _entranceController.dispose();
@@ -71,6 +131,10 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
 
   Future<void> _spin(FortuneWheelSnapshot snapshot) async {
     if (_spinning || snapshot.segments.isEmpty) return;
+    if (widget.freeSpinOnly && !snapshot.canFreeSpin) {
+      widget.onClose?.call();
+      return;
+    }
     if (!snapshot.canFreeSpin &&
         snapshot.settings.paidSpinsEnabled &&
         snapshot.walletBalance < snapshot.settings.paidSpinCostCoins) {
@@ -85,7 +149,6 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
     setState(() {
       _spinning = true;
       _error = null;
-      _latestWin = null;
     });
 
     try {
@@ -102,14 +165,15 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
       ).animate(
         CurvedAnimation(parent: _spinController, curve: Curves.easeOutCubic),
       );
+      unawaited(_playSpinSound());
       await _spinController.forward(from: 0);
       if (!mounted) return;
-      setState(() {
-        _latestWin = result.spin;
-        _spinning = false;
-      });
+      setState(() => _spinning = false);
       Haptics.success();
-      _showReward(result.spin);
+      await _showReward(result.spin);
+      if (mounted && widget.freeSpinOnly) {
+        widget.onClose?.call();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -117,6 +181,15 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
         _error = e.toString().replaceFirst('Exception: ', '');
       });
       Haptics.warning();
+    }
+  }
+
+  Future<void> _playSpinSound() async {
+    try {
+      await _spinAudioPlayer.stop();
+      await _spinAudioPlayer.play(AssetSource(_fortuneSpinSoundAsset));
+    } catch (_) {
+      // Audio must never block or invalidate a server-authoritative spin.
     }
   }
 
@@ -129,8 +202,9 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
   double _targetRotation(int count, int targetIndex) {
     final slice = (math.pi * 2) / math.max(1, count);
     final targetCenter = (targetIndex * slice) + (slice / 2);
-    final pointerAngle = -math.pi / 2;
-    final desired = pointerAngle - targetCenter;
+    // The painter already starts segment zero at -pi/2 (the top pointer), so
+    // only the segment's offset from that origin must be reversed here.
+    final desired = -targetCenter;
     final fullTurns = 6 + math.Random().nextInt(3);
     final base = (math.pi * 2 * fullTurns) + desired;
     final currentTurns = (_rotation / (math.pi * 2)).floor();
@@ -141,13 +215,34 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
     return target;
   }
 
-  void _showReward(FortuneWheelSpin spin) {
-    showModalBottomSheet<void>(
+  Future<void> _showReward(FortuneWheelSpin spin) {
+    return showGeneralDialog<void>(
       context: context,
-      useRootNavigator: false,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _FortuneRewardSheet(spin: spin),
+      useRootNavigator: true,
+      barrierDismissible: true,
+      barrierLabel: 'Close reward',
+      barrierColor: Colors.black.withValues(alpha: .72),
+      transitionDuration: const Duration(milliseconds: 320),
+      pageBuilder:
+          (_, __, ___) => Center(
+            child: Material(
+              color: Colors.transparent,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: _FortuneRewardSheet(spin: spin),
+              ),
+            ),
+          ),
+      transitionBuilder:
+          (_, animation, __, child) => FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: .90, end: 1).animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+              ),
+              child: child,
+            ),
+          ),
     );
   }
 
@@ -163,7 +258,6 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens('midnight');
     return Obx(() {
       final snapshot = _service.snapshot.value;
       final loading = _service.loading.value;
@@ -177,24 +271,10 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
             _entranceController.value,
           );
 
-          return Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Color(0xFF140925),
-                  Color(0xFF241151),
-                  Color(0xFF071021),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
+          return ColoredBox(
+            color: Colors.transparent,
             child: Stack(
               children: [
-                const Positioned.fill(child: _FortuneBackground()),
-                Positioned.fill(
-                  child: _FortuneSparkleOverlay(progress: ambient),
-                ),
                 SafeArea(
                   top: false,
                   child: Opacity(
@@ -202,18 +282,16 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
                     child: Transform.translate(
                       offset: Offset(0, (1 - entrance) * 26),
                       child: ListView(
-                        padding: const EdgeInsets.fromLTRB(18, 2, 18, 28),
+                        padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
                         children: [
-                          _HeroHeader(
+                          _FortuneTopBar(
                             snapshot: snapshot,
-                            tokens: tokens,
-                            ambient: ambient,
+                            showCloseButton: widget.showCloseButton,
+                            onClose:
+                                widget.onClose ??
+                                () => Navigator.of(context).maybePop(),
                           ),
-                          if ((snapshot?.freeSpinsRemaining ?? 0) > 0) ...[
-                            const SizedBox(height: 10),
-                            _FreeSpinRibbon(ambient: ambient),
-                          ],
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
                           if (loading && snapshot == null)
                             const _FortuneLoadingCard()
                           else if (error != null && snapshot == null)
@@ -228,8 +306,6 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
                               onRetry: () => unawaited(_service.refresh()),
                             )
                           else ...[
-                            _WalletStrip(snapshot: snapshot),
-                            const SizedBox(height: 16),
                             if (snapshot.segments.isEmpty)
                               _NoSegmentsCard(
                                 onRefresh: () => unawaited(_service.refresh()),
@@ -241,7 +317,7 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
                                 spinning: _spinning,
                                 ambient: ambient,
                               ),
-                              const SizedBox(height: 18),
+                              const SizedBox(height: 4),
                               _SpinButton(
                                 snapshot: snapshot,
                                 spinning: _spinning,
@@ -253,12 +329,6 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
                               const SizedBox(height: 12),
                               _InlineError(message: error),
                             ],
-                            if (_latestWin != null) ...[
-                              const SizedBox(height: 14),
-                              _LatestWinCard(spin: _latestWin!),
-                            ],
-                            const SizedBox(height: 18),
-                            _RecentRewards(spins: snapshot.recentSpins),
                           ],
                         ],
                       ),
@@ -274,158 +344,127 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
   }
 }
 
-class _HeroHeader extends StatelessWidget {
-  const _HeroHeader({
+class _FortuneTopBar extends StatelessWidget {
+  const _FortuneTopBar({
     required this.snapshot,
-    required this.tokens,
-    required this.ambient,
+    required this.showCloseButton,
+    required this.onClose,
   });
 
   final FortuneWheelSnapshot? snapshot;
-  final BrandTokens tokens;
-  final double ambient;
+  final bool showCloseButton;
+  final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
-    final free = snapshot?.freeSpinsRemaining ?? 0;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(30),
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(30),
-          gradient: LinearGradient(
-            colors: [
-              const Color(0xFFFFD76B).withValues(alpha: .20),
-              const Color(0xFFFF5FD2).withValues(alpha: .15),
-              Colors.white.withValues(alpha: .04),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+    return SizedBox(
+      height: 70,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 86,
+            child:
+                snapshot == null
+                    ? const SizedBox.shrink()
+                    : _BalanceChip(balance: snapshot!.walletBalance),
           ),
-          border: Border.all(color: Colors.white.withValues(alpha: .12)),
-        ),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: CustomPaint(painter: _ShimmerSweepPainter(ambient)),
+          Expanded(
+            child: Image.asset(
+              _fortuneTitleAsset,
+              height: 64,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
             ),
-            Row(
-              children: [
-                Transform.rotate(
-                  angle: ambient * math.pi * 2,
-                  child: Container(
-                    width: 62,
-                    height: 62,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const SweepGradient(
-                        colors: [
-                          Color(0xFFFFD76B),
-                          Color(0xFFFF5FD2),
-                          Color(0xFF67E8F9),
-                          Color(0xFFFFD76B),
-                        ],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFFFD76B).withValues(alpha: .28),
-                          blurRadius: 28,
-                          spreadRadius: 4,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.stars_rounded,
-                      color: Colors.white,
-                      size: 34,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Fortune Wheel',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -.4,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        free > 0
-                            ? '$free free spin ready today'
-                            : 'Spin for coins and win live rewards',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: .72),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
+          SizedBox(
+            width: 86,
+            child:
+                showCloseButton
+                    ? Align(
+                      alignment: Alignment.centerRight,
+                      child: _FortuneCloseButton(onPressed: onClose),
+                    )
+                    : const SizedBox.shrink(),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _FreeSpinRibbon extends StatelessWidget {
-  const _FreeSpinRibbon({required this.ambient});
+class _BalanceChip extends StatelessWidget {
+  const _BalanceChip({required this.balance});
 
-  final double ambient;
+  final int balance;
 
   @override
   Widget build(BuildContext context) {
-    final pulse = .5 + (.5 * math.sin(ambient * math.pi * 2));
-    return Transform.scale(
-      scale: 1 + (pulse * .018),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
-          gradient: LinearGradient(
-            colors: [
-              const Color(0xFFFFD76B).withValues(alpha: .28),
-              const Color(0xFFFF5FD2).withValues(alpha: .18),
-            ],
-          ),
-          border: Border.all(
-            color: const Color(0xFFFFD76B).withValues(alpha: .42 + pulse * .22),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(
-                0xFFFFD76B,
-              ).withValues(alpha: .12 + pulse * .16),
-              blurRadius: 18 + pulse * 16,
-              spreadRadius: pulse * 2,
-            ),
+    return Container(
+      height: 38,
+      padding: const EdgeInsets.fromLTRB(5, 3, 9, 3),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF3C1A62).withValues(alpha: .94),
+            const Color(0xFF160A25).withValues(alpha: .96),
           ],
         ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.local_fire_department_rounded, color: Color(0xFFFFD76B)),
-            SizedBox(width: 8),
-            Text(
-              'Claim your free spin now',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-                letterSpacing: .2,
+        border: Border.all(
+          color: const Color(0xFFFFD76B).withValues(alpha: .68),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: .30),
+            blurRadius: 14,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const CoinLottie(size: 24),
+          const SizedBox(width: 3),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                '$balance',
+                maxLines: 1,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FortuneCloseButton extends StatelessWidget {
+  const _FortuneCloseButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFF090512).withValues(alpha: .78),
+      shape: const CircleBorder(),
+      elevation: 8,
+      shadowColor: Colors.black,
+      child: IconButton(
+        tooltip: 'Close',
+        onPressed: onPressed,
+        icon: const Icon(Icons.close_rounded, size: 20),
+        color: Colors.white,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints.tightFor(width: 38, height: 38),
       ),
     );
   }
@@ -438,33 +477,24 @@ class _WalletStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final free = snapshot.canFreeSpin;
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 10,
+      runSpacing: 8,
       children: [
-        Expanded(
-          child: _MiniStat(
-            label: 'Wallet',
-            value: '${snapshot.walletBalance}',
-            icon: Icons.account_balance_wallet_rounded,
-            accent: const Color(0xFFFFD76B),
-          ),
+        _MiniStat(
+          label: '${snapshot.walletBalance}',
+          icon: Icons.monetization_on_rounded,
+          accent: const Color(0xFFFFD76B),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _MiniStat(
-            label: 'Free',
-            value: '${snapshot.freeSpinsRemaining}',
-            icon: Icons.card_giftcard_rounded,
-            accent: const Color(0xFF67E8F9),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _MiniStat(
-            label: 'Paid',
-            value: '${snapshot.settings.paidSpinCostCoins}',
-            icon: Icons.paid_rounded,
-            accent: const Color(0xFFFF5FD2),
-          ),
+        _MiniStat(
+          label:
+              free
+                  ? '${snapshot.freeSpinsRemaining} FREE'
+                  : '${snapshot.settings.paidSpinCostCoins} COINS',
+          icon: free ? Icons.card_giftcard_rounded : Icons.bolt_rounded,
+          accent: free ? const Color(0xFF67E8F9) : const Color(0xFFFF5FD2),
         ),
       ],
     );
@@ -474,52 +504,35 @@ class _WalletStrip extends StatelessWidget {
 class _MiniStat extends StatelessWidget {
   const _MiniStat({
     required this.label,
-    required this.value,
     required this.icon,
     required this.accent,
   });
 
   final String label;
-  final String value;
   final IconData icon;
   final Color accent;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: Colors.white.withValues(alpha: .07),
+        borderRadius: BorderRadius.circular(999),
+        color: Colors.white.withValues(alpha: .06),
         border: Border.all(color: Colors.white.withValues(alpha: .10)),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: accent, size: 19),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: .55),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
+          Icon(icon, color: accent, size: 17),
+          const SizedBox(width: 7),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              letterSpacing: .2,
             ),
           ),
         ],
@@ -545,8 +558,9 @@ class _WheelStage extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = math.min(MediaQuery.sizeOf(context).width - 44, 330.0);
     final wheelSize = size * .82;
+    final hubSize = size * .27;
+    final wheelCenterY = 44 + (wheelSize / 2);
     final glowPulse = .5 + (.5 * math.sin(ambient * math.pi * 2));
-    final pointerBob = math.sin(ambient * math.pi * 2) * (spinning ? 4 : 2);
     final frameScale = 1 + (glowPulse * .018);
     return Center(
       child: SizedBox(
@@ -596,23 +610,6 @@ class _WheelStage extends StatelessWidget {
               ),
             ),
             Positioned(
-              top: 14 + pointerBob,
-              child: IgnorePointer(
-                child: AnimatedScale(
-                  scale: spinning ? 1.10 : 1.02 + glowPulse * .03,
-                  duration: const Duration(milliseconds: 400),
-                  curve: Curves.easeOutBack,
-                  child: Image.asset(
-                    _fortuneWheelPointerAsset,
-                    width: size * .23,
-                    height: size * .23,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
               top: 18,
               child: IgnorePointer(
                 child: Transform.scale(
@@ -628,14 +625,29 @@ class _WheelStage extends StatelessWidget {
               ),
             ),
             Positioned(
-              top: (size / 2) - 8,
+              top: 42,
+              child: IgnorePointer(
+                child: AnimatedScale(
+                  scale: spinning ? 1.08 : 1,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOutBack,
+                  child: const SizedBox(
+                    width: 34,
+                    height: 38,
+                    child: CustomPaint(painter: _FortunePointerPainter()),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: wheelCenterY - (hubSize / 2),
               child: AnimatedScale(
-                scale: spinning ? 1.12 : 1 + glowPulse * .035,
+                scale: spinning ? 1.12 : 1 + glowPulse * .025,
                 duration: const Duration(milliseconds: 500),
                 curve: Curves.easeOutBack,
                 child: SizedBox(
-                  width: size * .30,
-                  height: size * .30,
+                  width: hubSize,
+                  height: hubSize,
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
@@ -644,21 +656,15 @@ class _WheelStage extends StatelessWidget {
                         fit: BoxFit.contain,
                         filterQuality: FilterQuality.high,
                       ),
-                      Text(
-                        spinning ? 'LUCK' : 'SPIN',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: size * .042,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.2,
-                          shadows: const [
-                            Shadow(
-                              color: Color(0xFF4A0045),
-                              blurRadius: 7,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
-                        ),
+                      Icon(
+                        spinning
+                            ? Icons.auto_awesome_rounded
+                            : Icons.stars_rounded,
+                        color: Colors.white,
+                        size: size * .075,
+                        shadows: const [
+                          Shadow(color: Color(0xFF4A0045), blurRadius: 7),
+                        ],
                       ),
                     ],
                   ),
@@ -672,18 +678,51 @@ class _WheelStage extends StatelessWidget {
   }
 }
 
+class _FortunePointerPainter extends CustomPainter {
+  const _FortunePointerPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path =
+        Path()
+          ..moveTo(2, 3)
+          ..quadraticBezierTo(size.width / 2, -1, size.width - 2, 3)
+          ..lineTo(size.width / 2, size.height - 2)
+          ..close();
+    canvas.drawShadow(path, Colors.black, 8, true);
+    final paint =
+        Paint()
+          ..shader = const LinearGradient(
+            colors: [Color(0xFFFFF2A8), Color(0xFFFFB21C), Color(0xFFB75A00)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ).createShader(Offset.zero & size);
+    canvas.drawPath(path, paint);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..color = Colors.white.withValues(alpha: .72),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 class _FortuneWheelPainter extends CustomPainter {
   _FortuneWheelPainter(this.segments);
 
   final List<FortuneWheelSegment> segments;
 
   static const _fallbackColors = [
-    Color(0xFFFFD76B),
-    Color(0xFFFF5FD2),
-    Color(0xFF67E8F9),
-    Color(0xFF8B5CF6),
-    Color(0xFF34D399),
-    Color(0xFFFF7A7A),
+    Color(0xFF7C3AED),
+    Color(0xFFDB2777),
+    Color(0xFF0891B2),
+    Color(0xFFEA580C),
+    Color(0xFF059669),
+    Color(0xFF9333EA),
   ];
 
   @override
@@ -705,16 +744,16 @@ class _FortuneWheelPainter extends CustomPainter {
           Paint()
             ..shader = RadialGradient(
               colors: [
-                color.withValues(alpha: .96),
-                color.withValues(alpha: .58),
+                Color.lerp(color, Colors.white, .16)!,
+                Color.lerp(color, Colors.black, .20)!,
               ],
             ).createShader(rect);
       canvas.drawArc(rect, start, slice, true, paint);
 
       final line =
           Paint()
-            ..color = Colors.white.withValues(alpha: .35)
-            ..strokeWidth = 2;
+            ..color = const Color(0xFFFFE7A3).withValues(alpha: .34)
+            ..strokeWidth = 1.2;
       canvas.drawLine(
         center,
         center + Offset(math.cos(start), math.sin(start)) * radius,
@@ -732,9 +771,11 @@ class _FortuneWheelPainter extends CustomPainter {
         text: _compactLabel(segments[i]),
         style: const TextStyle(
           color: Colors.white,
-          fontSize: 12,
+          fontSize: 10.5,
           fontWeight: FontWeight.w900,
-          shadows: [Shadow(color: Colors.black54, blurRadius: 5)],
+          letterSpacing: .25,
+          height: 1.05,
+          shadows: [Shadow(color: Colors.black87, blurRadius: 6)],
         ),
       );
       textPainter.layout(maxWidth: radius * .52);
@@ -774,13 +815,13 @@ class _FortuneWheelPainter extends CustomPainter {
 
   String _compactLabel(FortuneWheelSegment segment) {
     if (segment.rewardType == 'coins') {
-      return '${segment.rewardValueCoins}\nCoins';
+      return '${segment.rewardValueCoins}\nCOINS';
     }
     if (segment.rewardType == 'entry_pack') {
-      return 'Entry\nPack';
+      return 'ENTRY\n1 DAY';
     }
     if (segment.rewardType == 'subscription') {
-      return 'VIP\nPass';
+      return 'VIP\n1 DAY';
     }
     return segment.label;
   }
@@ -810,79 +851,123 @@ class _SpinButton extends StatelessWidget {
     final pulse = .5 + (.5 * math.sin(ambient * math.pi * 2));
     final label =
         spinning
-            ? 'Spinning...'
+            ? 'SPINNING...'
             : isFree
-            ? 'Use Free Spin'
-            : 'Spin for ${snapshot.settings.paidSpinCostCoins} Coins';
-    return Transform.scale(
-      scale: spinning ? 1 : 1 + (pulse * .014),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          gradient: const LinearGradient(
-            colors: [Color(0xFFFFD76B), Color(0xFFFF7A1A), Color(0xFFFF5FD2)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(
-                0xFFFF9A32,
-              ).withValues(alpha: .28 + pulse * .16),
-              blurRadius: 22 + pulse * 10,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: spinning || snapshot.segments.isEmpty ? null : onPressed,
-              borderRadius: BorderRadius.circular(24),
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: CustomPaint(painter: _ButtonShimmerPainter(ambient)),
+            ? 'FREE SPIN'
+            : 'SPIN';
+    return Center(
+      child: Transform.scale(
+        scale: spinning ? .98 : .98 + (pulse * .035),
+        child: SizedBox(
+          width: 180,
+          height: 60,
+          child: Stack(
+            children: [
+              Positioned(
+                left: 3,
+                right: 3,
+                top: 9,
+                bottom: 0,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    color: const Color(0xFF64134E),
+                    border: Border.all(color: const Color(0xFF3D092E)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(
+                          0xFFFF4DCB,
+                        ).withValues(alpha: .18 + pulse * .16),
+                        blurRadius: 20 + pulse * 8,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 16,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (spinning)
-                          const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.4,
-                              color: Colors.white,
-                            ),
-                          )
-                        else
-                          const Icon(
-                            Icons.auto_awesome_rounded,
-                            color: Colors.white,
-                          ),
-                        const SizedBox(width: 10),
-                        Text(
-                          label,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                bottom: 8,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Ink(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFF7BE4), Color(0xFFC61E9B)],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                        border: Border.all(
+                          color: const Color(0xFFFFE9A0),
+                          width: 1.4,
+                        ),
+                      ),
+                      child: InkWell(
+                        onTap:
+                            spinning || snapshot.segments.isEmpty
+                                ? null
+                                : onPressed,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (spinning)
+                              const SizedBox(
+                                width: 17,
+                                height: 17,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.3,
+                                  color: Colors.white,
+                                ),
+                              )
+                            else
+                              const Icon(
+                                Icons.auto_awesome_rounded,
+                                color: Color(0xFFFFF0A8),
+                                size: 19,
+                              ),
+                            const SizedBox(width: 8),
+                            Text(
+                              label,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: .5,
+                                shadows: [
+                                  Shadow(
+                                    color: Color(0xFF5B0A43),
+                                    blurRadius: 5,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (!spinning && !isFree) ...[
+                              const SizedBox(width: 6),
+                              const CoinLottie(size: 18),
+                              const SizedBox(width: 2),
+                              Text(
+                                '${snapshot.settings.paidSpinCostCoins}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1106,24 +1191,30 @@ class _FortuneRewardSheetState extends State<_FortuneRewardSheet>
                   (context, scale, child) =>
                       Transform.scale(scale: scale, child: child),
               child: Container(
-                padding: const EdgeInsets.all(22),
+                padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(32),
+                  borderRadius: BorderRadius.circular(34),
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF2E145F), Color(0xFF11091F)],
+                    colors: [
+                      Color(0xFF3B1764),
+                      Color(0xFF180925),
+                      Color(0xFF09050F),
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: .14),
+                    color: const Color(0xFFFFD76B).withValues(alpha: .48),
+                    width: 1.4,
                   ),
                   boxShadow: [
                     BoxShadow(
                       color: const Color(
                         0xFFFFD76B,
                       ).withValues(alpha: .12 + pulse * .12),
-                      blurRadius: 36 + pulse * 18,
-                      offset: const Offset(0, 16),
+                      blurRadius: 42 + pulse * 22,
+                      spreadRadius: pulse * 2,
+                      offset: const Offset(0, 18),
                     ),
                   ],
                 ),
@@ -1139,66 +1230,75 @@ class _FortuneRewardSheetState extends State<_FortuneRewardSheet>
                       Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Transform.scale(
-                            scale: 1 + pulse * .06,
-                            child: Container(
-                              width: 86,
-                              height: 86,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Color(0xFFFFD76B),
-                                    Color(0xFFFF5FD2),
-                                  ],
-                                ),
-                              ),
-                              child: Icon(
-                                _rewardIcon(widget.spin.rewardType),
-                                color: Colors.white,
-                                size: 42,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 18),
                           const Text(
-                            'You Won',
+                            'LUCKY DROP',
                             style: TextStyle(
-                              color: Colors.white70,
+                              color: Color(0xFFFFD76B),
+                              fontSize: 14,
                               fontWeight: FontWeight.w900,
-                              letterSpacing: 1.2,
+                              letterSpacing: 2.2,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 10),
+                          Transform.scale(
+                            scale: 1 + pulse * .045,
+                            child: SizedBox(
+                              width: 108,
+                              height: 108,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Image.asset(
+                                    _fortuneSpinButtonAsset,
+                                    fit: BoxFit.contain,
+                                    filterQuality: FilterQuality.high,
+                                  ),
+                                  Icon(
+                                    _rewardIcon(widget.spin.rewardType),
+                                    color: Colors.white,
+                                    size: 42,
+                                    shadows: const [
+                                      Shadow(
+                                        color: Color(0xFF4A0045),
+                                        blurRadius: 8,
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'YOUR REWARD',
+                            style: TextStyle(
+                              color: Colors.white60,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.8,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
                           Text(
                             _rewardText(widget.spin),
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 24,
+                              fontSize: 27,
                               fontWeight: FontWeight.w900,
+                              letterSpacing: -.3,
+                              shadows: [
+                                Shadow(
+                                  color: Color(0xFFFF5FD2),
+                                  blurRadius: 14,
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 18),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: () => Navigator.of(context).maybePop(),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFFFD76B),
-                                foregroundColor: const Color(0xFF321400),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
-                              ),
-                              child: const Text(
-                                'Collect',
-                                style: TextStyle(fontWeight: FontWeight.w900),
-                              ),
-                            ),
+                          const SizedBox(height: 22),
+                          _PremiumCollectButton(
+                            pulse: pulse,
+                            onPressed: () => Navigator.of(context).maybePop(),
                           ),
                         ],
                       ),
@@ -1210,6 +1310,94 @@ class _FortuneRewardSheetState extends State<_FortuneRewardSheet>
           ),
         );
       },
+    );
+  }
+}
+
+class _PremiumCollectButton extends StatelessWidget {
+  const _PremiumCollectButton({required this.pulse, required this.onPressed});
+
+  final double pulse;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.scale(
+      scale: .98 + pulse * .025,
+      child: SizedBox(
+        width: 176,
+        height: 58,
+        child: Stack(
+          children: [
+            Positioned(
+              left: 3,
+              right: 3,
+              top: 8,
+              bottom: 0,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6B174F),
+                  borderRadius: BorderRadius.circular(19),
+                  border: Border.all(color: const Color(0xFF3E082C)),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 7,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(19),
+                child: Material(
+                  color: Colors.transparent,
+                  child: Ink(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFF86E6), Color(0xFFD829A9)],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                      borderRadius: BorderRadius.circular(19),
+                      border: Border.all(
+                        color: const Color(0xFFFFEBA5),
+                        width: 1.3,
+                      ),
+                    ),
+                    child: InkWell(
+                      onTap: onPressed,
+                      borderRadius: BorderRadius.circular(19),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.card_giftcard_rounded,
+                            color: Colors.white,
+                            size: 19,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'COLLECT',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: .8,
+                              shadows: [
+                                Shadow(color: Color(0xFF6B174F), blurRadius: 5),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1559,25 +1747,27 @@ class _FortuneBackground extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.asset(
-          _fortuneBgAsset,
-          fit: BoxFit.cover,
-          alignment: Alignment.topCenter,
-          filterQuality: FilterQuality.high,
+        Opacity(
+          opacity: .34,
+          child: Image.asset(
+            _fortuneBgAsset,
+            fit: BoxFit.cover,
+            alignment: Alignment.topCenter,
+            filterQuality: FilterQuality.high,
+          ),
         ),
         DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Colors.black.withValues(alpha: .04),
-                const Color(0xFF090514).withValues(alpha: .24),
+                const Color(0xFF160B2C).withValues(alpha: .30),
+                const Color(0xFF07040E).withValues(alpha: .70),
               ],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
           ),
         ),
-        CustomPaint(painter: _FortuneBackgroundPainter()),
       ],
     );
   }

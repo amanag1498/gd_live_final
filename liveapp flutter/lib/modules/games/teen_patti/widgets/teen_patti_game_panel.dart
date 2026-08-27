@@ -31,6 +31,14 @@ class TeenPattiGamesSheet extends StatefulWidget {
 class _TeenPattiGamesSheetState extends State<TeenPattiGamesSheet> {
   String? _selectedGame;
 
+  Future<void> _openFortuneWheel() async {
+    final rootNavigator = Navigator.of(context, rootNavigator: true);
+    Navigator.of(context).pop();
+    await Future<void>.delayed(const Duration(milliseconds: 180));
+    if (!rootNavigator.mounted) return;
+    await showFortuneWheelDialog(rootNavigator.context);
+  }
+
   @override
   Widget build(BuildContext context) {
     final tokens = getBrandTokens('midnight');
@@ -74,8 +82,6 @@ class _TeenPattiGamesSheetState extends State<TeenPattiGamesSheet> {
                         ? const TeenPattiGamePanel()
                         : _selectedGame == 'greedy'
                         ? const GreedyGamePanel()
-                        : _selectedGame == 'fortune_wheel'
-                        ? const FortuneWheelPanel()
                         : _GamesList(
                           onOpenTeenPatti: () {
                             setState(() => _selectedGame = 'teen_patti');
@@ -84,7 +90,7 @@ class _TeenPattiGamesSheetState extends State<TeenPattiGamesSheet> {
                             setState(() => _selectedGame = 'greedy');
                           },
                           onOpenFortuneWheel: () {
-                            setState(() => _selectedGame = 'fortune_wheel');
+                            unawaited(_openFortuneWheel());
                           },
                         ),
               ),
@@ -160,70 +166,72 @@ class _GamesList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = Get.find<AppSettingsService>();
-    final showTeenPatti = settings.teenPattiEnabled;
-    final showGreedy = settings.greedyEnabled;
-    final showFortuneWheel = settings.fortuneWheelEnabled;
     final fortune =
         Get.isRegistered<FortuneWheelPreloadService>()
             ? Get.find<FortuneWheelPreloadService>()
             : null;
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(14, 6, 14, 26),
-      children: [
-        if (showTeenPatti)
-          _GameEntryCard(
-            title: 'Teen Patti',
-            description:
-                'Live round-based betting across A, B, and C pots with result reveals inside the room.',
-            chip: 'CARD TABLE',
-            accent: const Color(0xFFFFD966),
-            icon: ClipRRect(
-              borderRadius: BorderRadius.circular(18),
-              child: Image.asset(
-                'assets/games/teen_patti/logo_teenpatti.png',
-                width: 76,
-                height: 76,
-                fit: BoxFit.cover,
-              ),
-            ),
-            onTap: onOpenTeenPatti,
-          ),
-        if (showTeenPatti && showGreedy) const SizedBox(height: 14),
-        if (showGreedy)
-          _GameEntryCard(
-            title: 'Greedy',
-            description:
-                'Weighted spinner pots with sharper multipliers, wheel drama, and layered result moments.',
-            chip: 'SPINNER TABLE',
-            accent: const Color(0xFF67A5FF),
-            icon: Container(
-              width: 76,
-              height: 76,
-              decoration: BoxDecoration(
+    return Obx(() {
+      settings.payload.value;
+      final showTeenPatti = settings.teenPattiEnabled;
+      final showGreedy = settings.greedyEnabled;
+      final showFortuneWheel = settings.fortuneWheelEnabled;
+      final snapshot = fortune?.snapshot.value;
+      final freeSpins = snapshot?.freeSpinsRemaining ?? 0;
+      final paidCost = snapshot?.settings.paidSpinCostCoins;
+
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(14, 6, 14, 26),
+        children: [
+          if (showTeenPatti)
+            _GameEntryCard(
+              title: 'Teen Patti',
+              description:
+                  'Live round-based betting across A, B, and C pots with result reveals inside the room.',
+              chip: 'CARD TABLE',
+              accent: const Color(0xFFFFD966),
+              icon: ClipRRect(
                 borderRadius: BorderRadius.circular(18),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF5AA7FF), Color(0xFFE95BFF)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                child: Image.asset(
+                  'assets/games/teen_patti/logo_teenpatti.png',
+                  width: 76,
+                  height: 76,
+                  fit: BoxFit.cover,
                 ),
               ),
-              child: const Icon(
-                Icons.blur_circular_rounded,
-                color: Colors.white,
-                size: 38,
-              ),
+              onTap: onOpenTeenPatti,
             ),
-            onTap: onOpenGreedy,
-          ),
-        if ((showTeenPatti || showGreedy) && showFortuneWheel)
-          const SizedBox(height: 14),
-        if (showFortuneWheel)
-          Obx(() {
-            final snapshot = fortune?.snapshot.value;
-            final freeSpins = snapshot?.freeSpinsRemaining ?? 0;
-            final paidCost = snapshot?.settings.paidSpinCostCoins;
-            return _GameEntryCard(
+          if (showTeenPatti && showGreedy) const SizedBox(height: 14),
+          if (showGreedy)
+            _GameEntryCard(
+              title: 'Greedy',
+              description:
+                  'Weighted spinner pots with sharper multipliers, wheel drama, and layered result moments.',
+              chip: 'SPINNER TABLE',
+              accent: const Color(0xFF67A5FF),
+              icon: Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF5AA7FF), Color(0xFFE95BFF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.blur_circular_rounded,
+                  color: Colors.white,
+                  size: 38,
+                ),
+              ),
+              onTap: onOpenGreedy,
+            ),
+          if ((showTeenPatti || showGreedy) && showFortuneWheel)
+            const SizedBox(height: 14),
+          if (showFortuneWheel)
+            _GameEntryCard(
               title: 'Fortune Wheel',
               description:
                   freeSpins > 0
@@ -259,46 +267,46 @@ class _GamesList extends StatelessWidget {
                 ),
               ),
               onTap: onOpenFortuneWheel,
-            );
-          }),
-        if (!showTeenPatti && !showGreedy && !showFortuneWheel)
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              gradient: LinearGradient(
-                colors: [
-                  Colors.white.withValues(alpha: .06),
-                  Colors.white.withValues(alpha: .03),
+            ),
+          if (!showTeenPatti && !showGreedy && !showFortuneWheel)
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: .06),
+                    Colors.white.withValues(alpha: .03),
+                  ],
+                ),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'No room games are enabled right now.',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                    ),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    'Enable Teen Patti, Greedy, or Fortune Wheel for this user to make games available in the live room.',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w600,
+                      height: 1.35,
+                    ),
+                  ),
                 ],
               ),
-              border: Border.all(color: Colors.white12),
             ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'No room games are enabled right now.',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                  ),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  'Enable Teen Patti, Greedy, or Fortune Wheel for this user to make games available in the live room.',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w600,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
+        ],
+      );
+    });
   }
 }
 
