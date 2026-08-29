@@ -999,9 +999,7 @@ class _VideoCallPageState extends State<VideoCallPage>
     try {
       await _room?.disconnect();
     } catch (_) {}
-    if (mounted) {
-      await Navigator.of(context, rootNavigator: true).maybePop();
-    }
+    _popLivePage();
   }
 
   Future<bool> _handleBackNavigation() async {
