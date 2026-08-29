@@ -4,8 +4,14 @@
 
 @php
   $segments = collect($payload['segments'] ?? []);
-  $recentSpins = collect($payload['recent_spins'] ?? []);
   $summary = $payload['summary'] ?? [];
+  $entitlements = $payload['entitlement_summary'] ?? [];
+  $todayEntitlements = $entitlements['today'] ?? [];
+  $weekEntitlements = $entitlements['week'] ?? [];
+  $spinAudit = $payload['spin_audit'] ?? [];
+  $auditSummary = $spinAudit['summary'] ?? [];
+  $dailyAudit = collect($spinAudit['daily'] ?? []);
+  $auditSpins = $spinAudit['spins'] ?? null;
   $settings = $payload['settings'] ?? [];
   $expected = $payload['expected_value'] ?? [];
   $entryPacks = collect($payload['entry_packs'] ?? []);
@@ -16,6 +22,7 @@
   $coinsCollected = (int) ($summary['coins_collected_today'] ?? 0);
   $coinsRewarded = (int) ($summary['coins_rewarded_today'] ?? 0);
   $netCoinFlow = $coinsCollected - $coinsRewarded;
+  $auditNetCoinFlow = (int) ($auditSummary['coins_collected'] ?? 0) - (int) ($auditSummary['coins_rewarded'] ?? 0);
   $inputClass = 'h-10 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 shadow-theme-xs outline-hidden placeholder:text-gray-400 focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder:text-gray-500';
 @endphp
 
@@ -65,6 +72,17 @@
   </section>
 
   <section class="grid gap-4 lg:grid-cols-2">
+    <x-admin.stat-card label="Entitlements Today" :value="number_format((int) ($todayEntitlements['total_entitlements'] ?? 0))" :meta="number_format((int) ($todayEntitlements['entry_pack_entitlements'] ?? 0)) . ' entry packs, ' . number_format((int) ($todayEntitlements['subscription_entitlements'] ?? 0)) . ' subscriptions · ' . number_format((int) ($todayEntitlements['entitlement_hours'] ?? 0)) . 'h granted'" tone="brand" />
+    <x-admin.stat-card label="Entitlements This Week" :value="number_format((int) ($weekEntitlements['total_entitlements'] ?? 0))" :meta="number_format((int) ($weekEntitlements['entry_pack_entitlements'] ?? 0)) . ' entry packs, ' . number_format((int) ($weekEntitlements['subscription_entitlements'] ?? 0)) . ' subscriptions · ' . ($entitlements['week_start'] ?? '') . ' to ' . ($entitlements['week_end'] ?? '')" tone="success" />
+  </section>
+
+  @if(((int) ($todayEntitlements['entitlement_grant_issues'] ?? 0) + (int) ($weekEntitlements['entitlement_grant_issues'] ?? 0)) > 0)
+    <section class="rounded-2xl border border-error-200 bg-error-50 p-4 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-300">
+      Entitlement integrity warning: {{ number_format((int) ($weekEntitlements['entitlement_grant_issues'] ?? 0)) }} reward result(s) this week do not reference a persisted entry-pack or subscription grant. Review the matching audit rows.
+    </section>
+  @endif
+
+  <section class="grid gap-4 lg:grid-cols-2">
     <x-common.component-card title="Reward Mix" desc="Calculated from runtime-eligible segments only, using their configured weights.">
       <div class="grid gap-3 sm:grid-cols-3">
         @foreach([
@@ -96,6 +114,154 @@
       </div>
     </x-common.component-card>
   </section>
+
+  <x-common.component-card title="Spin & Entitlement Audit" desc="Filter the immutable spin ledger by business date ({{ $settings['timezone'] ?? 'Asia/Kolkata' }}), player, spin type, or reward. Daily totals and detail rows use the same filters.">
+    <form method="get" action="{{ route('admin.games.fortune-wheel.dashboard') }}" class="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
+      <div class="md:col-span-2 xl:col-span-3">
+        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Player / Spin Search</label>
+        <input name="q" value="{{ $filters['q'] ?? '' }}" class="{{ $inputClass }}" placeholder="Spin ID, user ID, name, email, key…">
+      </div>
+      <div class="xl:col-span-2">
+        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Period</label>
+        <select name="period" class="{{ $inputClass }}" data-fortune-audit-period>
+          <option value="today" @selected(($filters['period'] ?? '') === 'today')>Today</option>
+          <option value="week" @selected(($filters['period'] ?? 'week') === 'week')>This week</option>
+          <option value="30_days" @selected(($filters['period'] ?? '') === '30_days')>Last 30 days</option>
+          <option value="custom" @selected(($filters['period'] ?? '') === 'custom')>Custom dates</option>
+        </select>
+      </div>
+      <div class="xl:col-span-2">
+        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">From</label>
+        <input type="date" name="date_from" value="{{ $filters['date_from'] ?? '' }}" class="{{ $inputClass }}" data-fortune-audit-date>
+      </div>
+      <div class="xl:col-span-2">
+        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">To</label>
+        <input type="date" name="date_to" value="{{ $filters['date_to'] ?? '' }}" class="{{ $inputClass }}" data-fortune-audit-date>
+      </div>
+      <div class="xl:col-span-1">
+        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Spin</label>
+        <select name="spin_type" class="{{ $inputClass }}">
+          <option value="">All</option>
+          <option value="free" @selected(($filters['spin_type'] ?? '') === 'free')>Free</option>
+          <option value="paid" @selected(($filters['spin_type'] ?? '') === 'paid')>Paid</option>
+        </select>
+      </div>
+      <div class="xl:col-span-2">
+        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Reward</label>
+        <select name="reward_type" class="{{ $inputClass }}">
+          <option value="">All rewards</option>
+          <option value="coins" @selected(($filters['reward_type'] ?? '') === 'coins')>Coins</option>
+          <option value="entry_pack" @selected(($filters['reward_type'] ?? '') === 'entry_pack')>Entry pack</option>
+          <option value="subscription" @selected(($filters['reward_type'] ?? '') === 'subscription')>Subscription</option>
+        </select>
+      </div>
+      <div class="xl:col-span-2">
+        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Rows</label>
+        <select name="per_page" class="{{ $inputClass }}">
+          @foreach([25, 50, 100] as $pageSize)
+            <option value="{{ $pageSize }}" @selected(($filters['per_page'] ?? 25) === $pageSize)>{{ $pageSize }} per page</option>
+          @endforeach
+        </select>
+      </div>
+      <div class="flex flex-wrap items-end gap-2 md:col-span-2 xl:col-span-10 xl:justify-end">
+        <x-ui.button type="submit" size="sm">Apply Filters</x-ui.button>
+        <x-ui.button variant="outline" href="{{ route('admin.games.fortune-wheel.dashboard') }}" size="sm">Reset to This Week</x-ui.button>
+      </div>
+    </form>
+
+    <div class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      @foreach([
+        ['label' => 'Matching Spins', 'value' => number_format((int) ($auditSummary['total_spins'] ?? 0)), 'meta' => number_format((int) ($auditSummary['unique_players'] ?? 0)).' players'],
+        ['label' => 'Free / Paid', 'value' => number_format((int) ($auditSummary['free_spins'] ?? 0)).' / '.number_format((int) ($auditSummary['paid_spins'] ?? 0)), 'meta' => 'spin split'],
+        ['label' => 'Entry Packs', 'value' => number_format((int) ($auditSummary['entry_pack_entitlements'] ?? 0)), 'meta' => 'entitlements granted'],
+        ['label' => 'Subscriptions', 'value' => number_format((int) ($auditSummary['subscription_entitlements'] ?? 0)), 'meta' => number_format((int) ($auditSummary['entitlement_hours'] ?? 0)).' total entitlement hours'],
+        ['label' => 'Net Coin Flow', 'value' => ($auditNetCoinFlow >= 0 ? '+' : '').number_format($auditNetCoinFlow), 'meta' => number_format((int) ($auditSummary['coins_collected'] ?? 0)).' in · '.number_format((int) ($auditSummary['coins_rewarded'] ?? 0)).' out'],
+      ] as $metric)
+        <div class="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+          <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">{{ $metric['label'] }}</div>
+          <div class="mt-2 text-xl font-semibold text-gray-900 dark:text-white">{{ $metric['value'] }}</div>
+          <div class="mt-1 text-xs text-gray-500">{{ $metric['meta'] }}</div>
+        </div>
+      @endforeach
+    </div>
+
+    @if((int) ($auditSummary['entitlement_grant_issues'] ?? 0) > 0)
+      <div class="mt-4 rounded-2xl border border-error-200 bg-error-50 p-4 text-sm font-medium text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-300">
+        {{ number_format((int) $auditSummary['entitlement_grant_issues']) }} matching entitlement reward(s) have no persisted grant reference.
+      </div>
+    @endif
+
+    <div class="mt-6 overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-800">
+      <table class="min-w-[900px] divide-y divide-gray-200 text-sm dark:divide-gray-800">
+        <thead class="bg-gray-50 dark:bg-gray-950/60">
+          <tr class="text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <th class="px-4 py-3">Business Date</th><th class="px-4 py-3">Spins</th><th class="px-4 py-3">Free / Paid</th><th class="px-4 py-3">Entry Packs</th><th class="px-4 py-3">Subscriptions</th><th class="px-4 py-3">Grant Issues</th><th class="px-4 py-3">Hours Granted</th><th class="px-4 py-3">Coin In / Out</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
+          @forelse($dailyAudit as $day)
+            <tr class="bg-white dark:bg-gray-900">
+              <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">{{ \Carbon\CarbonImmutable::parse($day->spun_for_date)->format('D, d M Y') }}</td>
+              <td class="px-4 py-3">{{ number_format((int) $day->total_spins) }}</td>
+              <td class="px-4 py-3">{{ number_format((int) $day->free_spins) }} / {{ number_format((int) $day->paid_spins) }}</td>
+              <td class="px-4 py-3">{{ number_format((int) $day->entry_pack_entitlements) }}</td>
+              <td class="px-4 py-3">{{ number_format((int) $day->subscription_entitlements) }}</td>
+              <td class="px-4 py-3"><x-ui.badge :color="(int) $day->entitlement_grant_issues > 0 ? 'error' : 'success'">{{ number_format((int) $day->entitlement_grant_issues) }}</x-ui.badge></td>
+              <td class="px-4 py-3">{{ number_format((int) $day->entitlement_hours) }}h</td>
+              <td class="px-4 py-3">{{ number_format((int) $day->coins_collected) }} / {{ number_format((int) $day->coins_rewarded) }}</td>
+            </tr>
+          @empty
+            <tr class="bg-white dark:bg-gray-900"><td colspan="8" class="px-4 py-8 text-center text-gray-500">No daily activity matches these filters.</td></tr>
+          @endforelse
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-6 overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-800">
+      <table class="min-w-[1050px] divide-y divide-gray-200 text-sm dark:divide-gray-800">
+        <thead class="bg-gray-50 dark:bg-gray-950/60">
+          <tr class="text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <th class="px-4 py-3">Spin</th><th class="px-4 py-3">Player</th><th class="px-4 py-3">Type / Cost</th><th class="px-4 py-3">Reward</th><th class="px-4 py-3">Entitlement Grant</th><th class="px-4 py-3">Business Date</th><th class="px-4 py-3">Created</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
+          @forelse($auditSpins ?? [] as $spin)
+            @php
+              $rewardName = match($spin->reward_type) {
+                'coins' => number_format((int) $spin->reward_value_coins).' coins',
+                'entry_pack' => $spin->entryPack?->name ?? data_get($spin->meta, 'segment_label') ?? 'Entry pack',
+                'subscription' => $spin->subscriptionPlan?->name ?? data_get($spin->meta, 'segment_label') ?? 'Subscription',
+                default => ucfirst(str_replace('_', ' ', $spin->reward_type)),
+              };
+              $grantId = $spin->reward_type === 'entry_pack' ? $spin->user_entry_pack_id : ($spin->reward_type === 'subscription' ? $spin->user_subscription_id : null);
+            @endphp
+            <tr class="bg-white dark:bg-gray-900">
+              <td class="px-4 py-4"><div class="font-semibold text-gray-900 dark:text-white">#{{ $spin->id }}</div><div class="max-w-44 truncate text-xs text-gray-500" title="{{ $spin->idempotency_key }}">{{ $spin->idempotency_key ?: 'No client key' }}</div></td>
+              <td class="px-4 py-4"><div class="font-semibold text-gray-900 dark:text-white">{{ $spin->user?->name ?? 'User #'.$spin->user_id }}</div><div class="text-xs text-gray-500">#{{ $spin->user_id }} · {{ $spin->user?->email }}</div></td>
+              <td class="px-4 py-4"><x-ui.badge :color="$spin->spin_type === 'free' ? 'success' : 'brand'">{{ ucfirst($spin->spin_type) }}</x-ui.badge><div class="mt-1 text-xs text-gray-500">{{ number_format((int) $spin->spin_cost_coins) }} coins</div></td>
+              <td class="px-4 py-4"><div class="font-semibold text-gray-900 dark:text-white">{{ $rewardName }}</div><div class="text-xs text-gray-500">{{ ucfirst(str_replace('_', ' ', $spin->reward_type)) }}</div></td>
+              <td class="px-4 py-4">
+                @if($grantId)
+                  <div class="font-semibold text-gray-900 dark:text-white">Grant #{{ $grantId }}</div><div class="text-xs text-gray-500">{{ number_format((int) $spin->reward_duration_hours) }} hours</div>
+                @elseif(in_array($spin->reward_type, ['entry_pack', 'subscription'], true))
+                  <x-ui.badge color="error">Missing grant</x-ui.badge>
+                @else
+                  <span class="text-gray-400">—</span>
+                @endif
+              </td>
+              <td class="px-4 py-4">{{ optional($spin->spun_for_date)->toDateString() }}</td>
+              <td class="px-4 py-4">{{ optional($spin->created_at)->format('d M Y, H:i:s') }}</td>
+            </tr>
+          @empty
+            <tr class="bg-white dark:bg-gray-900"><td colspan="7" class="px-4 py-8 text-center text-gray-500">No spins match the selected filters.</td></tr>
+          @endforelse
+        </tbody>
+      </table>
+    </div>
+    @if($auditSpins)
+      <div class="mt-4 flex justify-end">{{ $auditSpins->links() }}</div>
+    @endif
+  </x-common.component-card>
 
   <x-common.component-card title="Create Segment" desc="Each active segment is a real result. A 0 Coin segment is allowed and never grants Try Again.">
     <form method="post" action="{{ route('admin.games.fortune-wheel.segments.store') }}" class="grid gap-4 md:grid-cols-2 xl:grid-cols-4" data-fortune-segment-form>
@@ -164,48 +330,19 @@
     </div>
   </x-common.component-card>
 
-  <x-common.component-card title="Recent Spins" desc="Latest gameplay records used for free-spin limits, coin debits, and reward auditing.">
-    <div class="overflow-x-auto">
-      <table class="min-w-[820px] divide-y divide-gray-200 dark:divide-gray-800">
-        <thead>
-          <tr class="text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-            <th class="px-4 py-3">User</th>
-            <th class="px-4 py-3">Type</th>
-            <th class="px-4 py-3">Cost</th>
-            <th class="px-4 py-3">Reward</th>
-            <th class="px-4 py-3">Spin Date</th>
-            <th class="px-4 py-3">Created</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
-          @forelse($recentSpins as $spin)
-            <tr class="bg-white dark:bg-gray-900">
-              <td class="px-4 py-4">
-                <div class="font-semibold text-gray-900 dark:text-white">{{ $spin->user?->name ?? 'User #'.$spin->user_id }}</div>
-                <div class="text-xs text-gray-500">{{ $spin->user?->email }}</div>
-              </td>
-              <td class="px-4 py-4"><x-ui.badge :color="$spin->spin_type === 'free' ? 'success' : 'brand'">{{ ucfirst($spin->spin_type) }}</x-ui.badge></td>
-              <td class="px-4 py-4">{{ number_format((int) $spin->spin_cost_coins) }} coins</td>
-              <td class="px-4 py-4">
-                <div class="font-semibold">{{ data_get($spin->meta, 'segment_label') ?? $spin->segment?->label ?? ucfirst(str_replace('_', ' ', $spin->reward_type)) }}</div>
-                <div class="text-xs text-gray-500">{{ ucfirst(str_replace('_', ' ', $spin->reward_type)) }}</div>
-              </td>
-              <td class="px-4 py-4">{{ optional($spin->spun_for_date)->toDateString() }}</td>
-              <td class="px-4 py-4">{{ optional($spin->created_at)->format('d M Y, H:i:s') }}</td>
-            </tr>
-          @empty
-            <tr class="bg-white dark:bg-gray-900"><td colspan="6" class="px-4 py-8 text-center text-gray-500">No spins yet.</td></tr>
-          @endforelse
-        </tbody>
-      </table>
-    </div>
-  </x-common.component-card>
 </div>
 @endsection
 
 @push('scripts')
 <script>
   document.addEventListener('DOMContentLoaded', () => {
+    const auditPeriod = document.querySelector('[data-fortune-audit-period]');
+    document.querySelectorAll('[data-fortune-audit-date]').forEach((input) => {
+      input.addEventListener('change', () => {
+        if (auditPeriod) auditPeriod.value = 'custom';
+      });
+    });
+
     document.querySelectorAll('[data-fortune-segment-form]').forEach((form) => {
       const rewardType = form.querySelector('[data-fortune-reward-type]');
       const colorPicker = form.querySelector('[data-fortune-color-picker]');
