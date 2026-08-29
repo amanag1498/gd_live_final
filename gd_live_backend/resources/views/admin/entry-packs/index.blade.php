@@ -14,9 +14,10 @@
 
 @section('content')
 <div class="space-y-6">
-  <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-    <x-admin.stat-card label="Purchases" :value="number_format($report['purchases'] ?? 0)" tone="brand" />
-    <x-admin.stat-card label="Coins Spent" :value="number_format($report['coins_spent'] ?? 0)" tone="dark" />
+  <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+    <x-admin.stat-card label="Ownership Records" :value="number_format($report['ownerships'] ?? 0)" tone="brand" />
+    <x-admin.stat-card label="Paid Purchases" :value="number_format($report['paid_purchases'] ?? 0)" tone="dark" />
+    <x-admin.stat-card label="Wheel Grants" :value="number_format($report['wheel_grants'] ?? 0)" tone="brand" />
     <x-admin.stat-card label="Active Users" :value="number_format($report['active_users'] ?? 0)" tone="success" />
     <x-admin.stat-card label="Expiry Churn" :value="number_format($report['expiry_churn_rate'] ?? 0, 1).'%' " meta="Usage and retention" tone="warning" />
   </section>

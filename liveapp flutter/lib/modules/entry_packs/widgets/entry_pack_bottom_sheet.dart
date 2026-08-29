@@ -38,18 +38,37 @@ class _EntryPackBottomSheetState extends State<EntryPackBottomSheet> {
   EntryPackStateDto? _state;
 
   UserEntryPackDto? _latestOwnedForPack(int packId) {
-    final matches =
-        (_state?.owned ?? const <UserEntryPackDto>[])
-            .where((owned) => owned.entryPackId == packId)
-            .toList()
-          ..sort((a, b) {
-            final aTime =
-                a.purchasedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-            final bTime =
-                b.purchasedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-            return bTime.compareTo(aTime);
-          });
-    return matches.isEmpty ? null : matches.first;
+    return preferredOwnedEntryPack(
+      _state?.owned ?? const <UserEntryPackDto>[],
+      packId,
+    );
+  }
+
+  List<UserEntryPackDto> _otherOwnedPackOptions() {
+    final activePackId = _state?.active?.entryPackId;
+    final latestByPack = <int, UserEntryPackDto>{};
+
+    for (final owned in _state?.owned ?? const <UserEntryPackDto>[]) {
+      if (owned.isExpired || owned.entryPackId == activePackId) continue;
+
+      final existing = latestByPack[owned.entryPackId];
+      if (existing == null || _isLaterOwnership(owned, existing)) {
+        latestByPack[owned.entryPackId] = owned;
+      }
+    }
+
+    final options =
+        latestByPack.values.toList()..sort(
+          (a, b) =>
+              (a.entryPack?.name ?? '').compareTo(b.entryPack?.name ?? ''),
+        );
+    return options;
+  }
+
+  bool _isLaterOwnership(UserEntryPackDto candidate, UserEntryPackDto current) {
+    if (candidate.expiresAt == null) return current.expiresAt != null;
+    if (current.expiresAt == null) return false;
+    return candidate.expiresAt!.isAfter(current.expiresAt!);
   }
 
   List<EntryPackDto> _mergePackState(
@@ -70,18 +89,7 @@ class _EntryPackBottomSheetState extends State<EntryPackBottomSheet> {
   UserEntryPackDto? _latestOwnedForPackFrom(
     EntryPackStateDto state,
     int packId,
-  ) {
-    final matches =
-        state.owned.where((owned) => owned.entryPackId == packId).toList()
-          ..sort((a, b) {
-            final aTime =
-                a.purchasedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-            final bTime =
-                b.purchasedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-            return bTime.compareTo(aTime);
-          });
-    return matches.isEmpty ? null : matches.first;
-  }
+  ) => preferredOwnedEntryPack(state.owned, packId);
 
   @override
   void initState() {
@@ -191,10 +199,7 @@ class _EntryPackBottomSheetState extends State<EntryPackBottomSheet> {
   Widget build(BuildContext context) {
     final tokens = _entryPackTokens();
     final active = _state?.active;
-    final ownedHistory =
-        (_state?.owned ?? const <UserEntryPackDto>[])
-            .where((pack) => active == null || pack.id != active.id)
-            .toList();
+    final ownedOptions = _otherOwnedPackOptions();
     final featuredPacks = _packs.take(3).toList();
 
     return SafeArea(
@@ -306,8 +311,7 @@ class _EntryPackBottomSheetState extends State<EntryPackBottomSheet> {
                                 ...featuredPacks.map((pack) {
                                   final owned = _latestOwnedForPack(pack.id);
                                   return Padding(
-                                    padding:
-                                        const EdgeInsets.only(bottom: 12),
+                                    padding: const EdgeInsets.only(bottom: 12),
                                     child: _EntryPackCard(
                                       pack: pack,
                                       ownedPack: owned,
@@ -346,18 +350,27 @@ class _EntryPackBottomSheetState extends State<EntryPackBottomSheet> {
                                   ),
                                 ),
                               ],
-                              if (ownedHistory.isNotEmpty) ...[
+                              if (ownedOptions.isNotEmpty) ...[
                                 const SizedBox(height: 8),
                                 const _EntrySectionTitle(
-                                  title: 'Owned Packs',
+                                  title: 'Switch Entry Pack',
                                   subtitle:
-                                      'Your purchased entry effects and activation history.',
+                                      'All your valid entry effects stay available until expiry.',
                                 ),
                                 const SizedBox(height: 10),
-                                ...ownedHistory.map(
+                                ...ownedOptions.map(
                                   (owned) => Padding(
                                     padding: const EdgeInsets.only(bottom: 12),
-                                    child: _OwnedEntryPackCard(owned: owned),
+                                    child: _OwnedEntryPackCard(
+                                      owned: owned,
+                                      busy: _submitting,
+                                      onActivate:
+                                          owned.entryPack == null
+                                              ? null
+                                              : () => _handlePackAction(
+                                                owned.entryPack!,
+                                              ),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -475,9 +488,9 @@ class _EntryHeroPanel extends StatelessWidget {
               backgroundColor: tokens.chipColor.withOpacity(.7),
             ),
           ],
-          ],
-        ),
-      );
+        ],
+      ),
+    );
   }
 }
 
@@ -554,18 +567,18 @@ class _EntryPackCard extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 8),
-                  Text(
-                    pack.active
-                        ? 'Currently active on your account.'
+                Text(
+                  pack.active
+                      ? 'Currently active on your account.'
                       : isExpiredOwned
                       ? 'Your previous access expired. Purchase again to reactivate this entry.'
                       : pack.owned
                       ? 'Already purchased and still valid. Switch to this entry anytime.'
                       : 'Unlock for ${pack.priceCoins} coins with ${pack.durationDays} days of validity.',
-                    style: TextStyle(
-                      color: tokens.textSecondary.withOpacity(.88),
-                      fontWeight: FontWeight.w500,
-                      fontSize: 12,
+                  style: TextStyle(
+                    color: tokens.textSecondary.withOpacity(.88),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 12,
                   ),
                 ),
                 if (ownedPack?.expiresAt != null) ...[
@@ -606,9 +619,15 @@ class _EntryPackCard extends StatelessWidget {
 }
 
 class _OwnedEntryPackCard extends StatelessWidget {
-  const _OwnedEntryPackCard({required this.owned});
+  const _OwnedEntryPackCard({
+    required this.owned,
+    required this.busy,
+    required this.onActivate,
+  });
 
   final UserEntryPackDto owned;
+  final bool busy;
+  final VoidCallback? onActivate;
 
   @override
   Widget build(BuildContext context) {
@@ -667,6 +686,19 @@ class _OwnedEntryPackCard extends StatelessWidget {
                 owned.expiresAt!.toLocal(),
               ),
             ),
+          if (!owned.isExpired && !owned.isActive) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: _PrimaryGlassButton(
+                label: 'Activate ${pack?.name ?? 'Entry Pack'}',
+                icon: Icons.auto_awesome_rounded,
+                loading: busy,
+                enabled: onActivate != null,
+                onTap: onActivate ?? () {},
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -859,10 +891,7 @@ class _GlassShell extends StatelessWidget {
                 end: Alignment.bottomRight,
                 colors:
                     light
-                        ? [
-                          Colors.white,
-                          const Color(0xFFF7FCF8),
-                        ]
+                        ? [Colors.white, const Color(0xFFF7FCF8)]
                         : tokens.cardGradient,
               ),
           border: Border.all(color: tokens.borderColor.withOpacity(.28)),

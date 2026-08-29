@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\EntryPack;
+use App\Models\FortuneWheelSegment;
 use App\Models\Host;
 use App\Models\LiveRoom;
 use App\Models\LiveRoomParticipant;
@@ -12,6 +13,8 @@ use App\Models\UserEntryPack;
 use App\Models\UserSubscription;
 use App\Models\Wallet;
 use App\Services\EntryPackService;
+use App\Services\FortuneWheelService;
+use App\Services\WalletService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Redis;
 use Laravel\Sanctum\Sanctum;
@@ -526,6 +529,57 @@ class EntryPackApiTest extends TestCase
             'entry_pack_id' => $secondPack->id,
             'is_active' => true,
         ]);
+    }
+
+    public function test_entry_ownership_report_separates_paid_purchases_from_wheel_grants(): void
+    {
+        config([
+            'games.fortune_wheel.enabled' => true,
+            'games.fortune_wheel.free_spins_per_day' => 1,
+            'games.fortune_wheel.timezone' => 'Asia/Kolkata',
+        ]);
+
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        $user = User::factory()->create();
+        $user->assignRole('user');
+        $pack = EntryPack::query()->create([
+            'name' => 'CAR 2',
+            'price_coins' => 3000,
+            'svg_url' => 'https://cdn.example.com/car-2.svg',
+            'animation_style' => 'fullscreen',
+            'priority' => 5,
+            'duration_ms' => 3000,
+            'duration_days' => 3,
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
+
+        WalletService::credit($user, 5000, 'ENTRY_PACK_REPORT_TEST');
+        $ownership = app(EntryPackService::class)->purchase($user, $pack, 'paid-car-2');
+        FortuneWheelSegment::query()->create([
+            'label' => 'CAR 2 1 Day',
+            'reward_type' => FortuneWheelSegment::REWARD_ENTRY_PACK,
+            'entry_pack_id' => $pack->id,
+            'reward_duration_hours' => 24,
+            'weight' => 1,
+            'is_active' => true,
+        ]);
+        app(FortuneWheelService::class)->spin($user, 'granted-car-2');
+
+        $this->actingAs($admin)
+            ->get(route('admin.entry-packs.reports'))
+            ->assertOk()
+            ->assertViewHas('report', fn (array $report): bool => $report['ownerships'] === 1
+                && $report['paid_purchases'] === 1
+                && $report['wheel_grants'] === 1
+                && $report['wheel_grant_hours'] === 24)
+            ->assertViewHas('recentPurchases', fn ($rows): bool => $rows->total() === 1)
+            ->assertViewHas('paidPurchases', fn ($rows): bool => $rows->total() === 1)
+            ->assertViewHas('wheelGrants', fn ($rows): bool => $rows->total() === 1
+                && (int) $rows->first()->user_entry_pack_id === (int) $ownership['id'])
+            ->assertSee('Paid Purchase History')
+            ->assertSee('Fortune Wheel Grant History');
     }
 
     private function grantSubscription(User $user): void
