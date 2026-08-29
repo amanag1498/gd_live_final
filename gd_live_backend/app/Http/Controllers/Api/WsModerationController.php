@@ -20,7 +20,7 @@ class WsModerationController extends Controller
 
     private function assertInternal(Request $request): void
     {
-        $expected = trim((string) env('WS_INTERNAL_KEY', ''));
+        $expected = trim((string) config('services.websocket.internal_key', ''));
         $provided = trim((string) $request->header('X-WS-Internal-Key', ''));
 
         if ($expected !== '') {

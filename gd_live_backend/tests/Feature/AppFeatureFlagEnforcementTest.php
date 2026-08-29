@@ -88,7 +88,7 @@ class AppFeatureFlagEnforcementTest extends TestCase
     public function test_maintenance_mode_keeps_trusted_realtime_server_requests_available(): void
     {
         config(['app_features.maintenance_mode_enabled' => true]);
-        putenv('WS_INTERNAL_KEY=test-internal-key');
+        config(['services.websocket.internal_key' => 'test-internal-key']);
 
         try {
             Sanctum::actingAs($this->member);
@@ -109,7 +109,7 @@ class AppFeatureFlagEnforcementTest extends TestCase
                 ->assertOk()
                 ->assertJsonPath('id', $this->member->id);
         } finally {
-            putenv('WS_INTERNAL_KEY');
+            config(['services.websocket.internal_key' => '']);
         }
     }
 
@@ -159,7 +159,7 @@ class AppFeatureFlagEnforcementTest extends TestCase
             'app_features.force_app_upgrade_enabled' => true,
             'app_features.android_min_version_code' => 99,
         ]);
-        putenv('WS_INTERNAL_KEY=test-internal-key');
+        config(['services.websocket.internal_key' => 'test-internal-key']);
 
         try {
             Sanctum::actingAs($this->member);
@@ -169,7 +169,7 @@ class AppFeatureFlagEnforcementTest extends TestCase
             ])->getJson('/api/profile')
                 ->assertOk();
         } finally {
-            putenv('WS_INTERNAL_KEY');
+            config(['services.websocket.internal_key' => '']);
         }
     }
 

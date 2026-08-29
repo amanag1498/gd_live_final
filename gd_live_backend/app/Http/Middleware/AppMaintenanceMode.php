@@ -59,7 +59,7 @@ class AppMaintenanceMode
 
     private function isTrustedRealtimeServerRequest(Request $request): bool
     {
-        $expected = trim((string) env('WS_INTERNAL_KEY', ''));
+        $expected = trim((string) config('services.websocket.internal_key', ''));
         $provided = trim((string) $request->header('X-WS-Internal-Key', ''));
 
         return $expected !== ''
