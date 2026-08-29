@@ -1918,7 +1918,7 @@ class _VideoCallPageState extends State<VideoCallPage>
       if (result == LiveRoomGamesSheetResult.fortuneWheel) {
         // The sheet route has fully completed here, so the wheel never overlaps
         // its reverse transition or inherits the sheet's disposed context.
-        await showFortuneWheelDialog(context);
+        await showFortuneWheelDialog(context, playSounds: false);
       }
     } finally {
       if (mounted) {

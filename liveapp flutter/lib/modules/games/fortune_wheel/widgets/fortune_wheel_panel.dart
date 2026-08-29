@@ -28,6 +28,7 @@ enum FortuneWheelDialogResult { recharge }
 Future<void> showFortuneWheelDialog(
   BuildContext context, {
   bool freeSpinOnly = false,
+  bool playSounds = true,
 }) async {
   final result = await showGeneralDialog<FortuneWheelDialogResult>(
     context: context,
@@ -50,6 +51,7 @@ Future<void> showFortuneWheelDialog(
               child: FortuneWheelPanel(
                 showCloseButton: true,
                 freeSpinOnly: freeSpinOnly,
+                playSounds: playSounds,
                 onClose:
                     () =>
                         Navigator.of(dialogContext, rootNavigator: true).pop(),
@@ -96,12 +98,14 @@ class FortuneWheelPanel extends StatefulWidget {
     super.key,
     this.showCloseButton = false,
     this.freeSpinOnly = false,
+    this.playSounds = true,
     this.onClose,
     this.onRechargeRequired,
   });
 
   final bool showCloseButton;
   final bool freeSpinOnly;
+  final bool playSounds;
   final VoidCallback? onClose;
   final VoidCallback? onRechargeRequired;
 
@@ -115,7 +119,7 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
   late final AnimationController _ambientController;
   late final AnimationController _entranceController;
   late Animation<double> _spinAnimation;
-  late final AudioPlayer _spinAudioPlayer;
+  AudioPlayer? _spinAudioPlayer;
 
   bool _spinning = false;
   String? _error;
@@ -129,7 +133,9 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
   @override
   void initState() {
     super.initState();
-    _spinAudioPlayer = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
+    if (widget.playSounds) {
+      _spinAudioPlayer = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
+    }
     _spinController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 3680),
@@ -156,8 +162,12 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
     if (rewardDismissed != null && !rewardDismissed.isCompleted) {
       rewardDismissed.complete();
     }
-    unawaited(_spinAudioPlayer.stop());
-    unawaited(_spinAudioPlayer.dispose());
+    final spinAudioPlayer = _spinAudioPlayer;
+    _spinAudioPlayer = null;
+    if (spinAudioPlayer != null) {
+      unawaited(spinAudioPlayer.stop());
+      unawaited(spinAudioPlayer.dispose());
+    }
     _spinController.dispose();
     _ambientController.dispose();
     _entranceController.dispose();
@@ -222,9 +232,11 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
   }
 
   Future<void> _playSpinSound() async {
+    final spinAudioPlayer = _spinAudioPlayer;
+    if (spinAudioPlayer == null) return;
     try {
-      await _spinAudioPlayer.stop();
-      await _spinAudioPlayer.play(AssetSource(_fortuneSpinSoundAsset));
+      await spinAudioPlayer.stop();
+      await spinAudioPlayer.play(AssetSource(_fortuneSpinSoundAsset));
     } catch (_) {
       // Audio must never block or invalidate a server-authoritative spin.
     }
