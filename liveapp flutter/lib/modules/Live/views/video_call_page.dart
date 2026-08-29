@@ -177,7 +177,7 @@ class _VideoCallPageState extends State<VideoCallPage>
   final ValueNotifier<List<LiveRoomChatMessage>> _chatMessages =
       ValueNotifier<List<LiveRoomChatMessage>>(const <LiveRoomChatMessage>[]);
   bool _handlingBackNavigation = false;
-  bool _gamesSheetOpen = false;
+  bool _gameSurfaceOpen = false;
   bool _audioRouteSyncInFlight = false;
 
   final _emojiKey = GlobalKey<_EmojiBurstState>();
@@ -1003,6 +1003,7 @@ class _VideoCallPageState extends State<VideoCallPage>
   }
 
   Future<bool> _handleBackNavigation() async {
+    if (_gameSurfaceOpen) return false;
     if (_handlingBackNavigation) return false;
     _handlingBackNavigation = true;
     try {
@@ -1900,24 +1901,29 @@ class _VideoCallPageState extends State<VideoCallPage>
   }
 
   Future<void> _openGamesSheet() async {
-    if (_gamesSheetOpen || !_showTeenPattiInVideoRoom) {
+    if (_gameSurfaceOpen || !_showTeenPattiInVideoRoom) {
       return;
     }
 
-    setState(() => _gamesSheetOpen = true);
-    final result = await showModalBottomSheet<LiveRoomGamesSheetResult>(
-      context: context,
-      useRootNavigator: false,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const TeenPattiGamesSheet(),
-    );
-    if (!mounted) return;
-    setState(() => _gamesSheetOpen = false);
-    if (result == LiveRoomGamesSheetResult.fortuneWheel) {
-      // The sheet route has fully completed here, so the wheel never overlaps
-      // its reverse transition or inherits the sheet's disposed context.
-      await showFortuneWheelDialog(context);
+    setState(() => _gameSurfaceOpen = true);
+    try {
+      final result = await showModalBottomSheet<LiveRoomGamesSheetResult>(
+        context: context,
+        useRootNavigator: false,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => const TeenPattiGamesSheet(),
+      );
+      if (!mounted) return;
+      if (result == LiveRoomGamesSheetResult.fortuneWheel) {
+        // The sheet route has fully completed here, so the wheel never overlaps
+        // its reverse transition or inherits the sheet's disposed context.
+        await showFortuneWheelDialog(context);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _gameSurfaceOpen = false);
+      }
     }
   }
 

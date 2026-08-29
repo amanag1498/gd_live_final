@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -24,14 +23,16 @@ const _fortunePremiumRewardAsset =
 const _fortuneTitleAsset = 'assets/games/fortune_wheel/spin_and_win_title.png';
 const _fortuneSpinSoundAsset = 'games/fortune_wheel/wheel_spin.mp3';
 
+enum FortuneWheelDialogResult { recharge }
+
 Future<void> showFortuneWheelDialog(
   BuildContext context, {
   bool freeSpinOnly = false,
-}) {
-  return showGeneralDialog<void>(
+}) async {
+  final result = await showGeneralDialog<FortuneWheelDialogResult>(
     context: context,
     useRootNavigator: true,
-    barrierDismissible: true,
+    barrierDismissible: false,
     barrierLabel: 'Close Fortune Wheel',
     barrierColor: Colors.black.withValues(alpha: .66),
     transitionDuration: const Duration(milliseconds: 360),
@@ -45,10 +46,19 @@ Future<void> showFortuneWheelDialog(
           child: SizedBox(
             width: width,
             height: height,
-            child: FortuneWheelPanel(
-              showCloseButton: true,
-              freeSpinOnly: freeSpinOnly,
-              onClose: () => Navigator.of(dialogContext).pop(),
+            child: RepaintBoundary(
+              child: FortuneWheelPanel(
+                showCloseButton: true,
+                freeSpinOnly: freeSpinOnly,
+                onClose:
+                    () =>
+                        Navigator.of(dialogContext, rootNavigator: true).pop(),
+                onRechargeRequired:
+                    () => Navigator.of(
+                      dialogContext,
+                      rootNavigator: true,
+                    ).pop(FortuneWheelDialogResult.recharge),
+              ),
             ),
           ),
         ),
@@ -69,6 +79,16 @@ Future<void> showFortuneWheelDialog(
       );
     },
   );
+
+  if (result == FortuneWheelDialogResult.recharge && context.mounted) {
+    await showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const RechargeBottomSheet(),
+    );
+  }
 }
 
 class FortuneWheelPanel extends StatefulWidget {
@@ -77,11 +97,13 @@ class FortuneWheelPanel extends StatefulWidget {
     this.showCloseButton = false,
     this.freeSpinOnly = false,
     this.onClose,
+    this.onRechargeRequired,
   });
 
   final bool showCloseButton;
   final bool freeSpinOnly;
   final VoidCallback? onClose;
+  final VoidCallback? onRechargeRequired;
 
   @override
   State<FortuneWheelPanel> createState() => _FortuneWheelPanelState();
@@ -98,6 +120,8 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
   bool _spinning = false;
   String? _error;
   double _rotation = 0;
+  FortuneWheelSpin? _visibleReward;
+  Completer<void>? _rewardDismissed;
 
   FortuneWheelPreloadService get _service =>
       Get.find<FortuneWheelPreloadService>();
@@ -127,6 +151,11 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
 
   @override
   void dispose() {
+    final rewardDismissed = _rewardDismissed;
+    _rewardDismissed = null;
+    if (rewardDismissed != null && !rewardDismissed.isCompleted) {
+      rewardDismissed.complete();
+    }
     unawaited(_spinAudioPlayer.stop());
     unawaited(_spinAudioPlayer.dispose());
     _spinController.dispose();
@@ -224,47 +253,29 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
   }
 
   Future<void> _showReward(FortuneWheelSpin spin) {
-    return showGeneralDialog<void>(
-      context: context,
-      useRootNavigator: true,
-      barrierDismissible: true,
-      barrierLabel: 'Close reward',
-      barrierColor: Colors.black.withValues(alpha: .91),
-      transitionDuration: const Duration(milliseconds: 320),
-      pageBuilder:
-          (_, __, ___) => BackdropFilter(
-            filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-            child: Center(
-              child: Material(
-                color: Colors.transparent,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: _FortuneRewardSheet(spin: spin),
-                ),
-              ),
-            ),
-          ),
-      transitionBuilder:
-          (_, animation, __, child) => FadeTransition(
-            opacity: animation,
-            child: ScaleTransition(
-              scale: Tween<double>(begin: .90, end: 1).animate(
-                CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
-              ),
-              child: child,
-            ),
-          ),
-    );
+    if (!mounted) return Future<void>.value();
+    final dismissed = Completer<void>();
+    setState(() {
+      _visibleReward = spin;
+      _rewardDismissed = dismissed;
+    });
+    return dismissed.future;
+  }
+
+  void _dismissReward() {
+    final dismissed = _rewardDismissed;
+    if (_visibleReward == null && dismissed == null) return;
+    setState(() {
+      _visibleReward = null;
+      _rewardDismissed = null;
+    });
+    if (dismissed != null && !dismissed.isCompleted) {
+      dismissed.complete();
+    }
   }
 
   void _showRechargePrompt() {
-    showModalBottomSheet<void>(
-      context: context,
-      useRootNavigator: false,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const RechargeBottomSheet(),
-    );
+    widget.onRechargeRequired?.call();
   }
 
   @override
@@ -282,72 +293,102 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
             _entranceController.value,
           );
 
-          return ColoredBox(
-            color: Colors.transparent,
-            child: Stack(
-              children: [
-                SafeArea(
-                  top: false,
-                  child: Opacity(
-                    opacity: entrance,
-                    child: Transform.translate(
-                      offset: Offset(0, (1 - entrance) * 26),
-                      child: ListView(
-                        padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
-                        children: [
-                          _FortuneTopBar(
-                            snapshot: snapshot,
-                            showBalance: !widget.freeSpinOnly,
-                            showCloseButton: widget.showCloseButton,
-                            onClose:
-                                widget.onClose ??
-                                () => Navigator.of(context).maybePop(),
-                          ),
-                          const SizedBox(height: 8),
-                          if (loading && snapshot == null)
-                            const _FortuneLoadingCard()
-                          else if (error != null && snapshot == null)
-                            _FortuneErrorCard(
-                              message: error,
-                              onRetry: () => unawaited(_service.refresh()),
-                            )
-                          else if (snapshot == null)
-                            _FortuneErrorCard(
-                              message:
-                                  'Fortune Wheel is not available right now.',
-                              onRetry: () => unawaited(_service.refresh()),
-                            )
-                          else ...[
-                            if (snapshot.segments.isEmpty)
-                              _NoSegmentsCard(
-                                onRefresh: () => unawaited(_service.refresh()),
+          return PopScope(
+            canPop: !_spinning && _visibleReward == null,
+            onPopInvoked: (didPop) {
+              if (!didPop && _visibleReward != null) {
+                _dismissReward();
+              }
+            },
+            child: ColoredBox(
+              color: Colors.transparent,
+              child: Stack(
+                children: [
+                  SafeArea(
+                    top: false,
+                    child: Opacity(
+                      opacity: entrance,
+                      child: Transform.translate(
+                        offset: Offset(0, (1 - entrance) * 26),
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+                          children: [
+                            _FortuneTopBar(
+                              snapshot: snapshot,
+                              showBalance: !widget.freeSpinOnly,
+                              showCloseButton: widget.showCloseButton,
+                              onClose:
+                                  _spinning
+                                      ? () {}
+                                      : widget.onClose ??
+                                          () =>
+                                              Navigator.of(context).maybePop(),
+                            ),
+                            const SizedBox(height: 8),
+                            if (loading && snapshot == null)
+                              const _FortuneLoadingCard()
+                            else if (error != null && snapshot == null)
+                              _FortuneErrorCard(
+                                message: error,
+                                onRetry: () => unawaited(_service.refresh()),
+                              )
+                            else if (snapshot == null)
+                              _FortuneErrorCard(
+                                message:
+                                    'Fortune Wheel is not available right now.',
+                                onRetry: () => unawaited(_service.refresh()),
                               )
                             else ...[
-                              _WheelStage(
-                                snapshot: snapshot,
-                                rotation: _rotation,
-                                spinning: _spinning,
-                                ambient: ambient,
-                              ),
-                              const SizedBox(height: 4),
-                              _SpinButton(
-                                snapshot: snapshot,
-                                spinning: _spinning,
-                                ambient: ambient,
-                                onPressed: () => unawaited(_spin(snapshot)),
-                              ),
-                            ],
-                            if (error != null) ...[
-                              const SizedBox(height: 12),
-                              _InlineError(message: error),
+                              if (snapshot.segments.isEmpty)
+                                _NoSegmentsCard(
+                                  onRefresh:
+                                      () => unawaited(_service.refresh()),
+                                )
+                              else ...[
+                                _WheelStage(
+                                  snapshot: snapshot,
+                                  rotation: _rotation,
+                                  spinning: _spinning,
+                                  ambient: ambient,
+                                ),
+                                const SizedBox(height: 4),
+                                _SpinButton(
+                                  snapshot: snapshot,
+                                  spinning: _spinning,
+                                  ambient: ambient,
+                                  onPressed: () => unawaited(_spin(snapshot)),
+                                ),
+                              ],
+                              if (error != null) ...[
+                                const SizedBox(height: 12),
+                                _InlineError(message: error),
+                              ],
                             ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                  if (_visibleReward != null)
+                    Positioned.fill(
+                      child: ColoredBox(
+                        color: Colors.black.withValues(alpha: .94),
+                        child: Center(
+                          child: Material(
+                            color: Colors.transparent,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 420),
+                              child: _FortuneRewardSheet(
+                                spin: _visibleReward!,
+                                onClose: _dismissReward,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           );
         },
@@ -1721,9 +1762,10 @@ class _LatestWinCard extends StatelessWidget {
 }
 
 class _FortuneRewardSheet extends StatefulWidget {
-  const _FortuneRewardSheet({required this.spin});
+  const _FortuneRewardSheet({required this.spin, required this.onClose});
 
   final FortuneWheelSpin spin;
+  final VoidCallback onClose;
 
   @override
   State<_FortuneRewardSheet> createState() => _PremiumRewardDialogState();
@@ -1901,7 +1943,7 @@ class _PremiumRewardDialogState extends State<_FortuneRewardSheet>
                                     icon: Icons.card_giftcard_rounded,
                                     onPressed: () {
                                       Haptics.selection();
-                                      Navigator.of(context).maybePop();
+                                      widget.onClose();
                                     },
                                   ),
                                 ],
@@ -1939,7 +1981,7 @@ class _PremiumRewardDialogState extends State<_FortuneRewardSheet>
                         ),
                         child: IconButton(
                           tooltip: 'Close reward',
-                          onPressed: () => Navigator.of(context).maybePop(),
+                          onPressed: widget.onClose,
                           icon: const Icon(Icons.close_rounded, size: 18),
                           color: Colors.white,
                           constraints: const BoxConstraints.tightFor(
