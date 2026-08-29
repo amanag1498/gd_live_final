@@ -7,6 +7,7 @@ const cors    = require('cors');
 const { Server } = require('socket.io');
 const Redis   = require('ioredis');
 const axios   = require('axios');
+const { moderationJoinErrorPayload } = require('./lib/moderation_join');
 // ----- LiveKit token sanity endpoint -----
 const jwt = require('jsonwebtoken');
 const { randomUUID } = require('crypto');
@@ -423,6 +424,7 @@ async function verifyUserFromLaravel(token, socket = null) {
     const { data } = await api.get('/ws/verify', {
       headers: {
         Authorization: `Bearer ${token}`,
+        ...internalApiHeaders(),
         ...(publicOrigin ? { 'X-Public-Origin': publicOrigin } : {}),
         ...(clientPlatform ? { 'X-Client-Platform': clientPlatform } : {}),
         ...(clientVersion ? { 'X-App-Version': clientVersion } : {}),
@@ -1887,18 +1889,27 @@ roomsNs.on('connection', (socket) => {
       ));
       return;
     }
-    const moderationSnapshot = await getModerationSnapshot();
     const hostUserId = Number(roomDoc?.host_id || 0);
-    const joinBlocked = moderationSnapshot.available
-      ? isUserBlockedByHost(hostUserId, socket.user?.id)
-      : ((await moderationJoinCheck(socket.authToken, room_id))?.allow === false);
-    if (joinBlocked) {
-      socket.emit('room:moderation:error', {
-        room_id: String(room_id),
-        code: 'HOST_BLOCKED',
-        message: 'You were blocked by this host.',
+    const targetUserId = Number(socket.user?.id || 0);
+    const moderationSnapshot = await getModerationSnapshot();
+    const blockedInSnapshot = moderationSnapshot.available
+      && isUserBlockedByHost(hostUserId, targetUserId);
+    const joinDecision = moderationSnapshot.available
+      ? {
+          allow: !blockedInSnapshot,
+          code: blockedInSnapshot ? 'HOST_BLOCKED' : null,
+          reason: blockedInSnapshot
+            ? 'You were blocked by this host.'
+            : null,
+        }
+      : await moderationJoinCheck(socket.authToken, room_id);
+    if (joinDecision?.allow === false) {
+      socket.emit('room:moderation:error', moderationJoinErrorPayload(joinDecision, {
+        roomId: room_id,
+        host_user_id: hostUserId || null,
+        target_user_id: targetUserId || null,
         at: nowISO(),
-      });
+      }));
       return;
     }
     const room = `room:${room_id}`;

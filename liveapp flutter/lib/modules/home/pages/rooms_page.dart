@@ -238,7 +238,10 @@ class RoomsPage extends StatelessWidget {
                   accent: tokens.primaryButtonGradient.first,
                   onTap: () async {
                     Navigator.of(dialogContext).pop();
-                    await gate.ensureAccessThen(onGranted: onSubscribed);
+                    await gate.ensureAccessThen(
+                      context: context,
+                      onGranted: onSubscribed,
+                    );
                   },
                 ),
                 const SizedBox(height: 12),

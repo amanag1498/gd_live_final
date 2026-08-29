@@ -1,4 +1,5 @@
 // lib/modules/subscriptions/controllers/viewer_gate_controller.dart
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:gd_live/services/api_client.dart';
@@ -21,6 +22,32 @@ class ViewerGateController extends GetxController {
 
   void _log(String msg) => debugPrint('[gate] $msg');
 
+  void _showMessage(
+    BuildContext context, {
+    required String title,
+    required String message,
+  }) {
+    if (!context.mounted) {
+      _log('Skipping "$title" message because its page is no longer mounted.');
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) {
+      _log(
+        'Skipping "$title" message because no ScaffoldMessenger is available.',
+      );
+      return;
+    }
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('$title\n$message'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Future<bool> hasActiveSubscription() async {
     try {
       final subs = await _api.mySubscriptions();
@@ -33,6 +60,7 @@ class ViewerGateController extends GetxController {
   }
 
   Future<bool> promptSubscriptionPurchase({
+    required BuildContext context,
     Future<void> Function()? onUnlocked,
   }) async {
     try {
@@ -50,29 +78,20 @@ class ViewerGateController extends GetxController {
       final fetched = await _api.fetchPlans();
       final actives = fetched.where((p) => p.isActive).toList();
       if (actives.isEmpty) {
-        Get.snackbar(
-          'Subscriptions',
-          'No active plans available right now.',
-          snackPosition: SnackPosition.BOTTOM,
+        _showMessage(
+          context,
+          title: 'Subscriptions',
+          message: 'No active plans available right now.',
         );
         return false;
       }
       plans.assignAll(actives);
 
-      final ctx = Get.context;
-      if (ctx == null) {
-        Get.snackbar(
-          'Subscriptions',
-          'Unable to open plans right now.',
-          snackPosition: SnackPosition.BOTTOM,
-        );
+      if (!context.mounted) {
         return false;
       }
 
-      final plan = await ChoosePlanSheet.show(
-        ctx,
-        plans: actives,
-      );
+      final plan = await ChoosePlanSheet.show(context, plans: actives);
       if (plan == null) {
         return false;
       }
@@ -82,10 +101,10 @@ class ViewerGateController extends GetxController {
         throw 'Subscription not active yet.';
       }
 
-      Get.snackbar(
-        'Unlocked',
-        'You can now watch live streams!',
-        snackPosition: SnackPosition.BOTTOM,
+      _showMessage(
+        context,
+        title: 'Unlocked',
+        message: 'You can now watch live streams!',
       );
       if (onUnlocked != null) {
         await onUnlocked();
@@ -102,8 +121,7 @@ class ViewerGateController extends GetxController {
               'You need more coins to buy a subscription. Recharge your wallet and try again.',
         );
       }
-      Get.snackbar('Subscription', e.toString(),
-          snackPosition: SnackPosition.BOTTOM);
+      _showMessage(context, title: 'Subscription', message: message);
       return false;
     } finally {
       loading.value = false;
@@ -111,9 +129,12 @@ class ViewerGateController extends GetxController {
   }
 
   /// Call this when user taps a LIVE card.
-  Future<void> ensureAccessThen({required Future<void> Function() onGranted}) async {
+  Future<void> ensureAccessThen({
+    required BuildContext context,
+    required Future<void> Function() onGranted,
+  }) async {
     _log('ensureAccessThen() start');
-    await promptSubscriptionPurchase(onUnlocked: onGranted);
+    await promptSubscriptionPurchase(context: context, onUnlocked: onGranted);
     _log('ensureAccessThen() end');
   }
 }

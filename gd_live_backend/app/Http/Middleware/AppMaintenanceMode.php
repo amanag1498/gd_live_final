@@ -30,6 +30,14 @@ class AppMaintenanceMode
 
     private function shouldBypass(Request $request): bool
     {
+        // The realtime server must keep room presence, moderation, game state,
+        // and disconnect cleanup working while client traffic is in maintenance.
+        // This key is server-only and is already used to trust the same calls in
+        // the client-version middleware and internal websocket controllers.
+        if ($this->isTrustedRealtimeServerRequest($request)) {
+            return true;
+        }
+
         if ($request->is('admin') || $request->is('admin/*')) {
             return true;
         }
@@ -47,5 +55,15 @@ class AppMaintenanceMode
         }
 
         return false;
+    }
+
+    private function isTrustedRealtimeServerRequest(Request $request): bool
+    {
+        $expected = trim((string) env('WS_INTERNAL_KEY', ''));
+        $provided = trim((string) $request->header('X-WS-Internal-Key', ''));
+
+        return $expected !== ''
+            && $provided !== ''
+            && hash_equals($expected, $provided);
     }
 }

@@ -37,6 +37,7 @@ import '../../../services/auth_service.dart';
 import '../../../services/call_audio_route.dart';
 import '../../../services/live_rooms_ws_service.dart';
 import '../../../services/livekit_video_quality.dart';
+import '../../games/fortune_wheel/widgets/fortune_wheel_panel.dart';
 import '../../games/teen_patti/widgets/teen_patti_game_panel.dart';
 import '../../profile/widgets/public_profile_card_sheet.dart';
 import '../../wallet/services/wallet_api.dart';
@@ -956,6 +957,23 @@ class _VideoCallPageState extends State<VideoCallPage>
     } catch (_) {}
   }
 
+  void _showLiveMessage(
+    String title,
+    String message, {
+    Duration duration = const Duration(seconds: 3),
+  }) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('$title\n$message'),
+        behavior: SnackBarBehavior.floating,
+        duration: duration,
+      ),
+    );
+  }
+
   Future<void> _endSession() async {
     if (_exiting) return;
     final ok = await _showEndLiveDialog();
@@ -965,7 +983,6 @@ class _VideoCallPageState extends State<VideoCallPage>
     _giftAnimationOverlay.clear();
     await _endSessionOnce();
     _leaveSocketRoom();
-    _closeTransientOverlays();
     _popLivePage();
   }
 
@@ -982,7 +999,9 @@ class _VideoCallPageState extends State<VideoCallPage>
     try {
       await _room?.disconnect();
     } catch (_) {}
-    if (mounted) Get.back();
+    if (mounted) {
+      await Navigator.of(context, rootNavigator: true).maybePop();
+    }
   }
 
   Future<bool> _handleBackNavigation() async {
@@ -1888,7 +1907,7 @@ class _VideoCallPageState extends State<VideoCallPage>
     }
 
     setState(() => _gamesSheetOpen = true);
-    await showModalBottomSheet<void>(
+    final result = await showModalBottomSheet<LiveRoomGamesSheetResult>(
       context: context,
       useRootNavigator: false,
       isScrollControlled: true,
@@ -1897,6 +1916,11 @@ class _VideoCallPageState extends State<VideoCallPage>
     );
     if (!mounted) return;
     setState(() => _gamesSheetOpen = false);
+    if (result == LiveRoomGamesSheetResult.fortuneWheel) {
+      // The sheet route has fully completed here, so the wheel never overlaps
+      // its reverse transition or inherits the sheet's disposed context.
+      await showFortuneWheelDialog(context);
+    }
   }
 
   void _appendChatMessage(LiveRoomChatMessage message) {
@@ -2551,10 +2575,9 @@ class _VideoCallPageState extends State<VideoCallPage>
       await widget.live.inviteSpeaker(widget.room.roomId, userId);
       Haptics.success();
       await _refreshSeatSnapshot();
-      Get.snackbar(
+      _showLiveMessage(
         'Invite sent',
         '$name can now accept or reject the invite.',
-        snackPosition: SnackPosition.BOTTOM,
       );
     } catch (e) {
       if (!mounted) return;
@@ -2581,16 +2604,11 @@ class _VideoCallPageState extends State<VideoCallPage>
         userId: userId,
       );
       if (!mounted) return;
-      Get.snackbar(
-        'Moderation',
-        '$name was removed from the room.',
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      _showLiveMessage('Moderation', '$name was removed from the room.');
     } catch (e) {
-      Get.snackbar(
+      _showLiveMessage(
         'Moderation',
         e.toString().replaceFirst('Exception: ', ''),
-        snackPosition: SnackPosition.BOTTOM,
       );
     }
   }
@@ -2611,16 +2629,11 @@ class _VideoCallPageState extends State<VideoCallPage>
         roomType: widget.room.roomType,
       );
       if (!mounted) return;
-      Get.snackbar(
-        'Moderation',
-        '$name was blocked.',
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      _showLiveMessage('Moderation', '$name was blocked.');
     } catch (e) {
-      Get.snackbar(
+      _showLiveMessage(
         'Moderation',
         e.toString().replaceFirst('Exception: ', ''),
-        snackPosition: SnackPosition.BOTTOM,
       );
     }
   }
@@ -2635,16 +2648,11 @@ class _VideoCallPageState extends State<VideoCallPage>
     try {
       await widget.live.unblockUser(userId: userId);
       if (!mounted) return;
-      Get.snackbar(
-        'Moderation',
-        '$name was unblocked.',
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      _showLiveMessage('Moderation', '$name was unblocked.');
     } catch (e) {
-      Get.snackbar(
+      _showLiveMessage(
         'Moderation',
         e.toString().replaceFirst('Exception: ', ''),
-        snackPosition: SnackPosition.BOTTOM,
       );
     }
   }
@@ -2795,16 +2803,11 @@ class _VideoCallPageState extends State<VideoCallPage>
         description: descriptionController.text.trim(),
       );
       if (!mounted) return;
-      Get.snackbar(
-        'Moderation',
-        'Report submitted.',
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      _showLiveMessage('Moderation', 'Report submitted.');
     } catch (e) {
-      Get.snackbar(
+      _showLiveMessage(
         'Moderation',
         e.toString().replaceFirst('Exception: ', ''),
-        snackPosition: SnackPosition.BOTTOM,
       );
     } finally {
       descriptionController.dispose();
@@ -3313,10 +3316,9 @@ class _VideoCallPageState extends State<VideoCallPage>
       if ((event['room_id'] ?? '').toString() != widget.room.roomId) return;
       final message =
           (event['message'] ?? 'Unable to send message.').toString();
-      Get.snackbar(
+      _showLiveMessage(
         'Chat',
         message,
-        snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 2),
       );
     });
@@ -3356,17 +3358,38 @@ class _VideoCallPageState extends State<VideoCallPage>
       }
     });
 
-    _moderationErrorsSub = rooms.moderationErrors.listen((event) {
+    _moderationErrorsSub = rooms.moderationErrors.listen((event) async {
       if (!mounted) return;
       final eventRoomId = (event['room_id'] ?? '').toString();
       if (eventRoomId.isNotEmpty && eventRoomId != widget.room.roomId) return;
+      final code = (event['code'] ?? '').toString().trim().toUpperCase();
       final message =
           (event['message'] ?? 'Unable to complete moderation action.')
               .toString();
-      Get.snackbar(
+      if (code == 'HOST_BLOCKED') {
+        final targetUserId = _safeInt(event['target_user_id']);
+        // A host can never be blocked from their own room. Older websocket
+        // servers also emitted HOST_BLOCKED for any failed access check without
+        // identifying a target, so only a targeted response is authoritative.
+        if (!_isHost &&
+            targetUserId != null &&
+            _myUserId != null &&
+            targetUserId == _myUserId) {
+          await _handleModerationTargetExit(blocked: true, message: message);
+          return;
+        }
+        if (!_isHost) {
+          _showLiveMessage(
+            'Moderation',
+            'Unable to validate room access right now.',
+            duration: const Duration(seconds: 3),
+          );
+        }
+        return;
+      }
+      _showLiveMessage(
         'Moderation',
         message,
-        snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 3),
       );
     });
@@ -3511,12 +3534,9 @@ class _VideoCallPageState extends State<VideoCallPage>
       if (_handoffToPrivateCallIfNeeded(reason)) {
         return;
       }
-      Get.closeAllSnackbars();
-      _closeTransientOverlays();
-      Get.snackbar(
+      _showLiveMessage(
         'Live Room',
         _roomEndedMessage(reason),
-        snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 3),
       );
       _popLivePage();
@@ -3541,27 +3561,21 @@ class _VideoCallPageState extends State<VideoCallPage>
       await _room?.disconnect();
     } catch (_) {}
     if (mounted) {
-      Get.closeAllSnackbars();
-      _closeTransientOverlays();
-      Get.snackbar(
+      _showLiveMessage(
         'Moderation',
         message,
-        snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 3),
       );
       _popLivePage();
     }
   }
 
-  void _closeTransientOverlays() {
-    while ((Get.isBottomSheetOpen ?? false) || (Get.isDialogOpen ?? false)) {
-      Get.back();
-    }
-  }
-
   void _popLivePage() {
     if (!mounted) return;
-    Get.offAllNamed(Routes.home);
+    Navigator.of(
+      context,
+      rootNavigator: true,
+    ).pushNamedAndRemoveUntil(Routes.home, (_) => false);
   }
 
   bool _handoffToPrivateCallIfNeeded(String reason) {
@@ -3587,10 +3601,11 @@ class _VideoCallPageState extends State<VideoCallPage>
       return false;
     }
 
-    Get.closeAllSnackbars();
-    _closeTransientOverlays();
     if (Get.currentRoute != Routes.activeCall) {
-      Get.offNamed(Routes.activeCall);
+      Navigator.of(
+        context,
+        rootNavigator: true,
+      ).pushReplacementNamed(Routes.activeCall);
     }
     return true;
   }
@@ -4052,10 +4067,9 @@ class _VideoCallPageState extends State<VideoCallPage>
     if (_privateCallBusy || !_isViewerOnly) return;
     final roomId = widget.room.roomId.trim();
     if (roomId.isEmpty) {
-      Get.snackbar(
+      _showLiveMessage(
         'Private call unavailable',
         'Missing live room context for this video call request.',
-        snackPosition: SnackPosition.BOTTOM,
       );
       return;
     }
@@ -4071,10 +4085,9 @@ class _VideoCallPageState extends State<VideoCallPage>
       await callController.placeCallFromLiveRoom(roomId: roomId, type: 'video');
     } catch (e) {
       if (!mounted) return;
-      Get.snackbar(
+      _showLiveMessage(
         'Private call unavailable',
         e.toString().replaceFirst('Exception: ', ''),
-        snackPosition: SnackPosition.BOTTOM,
       );
       setState(() => _privateCallBusy = false);
       return;
@@ -5044,10 +5057,9 @@ class _VideoCallPageState extends State<VideoCallPage>
       );
       if (!mounted) return;
       setState(() => _incomingPkInvite = null);
-      Get.snackbar(
+      _showLiveMessage(
         'PK Invite',
         'PK invite sent successfully.',
-        snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 2),
       );
     } catch (e) {

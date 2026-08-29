@@ -85,6 +85,34 @@ class AppFeatureFlagEnforcementTest extends TestCase
             ->assertOk();
     }
 
+    public function test_maintenance_mode_keeps_trusted_realtime_server_requests_available(): void
+    {
+        config(['app_features.maintenance_mode_enabled' => true]);
+        putenv('WS_INTERNAL_KEY=test-internal-key');
+
+        try {
+            Sanctum::actingAs($this->member);
+
+            $this->getJson('/api/ws/verify')
+                ->assertStatus(503)
+                ->assertJsonPath('error', 'MAINTENANCE_MODE');
+
+            $this->withHeaders([
+                'X-WS-Internal-Key' => 'wrong-key',
+            ])->getJson('/api/ws/verify')
+                ->assertStatus(503)
+                ->assertJsonPath('error', 'MAINTENANCE_MODE');
+
+            $this->withHeaders([
+                'X-WS-Internal-Key' => 'test-internal-key',
+            ])->getJson('/api/ws/verify')
+                ->assertOk()
+                ->assertJsonPath('id', $this->member->id);
+        } finally {
+            putenv('WS_INTERNAL_KEY');
+        }
+    }
+
     public function test_force_upgrade_rejects_old_android_client_headers(): void
     {
         config([

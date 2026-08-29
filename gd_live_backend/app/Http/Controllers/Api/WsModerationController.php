@@ -49,16 +49,18 @@ class WsModerationController extends Controller
 
         $room = LiveRoom::query()->where('room_id', $data['room_id'])->firstOrFail();
         $hostUserId = $this->moderation->hostUserIdForRoom($room);
-        if (!$this->moderation->isBlockedByHostUserId($hostUserId, $user->id)) {
+        $isBlocked = $this->moderation->isBlockedByHostUserId($hostUserId, $user->id);
+        if (!$isBlocked) {
             $this->autoModeration->clearChatState($room, $user);
         }
 
         return response()->json([
             'ok' => true,
-            'allow' => !$this->moderation->isBlockedByHostUserId($hostUserId, $user->id),
-            'reason' => $this->moderation->isBlockedByHostUserId($hostUserId, $user->id)
-                ? 'You were blocked by this host.'
-                : null,
+            'allow' => !$isBlocked,
+            'code' => $isBlocked ? 'HOST_BLOCKED' : null,
+            'reason' => $isBlocked ? 'You were blocked by this host.' : null,
+            'host_user_id' => $hostUserId,
+            'target_user_id' => (int) $user->id,
         ]);
     }
 
