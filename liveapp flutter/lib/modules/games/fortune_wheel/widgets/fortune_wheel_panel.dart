@@ -139,6 +139,7 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
     _spinController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 3680),
+      animationBehavior: AnimationBehavior.preserve,
     );
     _spinAnimation = AlwaysStoppedAnimation<double>(_rotation);
     _spinController.addListener(() {
@@ -215,7 +216,17 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
       unawaited(_playSpinSound());
       await _spinController.forward(from: 0);
       if (!mounted) return;
-      setState(() => _spinning = false);
+      // Animation controllers complete on wall-clock time. Explicitly paint
+      // the winning position before the reward is allowed to cover the wheel,
+      // which keeps low-frame-rate and reduced-animation devices in sequence.
+      setState(() {
+        _rotation = targetRotation;
+        _spinning = false;
+      });
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      await Future<void>.delayed(const Duration(milliseconds: 280));
+      if (!mounted) return;
       Haptics.success();
       await _showReward(result.spin);
       if (mounted && widget.freeSpinOnly) {
@@ -383,19 +394,42 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
                   ),
                   if (_visibleReward != null)
                     Positioned.fill(
-                      child: ColoredBox(
-                        color: Colors.black.withValues(alpha: .94),
-                        child: Center(
-                          child: Material(
-                            color: Colors.transparent,
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 420),
-                              child: _FortuneRewardSheet(
-                                spin: _visibleReward!,
-                                onClose: _dismissReward,
+                      child: DecoratedBox(
+                        decoration: const BoxDecoration(
+                          gradient: RadialGradient(
+                            center: Alignment(0, -.48),
+                            radius: 1.18,
+                            colors: [
+                              Color(0xFF9D366F),
+                              Color(0xFF593477),
+                              Color(0xFF20245C),
+                            ],
+                            stops: [0, .52, 1],
+                          ),
+                        ),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            const IgnorePointer(
+                              child: CustomPaint(
+                                painter: _FortuneBackgroundPainter(),
                               ),
                             ),
-                          ),
+                            Center(
+                              child: Material(
+                                color: Colors.transparent,
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 420,
+                                  ),
+                                  child: _FortuneRewardSheet(
+                                    spin: _visibleReward!,
+                                    onClose: _dismissReward,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -3128,6 +3162,8 @@ class _FortuneBackground extends StatelessWidget {
 }
 
 class _FortuneBackgroundPainter extends CustomPainter {
+  const _FortuneBackgroundPainter();
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..style = PaintingStyle.fill;
