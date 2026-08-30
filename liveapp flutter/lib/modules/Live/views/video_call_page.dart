@@ -817,6 +817,7 @@ class _VideoCallPageState extends State<VideoCallPage>
     final lp = room.localParticipant;
     if (lp == null) return null;
     for (final pub in lp.trackPublications.values) {
+      if (pub.muted) continue;
       if (pub.source == TrackSource.camera ||
           pub.source == TrackSource.unknown) {
         final tr = pub.track;
@@ -858,9 +859,16 @@ class _VideoCallPageState extends State<VideoCallPage>
       final enabling = !(lp.isCameraEnabled());
 
       if (!enabling) {
-        await lp.setCameraEnabled(false);
-        await _detachPreview();
         if (mounted) setState(() => _camOn = false);
+        try {
+          await lp.setCameraEnabled(false);
+          await _detachPreview();
+        } catch (_) {
+          if (mounted) {
+            setState(() => _camOn = lp.isCameraEnabled());
+          }
+          rethrow;
+        }
         return;
       }
 
@@ -5162,6 +5170,10 @@ class _VideoCallPageState extends State<VideoCallPage>
     if (_canPublishMedia) {
       final localParticipant = room.localParticipant;
       final localTrack = _localCameraTrack(room);
+      final localVideoVisible =
+          _camOn &&
+          localParticipant?.isCameraEnabled() == true &&
+          localTrack != null;
       final currentUser = Get.find<AuthService>().currentUser;
       final trimmedCurrentUserName = currentUser?.name.trim() ?? '';
       final localDisplayName =
@@ -5211,8 +5223,8 @@ class _VideoCallPageState extends State<VideoCallPage>
                     avatarUrl: currentUser?.avatarUrl,
                   ),
           child:
-              localTrack != null
-                  ? VideoTrackRenderer(localTrack, fit: VideoViewFit.cover)
+              localVideoVisible
+                  ? VideoTrackRenderer(localTrack!, fit: VideoViewFit.cover)
                   : _PkVideoFallback(
                     name: localDisplayName,
                     subtitle: _camOn ? 'Camera starting…' : 'Camera off',
