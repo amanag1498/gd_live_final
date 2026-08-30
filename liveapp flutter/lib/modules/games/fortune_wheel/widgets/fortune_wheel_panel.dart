@@ -35,7 +35,7 @@ Future<void> showFortuneWheelDialog(
     useRootNavigator: true,
     barrierDismissible: false,
     barrierLabel: 'Close Fortune Wheel',
-    barrierColor: Colors.black.withValues(alpha: .66),
+    barrierColor: Colors.black.withValues(alpha: .16),
     transitionDuration: const Duration(milliseconds: 360),
     pageBuilder: (dialogContext, _, __) {
       final size = MediaQuery.sizeOf(dialogContext);
@@ -330,7 +330,7 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
                   SafeArea(
                     top: false,
                     child: Opacity(
-                      opacity: entrance,
+                      opacity: _visibleReward == null ? entrance : 0,
                       child: Transform.translate(
                         offset: Offset(0, (1 - entrance) * 26),
                         child: ListView(
@@ -394,42 +394,20 @@ class _FortuneWheelPanelState extends State<FortuneWheelPanel>
                   ),
                   if (_visibleReward != null)
                     Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: const BoxDecoration(
-                          gradient: RadialGradient(
-                            center: Alignment(0, -.48),
-                            radius: 1.18,
-                            colors: [
-                              Color(0xFF9D366F),
-                              Color(0xFF593477),
-                              Color(0xFF20245C),
-                            ],
-                            stops: [0, .52, 1],
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {},
+                        child: Center(
+                          child: Material(
+                            color: Colors.transparent,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 420),
+                              child: _FortuneRewardSheet(
+                                spin: _visibleReward!,
+                                onClose: _dismissReward,
+                              ),
+                            ),
                           ),
-                        ),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            const IgnorePointer(
-                              child: CustomPaint(
-                                painter: _FortuneBackgroundPainter(),
-                              ),
-                            ),
-                            Center(
-                              child: Material(
-                                color: Colors.transparent,
-                                child: ConstrainedBox(
-                                  constraints: const BoxConstraints(
-                                    maxWidth: 420,
-                                  ),
-                                  child: _FortuneRewardSheet(
-                                    spin: _visibleReward!,
-                                    onClose: _dismissReward,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
                         ),
                       ),
                     ),
