@@ -10,6 +10,7 @@ use App\Models\Host;
 use App\Models\LiveRoom;
 use App\Models\LiveRoomGiftEarningLedger;
 use App\Models\User;
+use App\Models\WalletTransaction;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -560,6 +561,9 @@ class AgencyWeeklyPayoutReportService
                 ->firstOrFail();
 
             $before = $lockedItem->toArray();
+            if (data_get($lockedItem->meta, 'wallet_transfer.transaction_id')) {
+                throw new InvalidArgumentException('Transferred payout rows are locked.');
+            }
             $normalized = $this->normalizeSettlementItemPayload($payload, $lockedItem->meta ?? []);
 
             $lockedItem->forceFill([
@@ -634,6 +638,10 @@ class AgencyWeeklyPayoutReportService
                 throw new InvalidArgumentException('The host row does not belong to this payout report.');
             }
 
+            if (data_get($lockedItem->meta, 'wallet_transfer.transaction_id')) {
+                throw new InvalidArgumentException('Transferred payout rows cannot be deleted.');
+            }
+
             $before = $lockedItem->load('host.user')->toArray();
             $targetUser = $lockedItem->host?->user;
             $deletedItemId = (int) $lockedItem->id;
@@ -665,6 +673,115 @@ class AgencyWeeklyPayoutReportService
             }
 
             return $locked->fresh(['agency.owner', 'items.host.user', 'publishedByAdmin']);
+        });
+    }
+
+    public function transferItemToWallet(
+        AgencyPayoutReport $report,
+        AgencyPayoutReportItem $item,
+        ?User $actor = null,
+    ): array {
+        return DB::transaction(function () use ($report, $item, $actor) {
+            $locked = AgencyPayoutReport::query()
+                ->with('agency.owner')
+                ->lockForUpdate()
+                ->findOrFail($report->id);
+
+            if ($locked->paid_at || $locked->status === 'paid') {
+                throw new InvalidArgumentException('Paid payout reports are locked.');
+            }
+
+            if (!in_array($locked->status, ['generated', 'pending_review', 'approved'], true)) {
+                throw new InvalidArgumentException('Only draft or approved report rows can be transferred.');
+            }
+
+            $lockedItem = AgencyPayoutReportItem::query()
+                ->with('host.user')
+                ->whereKey($item->id)
+                ->where('agency_payout_report_id', $locked->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$lockedItem) {
+                throw new InvalidArgumentException('The host row does not belong to this payout report.');
+            }
+
+            if (data_get($lockedItem->meta, 'wallet_transfer.transaction_id')) {
+                throw new InvalidArgumentException('This host settlement was already transferred to the wallet.');
+            }
+
+            $hostUser = $lockedItem->host?->user;
+            if (!$hostUser) {
+                throw new InvalidArgumentException('The host does not have a linked user wallet.');
+            }
+
+            $coins = max(0, (int) $lockedItem->total_coins);
+            if ($coins === 0) {
+                throw new InvalidArgumentException('The host settlement has no coins to transfer.');
+            }
+
+            $reference = 'AGENCY_PAYOUT_ITEM_WALLET_TRANSFER:'.$lockedItem->id;
+            if (WalletTransaction::query()->where('reference', $reference)->exists()) {
+                throw new InvalidArgumentException('This host settlement was already transferred to the wallet.');
+            }
+
+            $before = $lockedItem->toArray();
+            $walletTransaction = WalletService::credit(
+                user: $hostUser,
+                coins: $coins,
+                reference: $reference,
+                meta: [
+                    'agency_payout_report_id' => (int) $locked->id,
+                    'agency_payout_report_item_id' => (int) $lockedItem->id,
+                    'host_id' => (int) $lockedItem->host_id,
+                    'transferred_by_admin_user_id' => $actor?->id,
+                ],
+                attributes: [
+                    'category' => 'agency_payout',
+                    'reference_type' => AgencyPayoutReportItem::class,
+                    'reference_id' => (int) $lockedItem->id,
+                ],
+                description: 'Host settlement transferred to wallet',
+            );
+
+            $remark = "Transferred {$coins} coins to wallet.";
+            $existingNote = trim((string) $lockedItem->admin_note);
+            $meta = $lockedItem->meta ?? [];
+            $meta['admin_note'] = $existingNote === '' ? $remark : $existingNote."\n".$remark;
+            $meta['wallet_transfer'] = [
+                'transaction_id' => (int) $walletTransaction->id,
+                'coins' => $coins,
+                'user_id' => (int) $hostUser->id,
+                'transferred_at' => now(config('app.timezone'))->toIso8601String(),
+                'transferred_by_admin_user_id' => $actor?->id,
+            ];
+            $lockedItem->forceFill(['meta' => $meta])->save();
+
+            if ($actor) {
+                app(AdminAuditService::class)->log(
+                    area: 'agency_payout_reports',
+                    action: 'transfer_item_to_wallet',
+                    admin: $actor,
+                    targetUser: $hostUser,
+                    entity: $locked,
+                    before: $before,
+                    after: $lockedItem->fresh()->toArray(),
+                    meta: [
+                        'report_id' => (int) $locked->id,
+                        'agency_payout_report_item_id' => (int) $lockedItem->id,
+                        'host_id' => (int) $lockedItem->host_id,
+                        'wallet_transaction_id' => (int) $walletTransaction->id,
+                        'coins' => $coins,
+                    ],
+                    reason: $remark,
+                );
+            }
+
+            return [
+                'report' => $locked->fresh(['agency.owner', 'items.host.user', 'publishedByAdmin']),
+                'item' => $lockedItem->fresh('host.user'),
+                'wallet_transaction' => $walletTransaction,
+            ];
         });
     }
 

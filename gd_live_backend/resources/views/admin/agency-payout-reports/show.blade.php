@@ -211,7 +211,12 @@
         </thead>
         <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
           @forelse($report->items as $item)
-            @php($formId = 'payout-row-' . $item->id)
+            @php
+              $formId = 'payout-row-' . $item->id;
+              $walletTransfer = data_get($item->meta, 'wallet_transfer');
+              $transferred = filled(data_get($walletTransfer, 'transaction_id'));
+              $rowLocked = $locked || $transferred;
+            @endphp
             <tr id="payout-item-{{ $item->id }}" data-payout-row data-hidden-coins="{{ (int) data_get($item->meta, 'audio_gift_coins', data_get($item->meta, 'audio_gift_gross', 0)) + (int) data_get($item->meta, 'audio_call_coins', data_get($item->meta, 'audio_call_gross', 0)) }}" class="bg-white transition-opacity dark:bg-gray-900">
               <td class="payout-grid-sticky-left min-w-[180px] px-4 py-4">
                 <form id="{{ $formId }}" class="js-payout-row-form" method="post" action="{{ route('admin.agency-payout-reports.items.update', [$report, $item]) }}" data-row-id="{{ $item->id }}">
@@ -220,28 +225,37 @@
                 <div class="font-semibold text-gray-900 dark:text-white">#{{ $item->host?->user_id ?? '—' }} · {{ $item->host?->user?->name ?? $item->host?->stage_name ?? '—' }}</div>
                 <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">Host ID: {{ $item->host_id }} · {{ $item->host?->stage_name ?? '—' }}</div>
               </td>
-              <td class="min-w-[190px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="video_room_minutes" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('video_room_minutes', $item->video_room_minutes) }}" @disabled($locked)></td>
-              <td class="min-w-[190px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="video_gift_coins" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('video_gift_coins', $item->video_gift_coins) }}" @disabled($locked)></td>
-              <td class="min-w-[180px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="pk_gift_coins" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('pk_gift_coins', $item->pk_gift_coins) }}" @disabled($locked)></td>
-              <td class="min-w-[180px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="video_call_coins" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('video_call_coins', $item->video_call_coins) }}" @disabled($locked)></td>
-              <td class="min-w-[180px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="video_call_minutes" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('video_call_minutes', $item->video_call_minutes) }}" @disabled($locked)></td>
-              <td class="min-w-[170px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="bonus_coins" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('bonus_coins', $item->bonus_coins) }}" @disabled($locked)></td>
+              <td class="min-w-[190px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="video_room_minutes" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('video_room_minutes', $item->video_room_minutes) }}" @disabled($rowLocked)></td>
+              <td class="min-w-[190px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="video_gift_coins" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('video_gift_coins', $item->video_gift_coins) }}" @disabled($rowLocked)></td>
+              <td class="min-w-[180px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="pk_gift_coins" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('pk_gift_coins', $item->pk_gift_coins) }}" @disabled($rowLocked)></td>
+              <td class="min-w-[180px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="video_call_coins" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('video_call_coins', $item->video_call_coins) }}" @disabled($rowLocked)></td>
+              <td class="min-w-[180px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="video_call_minutes" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('video_call_minutes', $item->video_call_minutes) }}" @disabled($rowLocked)></td>
+              <td class="min-w-[170px] px-4 py-4"><input type="number" inputmode="numeric" min="0" name="bonus_coins" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('bonus_coins', $item->bonus_coins) }}" @disabled($rowLocked)></td>
               <td data-row-total-coins class="min-w-[150px] whitespace-nowrap px-4 py-4 tabular-nums text-gray-700 dark:text-gray-200">{{ number_format($item->total_coins) }}</td>
-              <td class="min-w-[180px] px-4 py-4"><input type="number" inputmode="decimal" step="0.01" min="0" name="host_payout_inr" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('host_payout_inr', number_format($item->host_payout_inr, 2, '.', '')) }}" @disabled($locked)></td>
-              <td class="min-w-[210px] px-4 py-4"><input type="number" inputmode="decimal" step="0.01" min="0" name="agency_commission_inr" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('agency_commission_inr', number_format($item->agency_commission_inr, 2, '.', '')) }}" @disabled($locked)></td>
+              <td class="min-w-[180px] px-4 py-4"><input type="number" inputmode="decimal" step="0.01" min="0" name="host_payout_inr" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('host_payout_inr', number_format($item->host_payout_inr, 2, '.', '')) }}" @disabled($rowLocked)></td>
+              <td class="min-w-[210px] px-4 py-4"><input type="number" inputmode="decimal" step="0.01" min="0" name="agency_commission_inr" form="{{ $formId }}" class="{{ $settlementInputClass }}" value="{{ old('agency_commission_inr', number_format($item->agency_commission_inr, 2, '.', '')) }}" @disabled($rowLocked)></td>
               <td data-row-total-inr class="min-w-[150px] whitespace-nowrap px-4 py-4 tabular-nums text-gray-700 dark:text-gray-200">{{ number_format($item->total_inr, 2) }}</td>
               <td class="px-4 py-4">
-                <textarea name="admin_note" form="{{ $formId }}" rows="2" class="min-w-[220px] rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 shadow-theme-xs outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white" placeholder="Admin note" @disabled($locked)>{{ old('admin_note', $item->admin_note) }}</textarea>
+                <textarea name="admin_note" form="{{ $formId }}" rows="2" class="min-w-[220px] rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 shadow-theme-xs outline-hidden focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white" placeholder="Admin note" @disabled($rowLocked)>{{ old('admin_note', $item->admin_note) }}</textarea>
               </td>
               <td class="payout-grid-sticky-right min-w-[190px] px-4 py-4 text-right">
                 <div class="flex justify-end gap-2">
-                  <x-ui.button data-row-save type="submit" size="sm" form="{{ $formId }}" :disabled="$locked">Save</x-ui.button>
+                  <x-ui.button data-row-save type="submit" size="sm" form="{{ $formId }}" :disabled="$rowLocked">Save</x-ui.button>
+                  <form method="post" action="{{ route('admin.agency-payout-reports.items.transfer-to-wallet', [$report, $item]) }}" onsubmit="return confirm('Transfer {{ number_format($item->total_coins) }} coins to User ID {{ $item->host?->user_id ?? '—' }} wallet? This cannot be undone.');">
+                    @csrf
+                    <x-ui.button type="submit" variant="success" size="sm" :disabled="$rowLocked || $item->total_coins <= 0 || !$item->host?->user_id">
+                      {{ $transferred ? 'Transferred' : 'Transfer to Wallet' }}
+                    </x-ui.button>
+                  </form>
                   <form class="js-payout-row-delete-form" method="post" action="{{ route('admin.agency-payout-reports.items.destroy', [$report, $item]) }}" data-row-id="{{ $item->id }}" data-user-id="{{ $item->host?->user_id ?? '—' }}">
                     @csrf
                     @method('DELETE')
-                    <x-ui.button data-row-delete type="submit" variant="danger" size="sm" :disabled="$locked">Delete</x-ui.button>
+                    <x-ui.button data-row-delete type="submit" variant="danger" size="sm" :disabled="$rowLocked">Delete</x-ui.button>
                   </form>
                 </div>
+                @if($transferred)
+                  <div class="mt-2 text-xs font-medium text-success-600 dark:text-success-400">{{ number_format((int) data_get($walletTransfer, 'coins', 0)) }} coins transferred · Tx #{{ data_get($walletTransfer, 'transaction_id') }}</div>
+                @endif
                 <div data-row-feedback class="mt-2 min-h-4 text-xs font-medium" aria-live="polite"></div>
               </td>
             </tr>

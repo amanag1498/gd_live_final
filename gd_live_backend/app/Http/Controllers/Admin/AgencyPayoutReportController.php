@@ -326,6 +326,42 @@ class AgencyPayoutReportController extends Controller
             ->with('status', 'Host payout row deleted. Report totals were recalculated.');
     }
 
+    public function transferItemToWallet(Request $request, AgencyPayoutReport $agency_payout_report, AgencyPayoutReportItem $agency_payout_report_item)
+    {
+        try {
+            $result = $this->service->transferItemToWallet(
+                report: $agency_payout_report,
+                item: $agency_payout_report_item,
+                actor: $request->user(),
+            );
+        } catch (InvalidArgumentException $e) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => $e->getMessage(),
+                    'errors' => ['transfer_to_wallet' => [$e->getMessage()]],
+                ], 422);
+            }
+
+            return back()->withErrors(['transfer_to_wallet' => $e->getMessage()]);
+        }
+
+        $coins = (int) $result['wallet_transaction']->coins;
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => "Transferred {$coins} coins to the host wallet.",
+                'item_id' => (int) $result['item']->id,
+                'wallet_transaction_id' => (int) $result['wallet_transaction']->id,
+                'coins' => $coins,
+                'report' => $this->reportPayload($result['report']),
+            ]);
+        }
+
+        return redirect()
+            ->route('admin.agency-payout-reports.show', $agency_payout_report)
+            ->with('status', "Transferred {$coins} coins to the host wallet.");
+    }
+
     public function destroy(Request $request, AgencyPayoutReport $agency_payout_report)
     {
         $data = $request->validate([

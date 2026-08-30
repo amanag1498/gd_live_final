@@ -347,6 +347,66 @@ class AgencyPayoutReportTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_transfer_host_settlement_coins_to_wallet_once(): void
+    {
+        [$agency, , $host] = $this->seedAgencyFixture();
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+
+        $service = app(AgencyWeeklyPayoutReportService::class);
+        [$start, $end] = $service->resolvePeriod('2026-04-21', '2026-04-27');
+        $report = $service->generate($start, $end, $agency->id, false)['reports'][0];
+        $item = $report->fresh('items')->items->firstOrFail();
+        $coins = (int) $item->total_coins;
+        $walletBalanceBefore = (int) $host->user->wallet->balance;
+
+        $this->actingAs($admin)
+            ->get(route('admin.agency-payout-reports.show', $report))
+            ->assertOk()
+            ->assertSee('Transfer to Wallet')
+            ->assertSee(route('admin.agency-payout-reports.items.transfer-to-wallet', [$report, $item]), false);
+
+        $response = $this->actingAs($admin)->postJson(
+            route('admin.agency-payout-reports.items.transfer-to-wallet', [$report, $item]),
+        );
+
+        $response->assertOk()
+            ->assertJsonPath('item_id', $item->id)
+            ->assertJsonPath('coins', $coins);
+
+        $item->refresh();
+        $walletTransactionId = (int) data_get($item->meta, 'wallet_transfer.transaction_id');
+        $this->assertGreaterThan(0, $walletTransactionId);
+        $this->assertSame($coins, (int) data_get($item->meta, 'wallet_transfer.coins'));
+        $this->assertStringContainsString("Transferred {$coins} coins to wallet.", $item->admin_note);
+        $this->assertSame($walletBalanceBefore + $coins, (int) $host->user->wallet()->value('balance'));
+
+        $this->assertDatabaseHas('wallet_transactions', [
+            'id' => $walletTransactionId,
+            'wallet_id' => $host->user->wallet->id,
+            'type' => 'credit',
+            'coins' => $coins,
+            'category' => 'agency_payout',
+            'reference' => 'AGENCY_PAYOUT_ITEM_WALLET_TRANSFER:'.$item->id,
+            'reference_type' => \App\Models\AgencyPayoutReportItem::class,
+            'reference_id' => $item->id,
+        ]);
+        $this->assertDatabaseHas('admin_action_audits', [
+            'admin_user_id' => $admin->id,
+            'target_user_id' => $host->user_id,
+            'action' => 'transfer_item_to_wallet',
+            'entity_id' => $report->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->postJson(route('admin.agency-payout-reports.items.transfer-to-wallet', [$report, $item]))
+            ->assertStatus(422);
+        $this->assertSame($walletBalanceBefore + $coins, (int) $host->user->wallet()->value('balance'));
+        $this->assertSame(1, WalletTransaction::query()
+            ->where('reference', 'AGENCY_PAYOUT_ITEM_WALLET_TRANSFER:'.$item->id)
+            ->count());
+    }
+
     public function test_invalid_generate_input_is_rejected(): void
     {
         $admin = User::factory()->create();
