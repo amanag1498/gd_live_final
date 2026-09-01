@@ -132,6 +132,12 @@ class AppSettingsService
             'group' => 'android',
             'default' => false,
         ],
+        'app_features.platform.android.seven_up_down_enabled' => [
+            'label' => 'Lucky 7',
+            'type' => 'boolean',
+            'group' => 'android',
+            'default' => false,
+        ],
         'app_features.platform.android.video_room_games_enabled' => [
             'label' => 'Video Room Games Strip',
             'type' => 'boolean',
@@ -195,6 +201,12 @@ class AppSettingsService
         ],
         'app_features.platform.ios.fortune_wheel_enabled' => [
             'label' => 'Fortune Wheel',
+            'type' => 'boolean',
+            'group' => 'ios',
+            'default' => false,
+        ],
+        'app_features.platform.ios.seven_up_down_enabled' => [
+            'label' => 'Lucky 7',
             'type' => 'boolean',
             'group' => 'ios',
             'default' => false,
@@ -409,7 +421,7 @@ class AppSettingsService
             'type' => 'string',
             'group' => 'economy',
             'default' => 'probability',
-            'options' => ['random', 'minimum_liability', 'highest_liability', 'probability', 'exposure_guard'],
+            'options' => ['random', 'minimum_bet', 'highest_bet', 'probability', 'treasury_affordable'],
             'hint' => 'Server-side winner selection strategy for Greedy round settlement.',
         ],
         'games.greedy.multiplier_a' => [
@@ -475,6 +487,66 @@ class AppSettingsService
             'default' => 4,
             'min' => 1,
             'hint' => 'How many weighted wheel sectors map to pot D.',
+        ],
+        'games.seven_up_down.enabled' => [
+            'label' => 'Enable Lucky 7 Engine',
+            'type' => 'boolean',
+            'group' => 'availability',
+            'default' => false,
+            'hint' => 'Server-side master switch for rounds, betting, dice results, and settlement.',
+        ],
+        'games.seven_up_down.visible_in_video_room_strip' => [
+            'label' => 'Show In Video Room Strip',
+            'type' => 'boolean',
+            'group' => 'availability',
+            'default' => true,
+        ],
+        'games.seven_up_down.fake_bets_enabled' => [
+            'label' => 'Enable Fake Bets Display',
+            'type' => 'boolean',
+            'group' => 'availability',
+            'default' => false,
+            'hint' => 'Adds display-only volume; fake bets are never stored or settled.',
+        ],
+        'games.seven_up_down.min_bet' => [
+            'label' => 'Minimum Bet', 'type' => 'integer', 'group' => 'limits', 'default' => 10, 'min' => 1,
+        ],
+        'games.seven_up_down.max_bet' => [
+            'label' => 'Maximum Bet', 'type' => 'integer', 'group' => 'limits', 'default' => 5000, 'min' => 1,
+        ],
+        'games.seven_up_down.round_duration_seconds' => [
+            'label' => 'Round Duration Seconds', 'type' => 'integer', 'group' => 'timing', 'default' => 30, 'min' => 10,
+        ],
+        'games.seven_up_down.betting_lock_seconds' => [
+            'label' => 'Dice Roll / Bet Lock Seconds', 'type' => 'integer', 'group' => 'timing', 'default' => 5, 'min' => 2,
+        ],
+        'games.seven_up_down.result_display_seconds' => [
+            'label' => 'Result Display Seconds', 'type' => 'integer', 'group' => 'timing', 'default' => 6, 'min' => 3,
+        ],
+        'games.seven_up_down.winning_strategy_mode' => [
+            'label' => 'Winning Strategy',
+            'type' => 'string',
+            'group' => 'economy',
+            'default' => 'probability',
+            'options' => ['random', 'minimum_bet', 'highest_bet', 'probability', 'treasury_affordable'],
+        ],
+        'games.seven_up_down.multiplier_down' => [
+            'label' => '7 Down Multiplier', 'type' => 'integer', 'group' => 'economy', 'default' => 3, 'min' => 2,
+        ],
+        'games.seven_up_down.multiplier_seven' => [
+            'label' => 'Exact 7 Multiplier', 'type' => 'integer', 'group' => 'economy', 'default' => 4, 'min' => 2,
+        ],
+        'games.seven_up_down.multiplier_up' => [
+            'label' => '7 Up Multiplier', 'type' => 'integer', 'group' => 'economy', 'default' => 3, 'min' => 2,
+        ],
+        'games.seven_up_down.weight_down' => [
+            'label' => '7 Down Outcome Weight', 'type' => 'integer', 'group' => 'economy', 'default' => 15, 'min' => 1,
+        ],
+        'games.seven_up_down.weight_seven' => [
+            'label' => 'Exact 7 Outcome Weight', 'type' => 'integer', 'group' => 'economy', 'default' => 6, 'min' => 1,
+        ],
+        'games.seven_up_down.weight_up' => [
+            'label' => '7 Up Outcome Weight', 'type' => 'integer', 'group' => 'economy', 'default' => 15, 'min' => 1,
         ],
         'games.fortune_wheel.enabled' => [
             'label' => 'Enable Fortune Wheel',
@@ -657,8 +729,12 @@ class AppSettingsService
             && (bool) config('games.fortune_wheel.enabled', false)
             && (bool) config('games.fortune_wheel.visible_in_video_room_strip', true)
             && (bool) ($access[GameAccessService::GAME_FORTUNE_WHEEL] ?? false);
+        $sevenUpDownEnabled = (bool) config("{$prefix}.seven_up_down_enabled", false)
+            && (bool) config('games.seven_up_down.enabled', false)
+            && (bool) config('games.seven_up_down.visible_in_video_room_strip', true)
+            && (bool) ($access[GameAccessService::GAME_SEVEN_UP_DOWN] ?? false);
         $videoRoomGamesEnabled = (bool) config("{$prefix}.video_room_games_enabled", false)
-            && ($teenPattiEnabled || $greedyEnabled || $fortuneWheelEnabled);
+            && ($teenPattiEnabled || $greedyEnabled || $fortuneWheelEnabled || $sevenUpDownEnabled);
 
         return [
             'video_rooms_enabled' => (bool) config("{$prefix}.video_rooms_enabled", true),
@@ -674,6 +750,7 @@ class AppSettingsService
             'teen_patti_enabled' => $teenPattiEnabled,
             'greedy_enabled' => $greedyEnabled,
             'fortune_wheel_enabled' => $fortuneWheelEnabled,
+            'seven_up_down_enabled' => $sevenUpDownEnabled,
             'video_room_games_enabled' => $videoRoomGamesEnabled,
         ];
     }

@@ -23,6 +23,7 @@ use App\Http\Controllers\Admin\NotificationController as AdminNotificationContro
 use App\Http\Controllers\Admin\PresenceController;
 use App\Http\Controllers\Admin\RechargeAuditAdminController;
 use App\Http\Controllers\Admin\RechargePlanAdminController;
+use App\Http\Controllers\Admin\SevenUpDownAdminController;
 use App\Http\Controllers\Admin\ReportsController;
 use App\Http\Controllers\Admin\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Admin\SubscriptionPlanController;
@@ -220,6 +221,14 @@ Route::middleware(['auth', 'not_blocked', 'role:admin'])->prefix('admin')->name(
     Route::post('games/greedy/tick', [GreedyGameAdminController::class, 'tick'])->name('games.greedy.tick');
     Route::post('games/greedy/rounds/{round}/reconcile', [GreedyGameAdminController::class, 'reconcile'])->name('games.greedy.rounds.reconcile');
     Route::post('games/greedy/bets/{bet}/refund', [GreedyGameAdminController::class, 'refund'])->name('games.greedy.bets.refund');
+    Route::get('games/seven-up-down', [SevenUpDownAdminController::class, 'dashboard'])->name('games.seven-up-down.dashboard');
+    Route::get('games/seven-up-down/report', [SevenUpDownAdminController::class, 'report'])->name('games.seven-up-down.report');
+    Route::get('games/seven-up-down/rounds', [SevenUpDownAdminController::class, 'rounds'])->name('games.seven-up-down.rounds');
+    Route::get('games/seven-up-down/bets', [SevenUpDownAdminController::class, 'bets'])->name('games.seven-up-down.bets');
+    Route::get('games/seven-up-down/payouts', [SevenUpDownAdminController::class, 'payouts'])->name('games.seven-up-down.payouts');
+    Route::post('games/seven-up-down/tick', [SevenUpDownAdminController::class, 'tick'])->name('games.seven-up-down.tick');
+    Route::post('games/seven-up-down/rounds/{round}/reconcile', [SevenUpDownAdminController::class, 'reconcile'])->name('games.seven-up-down.rounds.reconcile');
+    Route::post('games/seven-up-down/bets/{bet}/refund', [SevenUpDownAdminController::class, 'refund'])->name('games.seven-up-down.bets.refund');
     Route::get('games/fortune-wheel', [FortuneWheelAdminController::class, 'dashboard'])->name('games.fortune-wheel.dashboard');
     Route::post('games/fortune-wheel/segments', [FortuneWheelAdminController::class, 'storeSegment'])->name('games.fortune-wheel.segments.store');
     Route::put('games/fortune-wheel/segments/{segment}', [FortuneWheelAdminController::class, 'updateSegment'])->name('games.fortune-wheel.segments.update');

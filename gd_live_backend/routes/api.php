@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\PushTokenController;
 use App\Http\Controllers\Api\RazorpayWebhookController;
 use App\Http\Controllers\Api\RechargeOrderController;
 use App\Http\Controllers\Api\RechargePlanController;
+use App\Http\Controllers\Api\SevenUpDownController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\TeenPattiController;
 use App\Http\Controllers\Api\UnblockRequestController;
@@ -66,6 +67,7 @@ Route::get('/metrics', [OpsController::class, 'metrics']);
 Route::get('/recharge/plans', [RechargePlanController::class, 'index'])->middleware('feature_enabled:wallet_recharge_enabled');
 Route::get('/games/teen-patti/public-snapshot', [TeenPattiController::class, 'publicSnapshot']);
 Route::get('/games/greedy/public-snapshot', [GreedyGameController::class, 'publicSnapshot']);
+Route::get('/games/seven-up-down/public-snapshot', [SevenUpDownController::class, 'publicSnapshot']);
 Route::get('/levels', [LevelController::class, 'index']);
 
 // host/admin only
@@ -137,6 +139,9 @@ Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
     Route::get('/games/greedy', [GreedyGameController::class, 'snapshot'])->middleware('feature_enabled:greedy_enabled');
     Route::get('/games/greedy/history', [GreedyGameController::class, 'history'])->middleware('feature_enabled:greedy_enabled');
     Route::post('/games/greedy/bets', [GreedyGameController::class, 'placeBet'])->middleware('feature_enabled:greedy_enabled');
+    Route::get('/games/seven-up-down', [SevenUpDownController::class, 'snapshot'])->middleware('feature_enabled:seven_up_down_enabled');
+    Route::get('/games/seven-up-down/history', [SevenUpDownController::class, 'history'])->middleware('feature_enabled:seven_up_down_enabled');
+    Route::post('/games/seven-up-down/bets', [SevenUpDownController::class, 'placeBet'])->middleware('feature_enabled:seven_up_down_enabled');
     Route::get('/games/fortune-wheel', [FortuneWheelController::class, 'snapshot'])->middleware('feature_enabled:fortune_wheel_enabled');
     Route::post('/games/fortune-wheel/spin', [FortuneWheelController::class, 'spin'])->middleware('feature_enabled:fortune_wheel_enabled');
     Route::get('/games/fortune-wheel/history', [FortuneWheelController::class, 'history'])->middleware('feature_enabled:fortune_wheel_enabled');
@@ -263,3 +268,4 @@ Route::middleware('throttle:240,1')->get('/ws/moderation/snapshot', [WsModeratio
 Route::middleware('throttle:240,1')->post('/ws/moderation/persist-chat-action', [WsModerationController::class, 'persistChatAction']);
 Route::middleware('throttle:240,1')->get('/ws/games/teen-patti/snapshot', [TeenPattiController::class, 'internalSnapshot']);
 Route::middleware('throttle:240,1')->get('/ws/games/greedy/snapshot', [GreedyGameController::class, 'internalSnapshot']);
+Route::middleware('throttle:240,1')->get('/ws/games/seven-up-down/snapshot', [SevenUpDownController::class, 'internalSnapshot']);

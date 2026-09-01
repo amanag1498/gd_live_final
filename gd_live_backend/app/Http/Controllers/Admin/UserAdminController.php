@@ -347,6 +347,7 @@ class UserAdminController extends Controller
             'teen_patti' => 'nullable|boolean',
             'greedy' => 'nullable|boolean',
             'fortune_wheel' => 'nullable|boolean',
+            'seven_up_down' => 'nullable|boolean',
             'reason' => 'nullable|string|max:500',
         ]);
 
@@ -355,6 +356,7 @@ class UserAdminController extends Controller
             GameAccessService::GAME_TEEN_PATTI => (bool) ($data['teen_patti'] ?? false),
             GameAccessService::GAME_GREEDY => (bool) ($data['greedy'] ?? false),
             GameAccessService::GAME_FORTUNE_WHEEL => (bool) ($data['fortune_wheel'] ?? false),
+            GameAccessService::GAME_SEVEN_UP_DOWN => (bool) ($data['seven_up_down'] ?? false),
         ], $request->user());
 
         $this->audits->log(

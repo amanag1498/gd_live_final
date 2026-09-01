@@ -1,0 +1,176 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\SevenUpDownBet;
+use App\Models\SevenUpDownFinancialAccount;
+use App\Models\SevenUpDownFinancialLedgerEntry;
+use App\Models\SevenUpDownPayout;
+use App\Models\SevenUpDownRound;
+use App\Models\User;
+use App\Models\UserGameAccess;
+use App\Models\Wallet;
+use App\Services\SevenUpDownService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Role;
+use Tests\TestCase;
+
+class SevenUpDownGameTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config()->set('games.seven_up_down.enabled', true);
+        config()->set('app_features.platform.android.seven_up_down_enabled', true);
+        config()->set('games.seven_up_down.min_bet', 10);
+        config()->set('games.seven_up_down.max_bet', 5000);
+        config()->set('games.seven_up_down.multiplier_down', 3);
+        config()->set('games.seven_up_down.multiplier_seven', 4);
+        config()->set('games.seven_up_down.multiplier_up', 3);
+        config()->set('games.seven_up_down.winning_strategy_mode', 'highest_bet');
+        Role::findOrCreate('admin', 'web');
+    }
+
+    public function test_retried_bet_is_debited_and_allocated_only_once(): void
+    {
+        $user = $this->fundedUser();
+        $this->openRound();
+        $service = app(SevenUpDownService::class);
+
+        $first = $service->placeBet($user, 'DOWN', 100, 'sud-idempotent');
+        $second = $service->placeBet($user, 'DOWN', 100, 'sud-idempotent');
+
+        $this->assertFalse($first['already_processed']);
+        $this->assertTrue($second['already_processed']);
+        $this->assertSame(900, (int) Wallet::query()->where('user_id', $user->id)->value('balance'));
+        $this->assertSame(1, SevenUpDownBet::query()->count());
+        $this->assertSame(1, SevenUpDownFinancialLedgerEntry::query()->where('event_type', 'bet_allocation')->count());
+    }
+
+    public function test_settlement_persists_matching_dice_and_credits_snapshotted_multiplier_once(): void
+    {
+        $user = $this->fundedUser();
+        $round = $this->openRound();
+        $service = app(SevenUpDownService::class);
+        $service->placeBet($user, 'SEVEN', 100, 'sud-seven');
+
+        config()->set('games.seven_up_down.multiplier_seven', 9);
+        $round->forceFill(['locks_at' => now()->subSeconds(2), 'ends_at' => now()->subSecond()])->save();
+        $settled = $service->settleRound($round->fresh());
+        $service->settleRound($settled->fresh());
+
+        $this->assertSame('SEVEN', $settled->winning_pot);
+        $this->assertSame(7, (int) $settled->dice_total);
+        $this->assertSame((int) $settled->dice_total, (int) $settled->dice_one + (int) $settled->dice_two);
+        $this->assertSame(4, (int) $settled->winning_multiplier);
+        $this->assertSame(1300, (int) Wallet::query()->where('user_id', $user->id)->value('balance'));
+        $this->assertSame(1, SevenUpDownPayout::query()->count());
+        $this->assertSame(1, SevenUpDownFinancialLedgerEntry::query()->where('event_type', 'payout_debit')->count());
+    }
+
+    public function test_every_settled_dice_result_matches_its_winning_pot(): void
+    {
+        foreach (['DOWN', 'SEVEN', 'UP'] as $pot) {
+            $user = $this->fundedUser();
+            $round = $this->openRound();
+            $service = app(SevenUpDownService::class);
+            $service->placeBet($user, $pot, 100, 'sud-'.$pot);
+            $round->forceFill(['locks_at' => now()->subSeconds(2), 'ends_at' => now()->subSecond()])->save();
+            $settled = $service->settleRound($round->fresh());
+
+            $this->assertSame($pot, $settled->winning_pot);
+            $this->assertContains((int) $settled->dice_one, range(1, 6));
+            $this->assertContains((int) $settled->dice_two, range(1, 6));
+            $this->assertTrue(match ($pot) {
+                'DOWN' => (int) $settled->dice_total < 7,
+                'SEVEN' => (int) $settled->dice_total === 7,
+                'UP' => (int) $settled->dice_total > 7,
+            });
+        }
+    }
+
+    public function test_refund_restores_wallet_and_reverses_financial_allocation(): void
+    {
+        $user = $this->fundedUser();
+        $this->openRound();
+        $service = app(SevenUpDownService::class);
+        $result = $service->placeBet($user, 'UP', 50, 'sud-refund');
+
+        $service->refundBet(SevenUpDownBet::query()->findOrFail($result['bet']['id']), 'test');
+
+        $account = SevenUpDownFinancialAccount::query()->where('game_key', 'seven_up_down')->firstOrFail();
+        $this->assertSame(1000, (int) Wallet::query()->where('user_id', $user->id)->value('balance'));
+        $this->assertSame(0, (int) $account->treasury_balance_coins);
+        $this->assertSame(0, (int) $account->company_commission_balance_coins);
+        $this->assertSame(1, SevenUpDownFinancialLedgerEntry::query()->where('event_type', 'bet_refund_reversal')->count());
+    }
+
+    public function test_admin_can_open_game_dashboard_and_settings_surface(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+
+        $this->actingAs($admin)
+            ->get(route('admin.games.seven-up-down.dashboard'))
+            ->assertOk()
+            ->assertSee('Lucky 7')
+            ->assertSee('Financial Audit Ledger');
+
+        $this->actingAs($admin)
+            ->get(route('admin.settings.games.edit', ['game' => 'seven_up_down']))
+            ->assertOk()
+            ->assertSee('Lucky 7')
+            ->assertSee('Exact 7 Multiplier');
+    }
+
+    public function test_api_requires_explicit_game_access(): void
+    {
+        $user = $this->fundedUser();
+        Sanctum::actingAs($user);
+
+        $this->getJson('/api/games/seven-up-down')
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Lucky 7 is locked for this user.');
+
+        UserGameAccess::query()->create([
+            'user_id' => $user->id,
+            'game_key' => 'seven_up_down',
+        ]);
+
+        $this->getJson('/api/games/seven-up-down')
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('data.settings.display_name', 'Lucky 7')
+            ->assertJsonPath('data.settings.rules.SEVEN.dice_combinations', 6)
+            ->assertJsonPath('data.settings.rules.payout_type', 'total_return_including_stake')
+            ->assertJsonPath('data.settings.pot_multipliers.SEVEN', 4);
+    }
+
+    private function fundedUser(): User
+    {
+        $user = User::factory()->create();
+        Wallet::query()->where('user_id', $user->id)->update(['balance' => 1000]);
+
+        return $user;
+    }
+
+    private function openRound(): SevenUpDownRound
+    {
+        return SevenUpDownRound::query()->create([
+            'round_key' => 'sud_'.str()->lower(str()->ulid()),
+            'status' => 'open',
+            'starts_at' => now()->subSecond(),
+            'locks_at' => now()->addMinute(),
+            'ends_at' => now()->addSeconds(65),
+            'meta' => [
+                'display_until' => now()->addSeconds(71)->toIso8601String(),
+                'pot_multipliers' => ['DOWN' => 3, 'SEVEN' => 4, 'UP' => 3],
+                'outcome_weights' => ['DOWN' => 15, 'SEVEN' => 6, 'UP' => 15],
+            ],
+        ]);
+    }
+}

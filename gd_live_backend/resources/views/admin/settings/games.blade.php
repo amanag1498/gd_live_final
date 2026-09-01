@@ -3,7 +3,7 @@
 
 @php
   $selectedGame = request('game', 'teen_patti');
-  if (!in_array($selectedGame, ['teen_patti', 'greedy', 'fortune_wheel'], true)) {
+  if (!in_array($selectedGame, ['teen_patti', 'greedy', 'seven_up_down', 'fortune_wheel'], true)) {
     $selectedGame = 'teen_patti';
   }
 
@@ -19,6 +19,12 @@
       'subtitle' => 'Spinner timing, fake bets, weighted pots, multipliers, and sector distribution.',
       'dashboard_route' => 'admin.games.greedy.dashboard',
       'settings_route' => route('admin.settings.games.edit', ['game' => 'greedy']),
+    ],
+    'seven_up_down' => [
+      'label' => 'Lucky 7',
+      'subtitle' => 'Three dice-total pots, backend dice results, timing, multipliers, and outcome strategy.',
+      'dashboard_route' => 'admin.games.seven-up-down.dashboard',
+      'settings_route' => route('admin.settings.games.edit', ['game' => 'seven_up_down']),
     ],
     'fortune_wheel' => [
       'label' => 'Fortune Wheel',
@@ -63,11 +69,12 @@
             <x-ui.badge color="brand">Games</x-ui.badge>
           </div>
           <h2 class="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">Game Settings</h2>
-          <p class="mt-3 text-sm text-gray-600 dark:text-gray-300">Separate control surfaces for Teen Patti, Greedy, and Fortune Wheel. Keep round engines, spin rewards, fake bets, timing, and payout controls isolated.</p>
+          <p class="mt-3 text-sm text-gray-600 dark:text-gray-300">Separate control surfaces for Teen Patti, Greedy, Lucky 7, and Fortune Wheel. Keep every engine, timing, and payout control isolated.</p>
         </div>
         <div class="flex flex-wrap gap-2">
           <x-ui.button variant="outline" size="sm" href="{{ route('admin.games.teen-patti.dashboard') }}">Teen Patti Dashboard</x-ui.button>
           <x-ui.button variant="outline" size="sm" href="{{ route('admin.games.greedy.dashboard') }}">Greedy Dashboard</x-ui.button>
+          <x-ui.button variant="outline" size="sm" href="{{ route('admin.games.seven-up-down.dashboard') }}">Lucky 7 Dashboard</x-ui.button>
           <x-ui.button variant="outline" size="sm" href="{{ route('admin.games.fortune-wheel.dashboard') }}">Fortune Wheel Dashboard</x-ui.button>
         </div>
       </div>

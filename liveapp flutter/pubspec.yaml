@@ -167,4 +167,5 @@ flutter:
     - lib/modules/home/views/
     - assets/games/teen_patti/
     - assets/games/fortune_wheel/
+    - assets/games/seven_up_down/
     - assets/logos/

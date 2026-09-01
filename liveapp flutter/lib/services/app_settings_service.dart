@@ -165,6 +165,8 @@ class AppSettingsService extends GetxService with WidgetsBindingObserver {
   bool get greedyEnabled => payload.value?.features.greedyEnabled ?? false;
   bool get fortuneWheelEnabled =>
       payload.value?.features.fortuneWheelEnabled ?? false;
+  bool get sevenUpDownEnabled =>
+      payload.value?.features.sevenUpDownEnabled ?? false;
   bool get videoRoomGamesEnabled =>
       payload.value?.features.videoRoomGamesEnabled ?? false;
   bool get anyLiveCreationEnabled => videoRoomsEnabled;
@@ -253,6 +255,7 @@ class AppPlatformFeatureFlags {
     required this.teenPattiEnabled,
     required this.greedyEnabled,
     required this.fortuneWheelEnabled,
+    required this.sevenUpDownEnabled,
     required this.videoRoomGamesEnabled,
   });
 
@@ -267,6 +270,7 @@ class AppPlatformFeatureFlags {
       teenPattiEnabled = false,
       greedyEnabled = false,
       fortuneWheelEnabled = false,
+      sevenUpDownEnabled = false,
       videoRoomGamesEnabled = false;
 
   final bool videoRoomsEnabled;
@@ -279,6 +283,7 @@ class AppPlatformFeatureFlags {
   final bool teenPattiEnabled;
   final bool greedyEnabled;
   final bool fortuneWheelEnabled;
+  final bool sevenUpDownEnabled;
   final bool videoRoomGamesEnabled;
 
   factory AppPlatformFeatureFlags.fromJson(Map<String, dynamic> json) {
@@ -310,6 +315,10 @@ class AppPlatformFeatureFlags {
       greedyEnabled: toBool(json['greedy_enabled'], fallback: false),
       fortuneWheelEnabled: toBool(
         json['fortune_wheel_enabled'],
+        fallback: false,
+      ),
+      sevenUpDownEnabled: toBool(
+        json['seven_up_down_enabled'],
         fallback: false,
       ),
       videoRoomGamesEnabled: toBool(

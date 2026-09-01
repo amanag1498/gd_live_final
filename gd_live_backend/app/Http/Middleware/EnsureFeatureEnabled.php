@@ -29,6 +29,7 @@ class EnsureFeatureEnabled
             'teen_patti_enabled' => GameAccessService::GAME_TEEN_PATTI,
             'greedy_enabled' => GameAccessService::GAME_GREEDY,
             'fortune_wheel_enabled' => GameAccessService::GAME_FORTUNE_WHEEL,
+            'seven_up_down_enabled' => GameAccessService::GAME_SEVEN_UP_DOWN,
             default => null,
         };
 
@@ -61,6 +62,7 @@ class EnsureFeatureEnabled
             'teen_patti_enabled' => 'Teen Patti is currently unavailable.',
             'greedy_enabled' => 'Greedy is currently unavailable.',
             'fortune_wheel_enabled' => 'Fortune Wheel is currently unavailable.',
+            'seven_up_down_enabled' => 'Lucky 7 is currently unavailable.',
             'video_room_games_enabled' => 'Video room games are currently unavailable.',
             default => 'This feature is currently unavailable.',
         };
@@ -72,6 +74,7 @@ class EnsureFeatureEnabled
             'teen_patti_enabled' => 'Teen Patti is locked for this user.',
             'greedy_enabled' => 'Greedy is locked for this user.',
             'fortune_wheel_enabled' => 'Fortune Wheel is locked for this user.',
+            'seven_up_down_enabled' => 'Lucky 7 is locked for this user.',
             default => $this->messageFor($featureKey),
         };
     }

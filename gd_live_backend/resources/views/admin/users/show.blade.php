@@ -201,6 +201,18 @@
               </label>
             </div>
           </div>
+          <div class="{{ $surfaceClass }}">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <div class="text-sm font-semibold text-gray-900 dark:text-white">Lucky 7</div>
+                <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">Unlock dice game access for user #{{ $user->id }}</div>
+              </div>
+              <label class="inline-flex items-center gap-3">
+                <input type="hidden" name="seven_up_down" value="0">
+                <input class="h-5 w-5 rounded border-gray-300 text-brand-500 focus:ring-brand-500/30 dark:border-gray-700 dark:bg-gray-900" type="checkbox" name="seven_up_down" value="1" @checked($gameAccessMap['seven_up_down'] ?? false)>
+              </label>
+            </div>
+          </div>
           <div>
             <label class="{{ $labelClass }}">Reason</label>
             <input type="text" name="reason" class="{{ $inputClass }}" placeholder="Reason for access change">

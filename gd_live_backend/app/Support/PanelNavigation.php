@@ -79,6 +79,7 @@ class PanelNavigation
                 'items' => [
                     self::item('Teen Patti', 'admin.games.teen-patti.dashboard', 'gamepad', ['admin.games.teen-patti.*']),
                     self::item('Greedy', 'admin.games.greedy.dashboard', 'gamepad', ['admin.games.greedy.*']),
+                    self::item('Lucky 7', 'admin.games.seven-up-down.dashboard', 'gamepad', ['admin.games.seven-up-down.*']),
                     self::item('Fortune Wheel', 'admin.games.fortune-wheel.dashboard', 'gamepad', ['admin.games.fortune-wheel.*']),
                 ],
             ],

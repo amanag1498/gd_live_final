@@ -13,12 +13,15 @@ class GameAccessService
 
     public const GAME_FORTUNE_WHEEL = 'fortune_wheel';
 
+    public const GAME_SEVEN_UP_DOWN = 'seven_up_down';
+
     public function supportedGames(): array
     {
         return [
             self::GAME_TEEN_PATTI,
             self::GAME_GREEDY,
             self::GAME_FORTUNE_WHEEL,
+            self::GAME_SEVEN_UP_DOWN,
         ];
     }
 

@@ -15,6 +15,7 @@ import '../../../../services/app_settings_service.dart';
 import '../../../../services/storage_service.dart';
 import '../../fortune_wheel/services/fortune_wheel_preload_service.dart';
 import '../../greedy/widgets/greedy_game_panel.dart';
+import '../../seven_up_down/widgets/seven_up_down_game_panel.dart';
 import '../../../wallet/widgets/recharge_bottom_sheet.dart';
 import '../models/teen_patti_models.dart';
 import '../services/teen_patti_api.dart';
@@ -75,6 +76,8 @@ class _TeenPattiGamesSheetState extends State<TeenPattiGamesSheet> {
                         ? const TeenPattiGamePanel()
                         : _selectedGame == 'greedy'
                         ? const GreedyGamePanel()
+                        : _selectedGame == 'seven_up_down'
+                        ? const SevenUpDownGamePanel()
                         : _GamesList(
                           onOpenTeenPatti: () {
                             setState(() => _selectedGame = 'teen_patti');
@@ -82,10 +85,13 @@ class _TeenPattiGamesSheetState extends State<TeenPattiGamesSheet> {
                           onOpenGreedy: () {
                             setState(() => _selectedGame = 'greedy');
                           },
+                          onOpenSevenUpDown: () {
+                            setState(() => _selectedGame = 'seven_up_down');
+                          },
                           onOpenFortuneWheel: () {
-                            Navigator.of(context).pop(
-                              LiveRoomGamesSheetResult.fortuneWheel,
-                            );
+                            Navigator.of(
+                              context,
+                            ).pop(LiveRoomGamesSheetResult.fortuneWheel);
                           },
                         ),
               ),
@@ -151,11 +157,13 @@ class _GamesList extends StatelessWidget {
   const _GamesList({
     required this.onOpenTeenPatti,
     required this.onOpenGreedy,
+    required this.onOpenSevenUpDown,
     required this.onOpenFortuneWheel,
   });
 
   final VoidCallback onOpenTeenPatti;
   final VoidCallback onOpenGreedy;
+  final VoidCallback onOpenSevenUpDown;
   final VoidCallback onOpenFortuneWheel;
 
   @override
@@ -170,6 +178,7 @@ class _GamesList extends StatelessWidget {
       settings.payload.value;
       final showTeenPatti = settings.teenPattiEnabled;
       final showGreedy = settings.greedyEnabled;
+      final showSevenUpDown = settings.sevenUpDownEnabled;
       final showFortuneWheel = settings.fortuneWheelEnabled;
       final snapshot = fortune?.snapshot.value;
       final freeSpins = snapshot?.freeSpinsRemaining ?? 0;
@@ -223,7 +232,52 @@ class _GamesList extends StatelessWidget {
               ),
               onTap: onOpenGreedy,
             ),
-          if ((showTeenPatti || showGreedy) && showFortuneWheel)
+          if ((showTeenPatti || showGreedy) && showSevenUpDown)
+            const SizedBox(height: 14),
+          if (showSevenUpDown)
+            _GameEntryCard(
+              title: 'Lucky 7',
+              description:
+                  'Pick totals 2–6, exact 7, or 8–12 and watch two backend-verified dice land on the round result.',
+              chip: 'LIVE DICE',
+              accent: const Color(0xFFFFC94A),
+              icon: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Image.asset(
+                      'assets/games/seven_up_down/table_background.png',
+                      width: 76,
+                      height: 76,
+                      fit: BoxFit.cover,
+                    ),
+                    Container(
+                      width: 76,
+                      height: 76,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: .48),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const Icon(
+                      Icons.casino_rounded,
+                      color: Colors.white,
+                      size: 40,
+                    ),
+                  ],
+                ),
+              ),
+              onTap: onOpenSevenUpDown,
+            ),
+          if ((showTeenPatti || showGreedy || showSevenUpDown) &&
+              showFortuneWheel)
             const SizedBox(height: 14),
           if (showFortuneWheel)
             _GameEntryCard(
