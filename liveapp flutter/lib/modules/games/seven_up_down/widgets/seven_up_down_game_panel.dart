@@ -297,6 +297,7 @@ class _SevenUpDownGamePanelState extends State<SevenUpDownGamePanel>
     }
     if (_selectedChip > snapshot.walletBalance) {
       await showRechargeWalletSheet(
+        context: context,
         reasonMessage: 'You need more coins to place this Lucky 7 bet.',
       );
       return;
@@ -1111,79 +1112,87 @@ class _SevenUpDownGamePanelState extends State<SevenUpDownGamePanel>
           border: Border.all(color: Colors.white.withValues(alpha: .12)),
           borderRadius: BorderRadius.circular(17),
         ),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 1),
-          childrenPadding: const EdgeInsets.fromLTRB(13, 0, 13, 13),
-          iconColor: const Color(0xFFFFD45E),
-          collapsedIconColor: Colors.white54,
-          title: const Text(
-            'HOW LUCKY 7 WORKS',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              letterSpacing: .7,
+        child: Material(
+          type: MaterialType.transparency,
+          borderRadius: BorderRadius.circular(17),
+          clipBehavior: Clip.antiAlias,
+          child: ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(
+              horizontal: 13,
+              vertical: 1,
             ),
-          ),
-          subtitle: Text(
-            totalStake > 0
-                ? 'Your current-round stake: $totalStake coins'
-                : 'Rules, returns and settlement details',
-            style: const TextStyle(color: Colors.white54, fontSize: 10),
-          ),
-          children: [
-            _ruleRow(
-              color: _potColors['DOWN']!,
-              title:
-                  '7 Down · totals ${rules['DOWN']!.minTotal}–${rules['DOWN']!.maxTotal}',
-              detail:
-                  '${rules['DOWN']!.diceCombinations} dice combinations · ${round.multipliers['DOWN'] ?? 0}x total return',
-            ),
-            _ruleRow(
-              color: _potColors['SEVEN']!,
-              title: 'Exact 7 · total ${rules['SEVEN']!.minTotal}',
-              detail:
-                  '${rules['SEVEN']!.diceCombinations} dice combinations · ${round.multipliers['SEVEN'] ?? 0}x total return',
-            ),
-            _ruleRow(
-              color: _potColors['UP']!,
-              title:
-                  '7 Up · totals ${rules['UP']!.minTotal}–${rules['UP']!.maxTotal}',
-              detail:
-                  '${rules['UP']!.diceCombinations} dice combinations · ${round.multipliers['UP'] ?? 0}x total return',
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Select a chip and tap a pot before the timer locks. A multiplier is the total amount returned for a winning bet, including its stake. The server stores both dice before this app animates them; wallet payouts are credited during settlement and protected against duplicate processing.',
+            childrenPadding: const EdgeInsets.fromLTRB(13, 0, 13, 13),
+            iconColor: const Color(0xFFFFD45E),
+            collapsedIconColor: Colors.white54,
+            title: const Text(
+              'HOW LUCKY 7 WORKS',
               style: TextStyle(
-                color: Colors.white60,
-                fontSize: 10,
-                height: 1.45,
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                letterSpacing: .7,
               ),
             ),
-            const SizedBox(height: 7),
-            Row(
-              children: [
-                const Icon(
-                  Icons.verified_user_rounded,
-                  color: Color(0xFF72F1C4),
-                  size: 14,
+            subtitle: Text(
+              totalStake > 0
+                  ? 'Your current-round stake: $totalStake coins'
+                  : 'Rules, returns and settlement details',
+              style: const TextStyle(color: Colors.white54, fontSize: 10),
+            ),
+            children: [
+              _ruleRow(
+                color: _potColors['DOWN']!,
+                title:
+                    '7 Down · totals ${rules['DOWN']!.minTotal}–${rules['DOWN']!.maxTotal}',
+                detail:
+                    '${rules['DOWN']!.diceCombinations} dice combinations · ${round.multipliers['DOWN'] ?? 0}x total return',
+              ),
+              _ruleRow(
+                color: _potColors['SEVEN']!,
+                title: 'Exact 7 · total ${rules['SEVEN']!.minTotal}',
+                detail:
+                    '${rules['SEVEN']!.diceCombinations} dice combinations · ${round.multipliers['SEVEN'] ?? 0}x total return',
+              ),
+              _ruleRow(
+                color: _potColors['UP']!,
+                title:
+                    '7 Up · totals ${rules['UP']!.minTotal}–${rules['UP']!.maxTotal}',
+                detail:
+                    '${rules['UP']!.diceCombinations} dice combinations · ${round.multipliers['UP'] ?? 0}x total return',
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Select a chip and tap a pot before the timer locks. A multiplier is the total amount returned for a winning bet, including its stake. The server stores both dice before this app animates them; wallet payouts are credited during settlement and protected against duplicate processing.',
+                style: TextStyle(
+                  color: Colors.white60,
+                  fontSize: 10,
+                  height: 1.45,
                 ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Round ${round.id} · ${round.roundKey}',
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF72F1C4),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
+              ),
+              const SizedBox(height: 7),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.verified_user_rounded,
+                    color: Color(0xFF72F1C4),
+                    size: 14,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Round ${round.id} · ${round.roundKey}',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF72F1C4),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

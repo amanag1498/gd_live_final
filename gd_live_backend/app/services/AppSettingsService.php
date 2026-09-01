@@ -732,9 +732,31 @@ class AppSettingsService
 
     public function platformFeatureFlags(string $platform, ?User $user = null): array
     {
-        $platform = $this->normalizeClientPlatform($platform);
         $games = app(GameAccessService::class);
-        $access = $games->userAccessMap($user);
+        return $this->platformFeatureFlagsForAccess(
+            $platform,
+            $games->userAccessMap($user),
+        );
+    }
+
+    public function websocketServerPayload(): array
+    {
+        $payload = $this->publicAppPayload();
+        $games = app(GameAccessService::class);
+        $globalAccess = array_fill_keys($games->supportedGames(), true);
+
+        foreach (['android', 'ios'] as $platform) {
+            $payload['platforms'][$platform]['features'] =
+                $this->platformFeatureFlagsForAccess($platform, $globalAccess);
+        }
+        $payload['features'] = $payload['platforms']['android']['features'];
+
+        return $payload;
+    }
+
+    private function platformFeatureFlagsForAccess(string $platform, array $access): array
+    {
+        $platform = $this->normalizeClientPlatform($platform);
         $prefix = "app_features.platform.{$platform}";
         $teenPattiEnabled = (bool) config("{$prefix}.teen_patti_enabled", false)
             && (bool) ($access[GameAccessService::GAME_TEEN_PATTI] ?? false);

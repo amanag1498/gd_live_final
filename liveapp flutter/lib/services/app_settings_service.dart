@@ -40,6 +40,7 @@ class AppSettingsService extends GetxService with WidgetsBindingObserver {
   final RxString currentBrandKey = kDefaultBrandKey.obs;
 
   bool _activitySyncInFlight = false;
+  Future<void>? _refreshInFlight;
 
   Future<void> initialize() async {
     WidgetsBinding.instance.addObserver(this);
@@ -71,8 +72,22 @@ class AppSettingsService extends GetxService with WidgetsBindingObserver {
     }
   }
 
-  Future<void> refresh() async {
-    if (loading.value) return;
+  Future<void> refresh() {
+    final inFlight = _refreshInFlight;
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    final refresh = _performRefresh();
+    _refreshInFlight = refresh;
+    return refresh.whenComplete(() {
+      if (identical(_refreshInFlight, refresh)) {
+        _refreshInFlight = null;
+      }
+    });
+  }
+
+  Future<void> _performRefresh() async {
     loading.value = true;
     error.value = null;
     try {
@@ -174,8 +189,13 @@ class AppSettingsService extends GetxService with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(syncDailyActivity());
+      unawaited(_refreshAfterResume());
     }
+  }
+
+  Future<void> _refreshAfterResume() async {
+    await refresh();
+    await syncDailyActivity();
   }
 }
 

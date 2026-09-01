@@ -207,7 +207,9 @@ async function getAppConfig(force = false) {
   }
 
   try {
-    const { data } = await api.get('/app-config');
+    const { data } = await api.get('/ws/app-config', {
+      headers: internalApiHeaders(),
+    });
     appConfigCache = {
       fetchedAt: now,
       data: normalizeAppConfig(data?.data),
@@ -444,6 +446,9 @@ async function verifyUserFromLaravel(token, socket = null) {
       level: Number.isFinite(Number(data.level)) ? Number(data.level) : null,
       is_vip: !!data.is_vip,
       roles: Array.isArray(data.roles) ? data.roles : [],
+      game_access: data.game_access && typeof data.game_access === 'object'
+        ? data.game_access
+        : {},
     };
     verifiedUserCache.set(cacheKey, {
       user,
@@ -594,9 +599,9 @@ function makeAuthMiddleware(_namespaceName) {
       }
 
       if (_namespaceName === '/games'
-        && !featureEnabled('teen_patti_enabled', clientPlatform)
-        && !featureEnabled('greedy_enabled', clientPlatform)
-        && !featureEnabled('seven_up_down_enabled', clientPlatform)) {
+        && !(featureEnabled('teen_patti_enabled', clientPlatform) && user.game_access?.teen_patti)
+        && !(featureEnabled('greedy_enabled', clientPlatform) && user.game_access?.greedy)
+        && !(featureEnabled('seven_up_down_enabled', clientPlatform) && user.game_access?.seven_up_down)) {
         return next(new Error('games_disabled'));
       }
 
@@ -2211,7 +2216,8 @@ gamesNs.on('connection', (socket) => {
 
   socket.on('games:teen_patti:subscribe', async () => {
     await getAppConfig();
-    if (!featureEnabled('teen_patti_enabled', socket.clientPlatform)) {
+    if (!featureEnabled('teen_patti_enabled', socket.clientPlatform)
+      || !socket.user?.game_access?.teen_patti) {
       socket.emit('feature:error', featureErrorPayload(
         'TEEN_PATTI_DISABLED',
         'Teen Patti is currently unavailable.',
@@ -2232,7 +2238,8 @@ gamesNs.on('connection', (socket) => {
 
   socket.on('games:greedy:subscribe', async () => {
     await getAppConfig();
-    if (!featureEnabled('greedy_enabled', socket.clientPlatform)) {
+    if (!featureEnabled('greedy_enabled', socket.clientPlatform)
+      || !socket.user?.game_access?.greedy) {
       socket.emit('feature:error', featureErrorPayload(
         'GREEDY_DISABLED',
         'Greedy is currently unavailable.',
@@ -2253,7 +2260,8 @@ gamesNs.on('connection', (socket) => {
 
   socket.on('games:seven_up_down:subscribe', async () => {
     await getAppConfig();
-    if (!featureEnabled('seven_up_down_enabled', socket.clientPlatform)) {
+    if (!featureEnabled('seven_up_down_enabled', socket.clientPlatform)
+      || !socket.user?.game_access?.seven_up_down) {
       socket.emit('feature:error', featureErrorPayload(
         'SEVEN_UP_DOWN_DISABLED',
         'Lucky 7 is currently unavailable.',

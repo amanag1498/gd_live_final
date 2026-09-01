@@ -179,6 +179,7 @@ class _VideoCallPageState extends State<VideoCallPage>
   bool _handlingBackNavigation = false;
   bool _gameSurfaceOpen = false;
   bool _audioRouteSyncInFlight = false;
+  Worker? _appSettingsWorker;
 
   final _emojiKey = GlobalKey<_EmojiBurstState>();
 
@@ -197,7 +198,23 @@ class _VideoCallPageState extends State<VideoCallPage>
     );
     _micOn = widget.initialMicOn;
     _camOn = widget.initialCamOn;
+    _appSettingsWorker = ever<AppSettingsPayload?>(
+      Get.find<AppSettingsService>().payload,
+      (_) {
+        if (mounted) {
+          setState(() {});
+        }
+      },
+    );
+    unawaited(_refreshRoomGameAvailability());
     _bootstrap();
+  }
+
+  Future<void> _refreshRoomGameAvailability() async {
+    await Get.find<AppSettingsService>().refresh();
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Map<String, dynamic> _buildDevPkBattlePayload({
@@ -497,6 +514,7 @@ class _VideoCallPageState extends State<VideoCallPage>
 
   @override
   void dispose() {
+    _appSettingsWorker?.dispose();
     Get.find<AppCallController>().clearCurrentLiveRoomContext();
     if (!_endSent) {
       _leaveSessionOnce();
@@ -1910,7 +1928,12 @@ class _VideoCallPageState extends State<VideoCallPage>
   }
 
   Future<void> _openGamesSheet() async {
-    if (_gameSurfaceOpen || !_showTeenPattiInVideoRoom) {
+    if (_gameSurfaceOpen) {
+      return;
+    }
+
+    await _refreshRoomGameAvailability();
+    if (!mounted || !_showTeenPattiInVideoRoom) {
       return;
     }
 

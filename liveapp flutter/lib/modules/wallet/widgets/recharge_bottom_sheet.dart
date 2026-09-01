@@ -28,9 +28,44 @@ bool isInsufficientCoinsErrorMessage(String message) {
 }
 
 Future<void> showRechargeWalletSheet({
+  BuildContext? context,
   String? reasonTitle,
   String? reasonMessage,
 }) async {
+  if (context != null) {
+    if (!Get.find<AppSettingsService>().walletRechargeEnabled) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(
+            reasonMessage ?? 'Wallet recharge is currently unavailable.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (reasonMessage != null && reasonMessage.trim().isNotEmpty) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(reasonMessage.trim()),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+
+    await Future<void>.delayed(const Duration(milliseconds: 160));
+    if (!context.mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const RechargeBottomSheet(),
+    );
+    return;
+  }
+
   if (!Get.find<AppSettingsService>().walletRechargeEnabled) {
     final fallback =
         reasonMessage ?? 'Wallet recharge is currently unavailable.';

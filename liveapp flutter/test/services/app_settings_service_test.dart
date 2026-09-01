@@ -71,5 +71,17 @@ void main() {
 
       expect(payload.features.walletRechargeEnabled, isTrue);
     });
+
+    test('reads Lucky 7 and video-room game availability', () {
+      final payload = AppSettingsPayload.fromJson({
+        'features': const <String, dynamic>{
+          'seven_up_down_enabled': true,
+          'video_room_games_enabled': true,
+        },
+      });
+
+      expect(payload.features.sevenUpDownEnabled, isTrue);
+      expect(payload.features.videoRoomGamesEnabled, isTrue);
+    });
   });
 }

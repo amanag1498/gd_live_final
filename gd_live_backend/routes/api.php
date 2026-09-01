@@ -260,7 +260,21 @@ Route::middleware('auth:sanctum')->get('/ws/verify', function (\Illuminate\Http\
         'level' => $u->level?->level !== null ? (int) $u->level->level : null,
         'is_vip' => $isVip,
         'roles' => method_exists($u, 'getRoleNames') ? $u->getRoleNames()->values()->all() : [],
+        'game_access' => app(\App\Services\GameAccessService::class)->userAccessMap($u),
     ];
+});
+Route::middleware('throttle:240,1')->get('/ws/app-config', function (Request $request, AppSettingsService $settings) {
+    $expected = trim((string) config('services.websocket.internal_key', ''));
+    $provided = trim((string) $request->header('X-WS-Internal-Key', ''));
+
+    if ($expected !== '') {
+        abort_unless(hash_equals($expected, $provided), 403);
+    }
+
+    return response()->json([
+        'ok' => true,
+        'data' => $settings->websocketServerPayload(),
+    ]);
 });
 Route::middleware('auth:sanctum')->post('/ws/rooms/join-check', [WsModerationController::class, 'joinCheck']);
 Route::middleware('auth:sanctum')->post('/ws/rooms/chat-check', [WsModerationController::class, 'chatCheck']);

@@ -331,6 +331,80 @@ class AppFeatureFlagEnforcementTest extends TestCase
             ->assertJsonPath('data.features.fortune_wheel_enabled', false);
     }
 
+    public function test_app_config_exposes_lucky_7_only_when_all_room_visibility_gates_are_enabled(): void
+    {
+        Sanctum::actingAs($this->member);
+
+        config([
+            'app_features.platform.android.video_room_games_enabled' => true,
+            'app_features.platform.android.seven_up_down_enabled' => true,
+            'games.seven_up_down.enabled' => true,
+            'games.seven_up_down.visible_in_video_room_strip' => true,
+        ]);
+
+        $this->withHeaders($this->androidHeaders())
+            ->getJson('/api/app-config')
+            ->assertOk()
+            ->assertJsonPath('data.features.seven_up_down_enabled', false);
+
+        UserGameAccess::query()->create([
+            'user_id' => $this->member->id,
+            'game_key' => GameAccessService::GAME_SEVEN_UP_DOWN,
+            'granted_by' => $this->admin->id,
+        ]);
+
+        $this->withHeaders($this->androidHeaders())
+            ->getJson('/api/app-config')
+            ->assertOk()
+            ->assertJsonPath('data.features.seven_up_down_enabled', true)
+            ->assertJsonPath('data.features.video_room_games_enabled', true);
+
+        config(['games.seven_up_down.visible_in_video_room_strip' => false]);
+
+        $this->withHeaders($this->androidHeaders())
+            ->getJson('/api/app-config')
+            ->assertOk()
+            ->assertJsonPath('data.features.seven_up_down_enabled', false);
+    }
+
+    public function test_realtime_server_config_uses_global_game_flags_while_verify_exposes_user_access(): void
+    {
+        config([
+            'services.websocket.internal_key' => 'test-internal-key',
+            'app_features.platform.android.video_room_games_enabled' => true,
+            'app_features.platform.android.seven_up_down_enabled' => true,
+            'games.seven_up_down.enabled' => true,
+            'games.seven_up_down.visible_in_video_room_strip' => true,
+        ]);
+
+        try {
+            $this->withHeaders(['X-WS-Internal-Key' => 'wrong-key'])
+                ->getJson('/api/ws/app-config')
+                ->assertForbidden();
+
+            $this->withHeaders(['X-WS-Internal-Key' => 'test-internal-key'])
+                ->getJson('/api/ws/app-config')
+                ->assertOk()
+                ->assertJsonPath('data.platforms.android.features.seven_up_down_enabled', true)
+                ->assertJsonPath('data.platforms.android.features.video_room_games_enabled', true);
+
+            UserGameAccess::query()->create([
+                'user_id' => $this->member->id,
+                'game_key' => GameAccessService::GAME_SEVEN_UP_DOWN,
+                'granted_by' => $this->admin->id,
+            ]);
+
+            Sanctum::actingAs($this->member);
+            $this->withHeaders(['X-WS-Internal-Key' => 'test-internal-key'])
+                ->getJson('/api/ws/verify')
+                ->assertOk()
+                ->assertJsonPath('game_access.seven_up_down', true)
+                ->assertJsonPath('game_access.teen_patti', false);
+        } finally {
+            config(['services.websocket.internal_key' => '']);
+        }
+    }
+
     public function test_invalid_app_settings_values_are_rejected(): void
     {
         $payload = $this->validAppSettingsPayload();
