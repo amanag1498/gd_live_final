@@ -15,6 +15,7 @@ use Database\Seeders\EntryPackSeeder;
 use Database\Seeders\FortuneWheelSeeder;
 use Database\Seeders\SubscriptionPlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -202,6 +203,47 @@ class FortuneWheelAdminTest extends TestCase
 
         $response->assertRedirect(route('admin.games.fortune-wheel.dashboard'))
             ->assertSessionHasErrors('date_to');
+    }
+
+    public function test_dashboard_payload_uses_a_bounded_index_friendly_query_plan(): void
+    {
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-08-26 12:00:00', 'Asia/Kolkata'));
+        config(['games.fortune_wheel.timezone' => 'Asia/Kolkata']);
+        $this->seed([
+            EntryPackSeeder::class,
+            SubscriptionPlanSeeder::class,
+            FortuneWheelSeeder::class,
+        ]);
+
+        $player = User::factory()->create(['name' => 'Performance Player']);
+        $this->spin($player, [
+            'spin_type' => FortuneWheelSpin::TYPE_PAID,
+            'spin_cost_coins' => 50,
+            'reward_type' => FortuneWheelSegment::REWARD_SUBSCRIPTION,
+            'reward_duration_hours' => 24,
+            'spun_for_date' => '2026-08-26',
+        ]);
+
+        $queries = [];
+        DB::listen(function ($query) use (&$queries): void {
+            $queries[] = $query->sql;
+        });
+
+        $payload = app(FortuneWheelService::class)->adminDashboardPayload([
+            'period' => 'week',
+            'date_from' => '2026-08-24',
+            'date_to' => '2026-08-26',
+            'q' => '',
+            'spin_type' => '',
+            'reward_type' => '',
+            'per_page' => 25,
+        ]);
+
+        $this->assertLessThanOrEqual(14, count($queries));
+        $this->assertSame(1, data_get($payload, 'spin_audit.summary.total_spins'));
+        $this->assertFalse(collect($queries)->contains(
+            fn (string $sql): bool => str_contains(strtolower($sql), "strftime('%y-%m-%d', \"spun_for_date\")"),
+        ));
     }
 
     private function coinSegment(string $label, int $coins, int $weight = 1): FortuneWheelSegment

@@ -126,7 +126,8 @@ class FortuneWheelService
             $spunForDate = $this->spunForDate();
             $freeUsed = FortuneWheelSpin::query()
                 ->where('user_id', $user->id)
-                ->whereDate('spun_for_date', $spunForDate)
+                ->where('spun_for_date', '>=', $spunForDate)
+                ->where('spun_for_date', '<', $this->nextBusinessDate($spunForDate))
                 ->where('spin_type', FortuneWheelSpin::TYPE_FREE)
                 ->lockForUpdate()
                 ->count();
@@ -229,18 +230,15 @@ class FortuneWheelService
     public function adminDashboardPayload(array $filters = []): array
     {
         $today = $this->spunForDate();
-        $todaySpins = FortuneWheelSpin::query()->whereDate('spun_for_date', $today);
         $weekStart = CarbonImmutable::parse($today, $this->timezone())->startOfWeek()->toDateString();
-        $weekSpins = FortuneWheelSpin::query()
-            ->whereDate('spun_for_date', '>=', $weekStart)
-            ->whereDate('spun_for_date', '<=', $today);
-        $paidSpins = (clone $todaySpins)->where('spin_type', FortuneWheelSpin::TYPE_PAID);
         $segments = FortuneWheelSegment::query()
             ->with(['entryPack', 'subscriptionPlan'])
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get();
-        $eligibleSegments = $this->activeSegments()->get();
+        $eligibleSegments = $segments
+            ->filter(fn (FortuneWheelSegment $segment) => $this->segmentIsSelectable($segment))
+            ->values();
         $eligibleSegmentIds = $eligibleSegments->pluck('id')->map(fn ($id) => (int) $id)->values();
         $entryPacks = EntryPack::query()->where('is_active', true)->orderBy('sort_order')->orderBy('id')->get();
         $subscriptionPlans = SubscriptionPlan::query()->where('is_active', true)->orderBy('price_coins')->orderBy('id')->get();
@@ -269,6 +267,9 @@ class FortuneWheelService
 
         $auditQuery = $this->filteredAdminSpinsQuery($filters);
         $auditSummary = $this->aggregateSpinQuery(clone $auditQuery);
+        $periodSummaries = $this->aggregateTodayAndWeek($weekStart, $today);
+        $todaySummary = $periodSummaries['today'];
+        $weekSummary = $periodSummaries['week'];
         $dailyBreakdown = (clone $auditQuery)
             ->selectRaw('spun_for_date')
             ->selectRaw('COUNT(*) as total_spins')
@@ -291,24 +292,45 @@ class FortuneWheelService
                 'summary' => $auditSummary,
                 'daily' => $dailyBreakdown,
                 'spins' => (clone $auditQuery)
-                    ->with(['user', 'segment', 'entryPack', 'subscriptionPlan', 'userEntryPack', 'userSubscription'])
+                    ->select([
+                        'id',
+                        'user_id',
+                        'spin_type',
+                        'spin_cost_coins',
+                        'reward_type',
+                        'reward_value_coins',
+                        'entry_pack_id',
+                        'subscription_plan_id',
+                        'reward_duration_hours',
+                        'user_entry_pack_id',
+                        'user_subscription_id',
+                        'idempotency_key',
+                        'spun_for_date',
+                        'meta',
+                        'created_at',
+                    ])
+                    ->with([
+                        'user:id,name,email',
+                        'entryPack:id,name',
+                        'subscriptionPlan:id,name',
+                    ])
                     ->latest('id')
                     ->paginate((int) ($filters['per_page'] ?? 25))
                     ->withQueryString(),
             ],
             'entitlement_summary' => [
-                'today' => $this->aggregateSpinQuery(clone $todaySpins),
-                'week' => $this->aggregateSpinQuery(clone $weekSpins),
+                'today' => $todaySummary,
+                'week' => $weekSummary,
                 'week_start' => $weekStart,
                 'week_end' => $today,
             ],
             'summary' => [
                 'today' => $today,
-                'spins_today' => (int) (clone $todaySpins)->count(),
-                'free_spins_today' => (int) (clone $todaySpins)->where('spin_type', FortuneWheelSpin::TYPE_FREE)->count(),
-                'paid_spins_today' => (int) (clone $paidSpins)->count(),
-                'coins_collected_today' => (int) (clone $paidSpins)->sum('spin_cost_coins'),
-                'coins_rewarded_today' => (int) (clone $todaySpins)->where('reward_type', FortuneWheelSegment::REWARD_COINS)->sum('reward_value_coins'),
+                'spins_today' => $todaySummary['total_spins'],
+                'free_spins_today' => $todaySummary['free_spins'],
+                'paid_spins_today' => $todaySummary['paid_spins'],
+                'coins_collected_today' => $todaySummary['coins_collected'],
+                'coins_rewarded_today' => $todaySummary['coins_rewarded'],
                 'configured_segments' => $segments->count(),
                 'active_segments' => $activeConfigured->count(),
                 'eligible_segments' => $eligibleSegments->count(),
@@ -344,8 +366,8 @@ class FortuneWheelService
             })
             ->when(! empty($filters['spin_type']), fn (Builder $query) => $query->where('spin_type', $filters['spin_type']))
             ->when(! empty($filters['reward_type']), fn (Builder $query) => $query->where('reward_type', $filters['reward_type']))
-            ->when(! empty($filters['date_from']), fn (Builder $query) => $query->whereDate('spun_for_date', '>=', $filters['date_from']))
-            ->when(! empty($filters['date_to']), fn (Builder $query) => $query->whereDate('spun_for_date', '<=', $filters['date_to']));
+            ->when(! empty($filters['date_from']), fn (Builder $query) => $query->where('spun_for_date', '>=', $filters['date_from']))
+            ->when(! empty($filters['date_to']), fn (Builder $query) => $query->where('spun_for_date', '<', $this->nextBusinessDate($filters['date_to'])));
     }
 
     private function aggregateSpinQuery(Builder $query): array
@@ -363,21 +385,63 @@ class FortuneWheelService
             ->selectRaw("COALESCE(SUM(CASE WHEN reward_type = 'coins' THEN reward_value_coins ELSE 0 END), 0) as coins_rewarded")
             ->first();
 
-        $entryPacks = (int) ($row?->entry_pack_entitlements ?? 0);
-        $subscriptions = (int) ($row?->subscription_entitlements ?? 0);
+        return $this->spinSummaryFromRow($row);
+    }
+
+    private function aggregateTodayAndWeek(string $weekStart, string $today): array
+    {
+        $tomorrow = $this->nextBusinessDate($today);
+        $todayRange = 'spun_for_date >= ? AND spun_for_date < ?';
+        $todayBindings = [$today, $tomorrow];
+        $row = FortuneWheelSpin::query()
+            ->where('spun_for_date', '>=', $weekStart)
+            ->where('spun_for_date', '<', $tomorrow)
+            ->selectRaw('COUNT(*) as week_total_spins')
+            ->selectRaw('COUNT(DISTINCT user_id) as week_unique_players')
+            ->selectRaw("SUM(CASE WHEN spin_type = 'free' THEN 1 ELSE 0 END) as week_free_spins")
+            ->selectRaw("SUM(CASE WHEN spin_type = 'paid' THEN 1 ELSE 0 END) as week_paid_spins")
+            ->selectRaw("SUM(CASE WHEN reward_type = 'entry_pack' AND user_entry_pack_id IS NOT NULL THEN 1 ELSE 0 END) as week_entry_pack_entitlements")
+            ->selectRaw("SUM(CASE WHEN reward_type = 'subscription' AND user_subscription_id IS NOT NULL THEN 1 ELSE 0 END) as week_subscription_entitlements")
+            ->selectRaw("SUM(CASE WHEN (reward_type = 'entry_pack' AND user_entry_pack_id IS NULL) OR (reward_type = 'subscription' AND user_subscription_id IS NULL) THEN 1 ELSE 0 END) as week_entitlement_grant_issues")
+            ->selectRaw('COALESCE(SUM(CASE WHEN user_entry_pack_id IS NOT NULL OR user_subscription_id IS NOT NULL THEN reward_duration_hours ELSE 0 END), 0) as week_entitlement_hours')
+            ->selectRaw('COALESCE(SUM(spin_cost_coins), 0) as week_coins_collected')
+            ->selectRaw("COALESCE(SUM(CASE WHEN reward_type = 'coins' THEN reward_value_coins ELSE 0 END), 0) as week_coins_rewarded")
+            ->selectRaw("SUM(CASE WHEN {$todayRange} THEN 1 ELSE 0 END) as today_total_spins", $todayBindings)
+            ->selectRaw("COUNT(DISTINCT CASE WHEN {$todayRange} THEN user_id END) as today_unique_players", $todayBindings)
+            ->selectRaw("SUM(CASE WHEN {$todayRange} AND spin_type = 'free' THEN 1 ELSE 0 END) as today_free_spins", $todayBindings)
+            ->selectRaw("SUM(CASE WHEN {$todayRange} AND spin_type = 'paid' THEN 1 ELSE 0 END) as today_paid_spins", $todayBindings)
+            ->selectRaw("SUM(CASE WHEN {$todayRange} AND reward_type = 'entry_pack' AND user_entry_pack_id IS NOT NULL THEN 1 ELSE 0 END) as today_entry_pack_entitlements", $todayBindings)
+            ->selectRaw("SUM(CASE WHEN {$todayRange} AND reward_type = 'subscription' AND user_subscription_id IS NOT NULL THEN 1 ELSE 0 END) as today_subscription_entitlements", $todayBindings)
+            ->selectRaw("SUM(CASE WHEN {$todayRange} AND ((reward_type = 'entry_pack' AND user_entry_pack_id IS NULL) OR (reward_type = 'subscription' AND user_subscription_id IS NULL)) THEN 1 ELSE 0 END) as today_entitlement_grant_issues", $todayBindings)
+            ->selectRaw("COALESCE(SUM(CASE WHEN {$todayRange} AND (user_entry_pack_id IS NOT NULL OR user_subscription_id IS NOT NULL) THEN reward_duration_hours ELSE 0 END), 0) as today_entitlement_hours", $todayBindings)
+            ->selectRaw("COALESCE(SUM(CASE WHEN {$todayRange} THEN spin_cost_coins ELSE 0 END), 0) as today_coins_collected", $todayBindings)
+            ->selectRaw("COALESCE(SUM(CASE WHEN {$todayRange} AND reward_type = 'coins' THEN reward_value_coins ELSE 0 END), 0) as today_coins_rewarded", $todayBindings)
+            ->first();
 
         return [
-            'total_spins' => (int) ($row?->total_spins ?? 0),
-            'unique_players' => (int) ($row?->unique_players ?? 0),
-            'free_spins' => (int) ($row?->free_spins ?? 0),
-            'paid_spins' => (int) ($row?->paid_spins ?? 0),
+            'today' => $this->spinSummaryFromRow($row, 'today_'),
+            'week' => $this->spinSummaryFromRow($row, 'week_'),
+        ];
+    }
+
+    private function spinSummaryFromRow(?object $row, string $prefix = ''): array
+    {
+        $value = static fn (string $key): mixed => data_get($row, $prefix.$key);
+        $entryPacks = (int) ($value('entry_pack_entitlements') ?? 0);
+        $subscriptions = (int) ($value('subscription_entitlements') ?? 0);
+
+        return [
+            'total_spins' => (int) ($value('total_spins') ?? 0),
+            'unique_players' => (int) ($value('unique_players') ?? 0),
+            'free_spins' => (int) ($value('free_spins') ?? 0),
+            'paid_spins' => (int) ($value('paid_spins') ?? 0),
             'entry_pack_entitlements' => $entryPacks,
             'subscription_entitlements' => $subscriptions,
             'total_entitlements' => $entryPacks + $subscriptions,
-            'entitlement_grant_issues' => (int) ($row?->entitlement_grant_issues ?? 0),
-            'entitlement_hours' => (int) ($row?->entitlement_hours ?? 0),
-            'coins_collected' => (int) ($row?->coins_collected ?? 0),
-            'coins_rewarded' => (int) ($row?->coins_rewarded ?? 0),
+            'entitlement_grant_issues' => (int) ($value('entitlement_grant_issues') ?? 0),
+            'entitlement_hours' => (int) ($value('entitlement_hours') ?? 0),
+            'coins_collected' => (int) ($value('coins_collected') ?? 0),
+            'coins_rewarded' => (int) ($value('coins_rewarded') ?? 0),
         ];
     }
 
@@ -415,6 +479,24 @@ class FortuneWheelService
             })
             ->orderBy('sort_order')
             ->orderBy('id');
+    }
+
+    private function segmentIsSelectable(FortuneWheelSegment $segment): bool
+    {
+        if (! $segment->is_active || (int) $segment->weight <= 0) {
+            return false;
+        }
+
+        return match ($segment->reward_type) {
+            FortuneWheelSegment::REWARD_COINS => true,
+            FortuneWheelSegment::REWARD_ENTRY_PACK => $segment->entry_pack_id !== null
+                && $segment->reward_duration_hours !== null
+                && (bool) $segment->entryPack?->is_active,
+            FortuneWheelSegment::REWARD_SUBSCRIPTION => $segment->subscription_plan_id !== null
+                && $segment->reward_duration_hours !== null
+                && (bool) $segment->subscriptionPlan?->is_active,
+            default => false,
+        };
     }
 
     private function weightedSegment(Collection $segments): FortuneWheelSegment
@@ -551,7 +633,8 @@ class FortuneWheelService
     {
         $used = (int) FortuneWheelSpin::query()
             ->where('user_id', $user->id)
-            ->whereDate('spun_for_date', $spunForDate)
+            ->where('spun_for_date', '>=', $spunForDate)
+            ->where('spun_for_date', '<', $this->nextBusinessDate($spunForDate))
             ->where('spin_type', FortuneWheelSpin::TYPE_FREE)
             ->count();
 
@@ -561,6 +644,11 @@ class FortuneWheelService
     private function spunForDate(): string
     {
         return CarbonImmutable::now($this->timezone())->toDateString();
+    }
+
+    private function nextBusinessDate(string $date): string
+    {
+        return CarbonImmutable::parse($date, $this->timezone())->addDay()->toDateString();
     }
 
     private function expectedValuePayload(?Collection $segments = null): array
