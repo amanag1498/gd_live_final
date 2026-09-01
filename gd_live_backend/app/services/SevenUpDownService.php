@@ -710,7 +710,9 @@ class SevenUpDownService
             }
 
             $bets = $lockedRound->bets;
-            $winner = $this->determineWinningPot($lockedRound, $bets);
+            $winnerResult = $this->determineWinningPot($lockedRound, $bets);
+            $winner = $winnerResult['pot'];
+            $strategyMeta = $winnerResult['meta'];
             $multipliers = (array) data_get($lockedRound->meta, 'pot_multipliers', $this->potMultipliers());
             $winningMultiplier = $multipliers[$winner];
             [$diceOne, $diceTwo] = $this->diceForPot($winner);
@@ -748,6 +750,10 @@ class SevenUpDownService
                 'dice_two' => $diceTwo,
                 'dice_total' => $diceOne + $diceTwo,
                 'settled_at' => now(),
+                'meta' => array_filter([
+                    ...($lockedRound->meta ?? []),
+                    'winning_decision' => $strategyMeta,
+                ]),
             ])->save();
 
             $payload = $this->roundPayload($lockedRound->fresh());
@@ -794,27 +800,45 @@ class SevenUpDownService
         return $round;
     }
 
-    private function determineWinningPot(SevenUpDownRound $round, Collection $bets): string
+    private function determineWinningPot(SevenUpDownRound $round, Collection $bets): array
     {
         $totals = [
             'DOWN' => (int) $round->total_bet_down,
             'SEVEN' => (int) $round->total_bet_seven,
             'UP' => (int) $round->total_bet_up,
         ];
+        $mode = $this->winningStrategyMode();
         if ($bets->isEmpty()) {
-            return $this->weightedPot();
+            return [
+                'pot' => self::POTS[random_int(0, count(self::POTS) - 1)],
+                'meta' => [
+                    'mode' => $mode,
+                    'reason' => 'empty_round_random',
+                ],
+            ];
         }
 
-        return match ($this->winningStrategyMode()) {
+        $pot = match ($mode) {
             'minimum_bet' => collect($totals)->sort()->keys()->first(),
             'highest_bet' => collect($totals)->sortDesc()->keys()->first(),
-            'treasury_affordable' => $this->treasuryAffordablePot(
-                $totals,
-                (array) data_get($round->meta, 'pot_multipliers', $this->potMultipliers()),
-            ),
+            'treasury_affordable' => null,
             'probability' => $this->weightedPot(),
             default => self::POTS[random_int(0, count(self::POTS) - 1)],
         };
+
+        if ($mode === 'treasury_affordable') {
+            return $this->treasuryAffordableWinningPot(
+                $totals,
+                (array) data_get($round->meta, 'pot_multipliers', $this->potMultipliers()),
+            );
+        }
+
+        return [
+            'pot' => $pot,
+            'meta' => [
+                'mode' => $mode,
+            ],
+        ];
     }
 
     private function weightedPot(?array $allowedPots = null): string
@@ -857,26 +881,124 @@ class SevenUpDownService
         return $pairs[random_int(0, count($pairs) - 1)];
     }
 
-    private function treasuryAffordablePot(array $totals, array $multipliers): string
+    private function treasuryAffordableWinningPot(array $totals, array $multipliers): array
     {
-        $treasury = (int) $this->financials->account()->treasury_balance_coins;
+        $treasuryBalance = (int) $this->financials->account()->treasury_balance_coins;
         $liabilities = $this->potLiabilities($totals, $multipliers);
         $potsWithBets = collect($totals)->filter(fn (int $total) => $total > 0)->keys()->values()->all();
-        $eligible = collect($potsWithBets)
-            ->filter(fn (string $pot) => $liabilities[$pot] < $treasury)
+        $eligiblePots = collect($potsWithBets)
+            ->filter(fn (string $pot) => $liabilities[$pot] < $treasuryBalance)
             ->values()
             ->all();
 
-        if ($treasury > 0 && $eligible !== []) {
-            return $this->weightedPot($eligible);
+        $meta = [
+            'mode' => 'treasury_affordable',
+            'treasury_balance_before_settlement' => $treasuryBalance,
+            'pot_multipliers' => $multipliers,
+            'pot_totals' => $totals,
+            'pot_payouts' => $liabilities,
+            'eligible_pots' => $eligiblePots,
+        ];
+
+        if ($treasuryBalance <= 0) {
+            return [
+                'pot' => $this->minimumRealBetPot($totals),
+                'meta' => [
+                    ...$meta,
+                    'reason' => 'treasury_recovery_minimum_bet',
+                ],
+            ];
         }
 
-        $empty = collect($totals)->filter(fn (int $total) => $total === 0)->keys()->values()->all();
-        if ($empty !== []) {
-            return $this->weightedPot($empty);
+        if (count($potsWithBets) === 1) {
+            $onlyPot = $potsWithBets[0];
+            if (! in_array($onlyPot, $eligiblePots, true)) {
+                return [
+                    'pot' => $this->emptyPotFallback($totals),
+                    'meta' => [
+                        ...$meta,
+                        'single_pot_roll' => null,
+                        'reason' => 'single_pot_not_affordable',
+                    ],
+                ];
+            }
+
+            $roll = random_int(1, 100);
+            if ($roll <= 75) {
+                return [
+                    'pot' => $onlyPot,
+                    'meta' => [
+                        ...$meta,
+                        'single_pot_roll' => $roll,
+                        'single_pot_win_probability_percent' => 75,
+                    ],
+                ];
+            }
+
+            return [
+                'pot' => $this->emptyPotFallback($totals),
+                'meta' => [
+                    ...$meta,
+                    'single_pot_roll' => $roll,
+                    'single_pot_win_probability_percent' => 75,
+                    'reason' => 'single_pot_probability_miss',
+                ],
+            ];
         }
 
-        return collect($totals)->sort()->keys()->first();
+        if ($eligiblePots === []) {
+            if ($this->allPotsHaveBets($totals)) {
+                return [
+                    'pot' => $this->minimumRealBetPot($totals),
+                    'meta' => [
+                        ...$meta,
+                        'reason' => 'treasury_overdraft_minimum_bet',
+                    ],
+                ];
+            }
+
+            return [
+                'pot' => $this->emptyPotFallback($totals),
+                'meta' => [
+                    ...$meta,
+                    'reason' => 'no_eligible_pot',
+                ],
+            ];
+        }
+
+        return [
+            'pot' => $eligiblePots[random_int(0, count($eligiblePots) - 1)],
+            'meta' => $meta,
+        ];
+    }
+
+    private function minimumRealBetPot(array $totals): string
+    {
+        return (string) collect($totals)
+            ->filter(fn (int $total) => $total > 0)
+            ->sort()
+            ->keys()
+            ->first();
+    }
+
+    private function allPotsHaveBets(array $totals): bool
+    {
+        return collect($totals)->every(fn (int $total) => $total > 0);
+    }
+
+    private function emptyPotFallback(array $totals): ?string
+    {
+        $emptyPots = collect($totals)
+            ->filter(fn (int $total) => $total === 0)
+            ->keys()
+            ->values()
+            ->all();
+
+        if ($emptyPots === []) {
+            return null;
+        }
+
+        return $emptyPots[random_int(0, count($emptyPots) - 1)];
     }
 
     private function roundPayload(SevenUpDownRound $round, ?User $viewer = null): array

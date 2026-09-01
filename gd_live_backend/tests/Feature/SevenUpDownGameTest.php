@@ -109,6 +109,126 @@ class SevenUpDownGameTest extends TestCase
         $this->assertSame(1, SevenUpDownFinancialLedgerEntry::query()->where('event_type', 'bet_refund_reversal')->count());
     }
 
+    public function test_treasury_affordable_single_occupied_pot_uses_teen_patti_seventy_five_percent_flow(): void
+    {
+        config()->set('games.seven_up_down.winning_strategy_mode', 'treasury_affordable');
+        SevenUpDownFinancialAccount::query()
+            ->where('game_key', 'seven_up_down')
+            ->update(['treasury_balance_coins' => 1000]);
+
+        $user = $this->fundedUser();
+        $round = $this->openRound();
+        $service = app(SevenUpDownService::class);
+        $service->placeBet($user, 'DOWN', 100, 'sud-single-affordable');
+
+        $round->forceFill(['locks_at' => now()->subSeconds(2), 'ends_at' => now()->subSecond()])->save();
+        $settled = $service->settleRound($round->fresh());
+        $decision = $settled->meta['winning_decision'];
+
+        $this->assertSame(['DOWN'], $decision['eligible_pots']);
+        $this->assertSame(75, $decision['single_pot_win_probability_percent']);
+        $this->assertGreaterThanOrEqual(1, (int) $decision['single_pot_roll']);
+        $this->assertLessThanOrEqual(100, (int) $decision['single_pot_roll']);
+
+        if ((int) $decision['single_pot_roll'] <= 75) {
+            $this->assertSame('DOWN', $settled->winning_pot);
+            $this->assertArrayNotHasKey('reason', $decision);
+        } else {
+            $this->assertContains($settled->winning_pot, ['SEVEN', 'UP']);
+            $this->assertSame('single_pot_probability_miss', $decision['reason']);
+        }
+    }
+
+    public function test_treasury_affordable_randomly_selects_only_between_affordable_occupied_pots(): void
+    {
+        config()->set('games.seven_up_down.winning_strategy_mode', 'treasury_affordable');
+        SevenUpDownFinancialAccount::query()
+            ->where('game_key', 'seven_up_down')
+            ->update(['treasury_balance_coins' => 1000]);
+
+        $downUser = $this->fundedUser();
+        $sevenUser = $this->fundedUser();
+        $round = $this->openRound();
+        $service = app(SevenUpDownService::class);
+        $service->placeBet($downUser, 'DOWN', 100, 'sud-two-affordable-down');
+        $service->placeBet($sevenUser, 'SEVEN', 100, 'sud-two-affordable-seven');
+
+        $round->forceFill(['locks_at' => now()->subSeconds(2), 'ends_at' => now()->subSecond()])->save();
+        $settled = $service->settleRound($round->fresh());
+        $decision = $settled->meta['winning_decision'];
+
+        $this->assertSame(['DOWN', 'SEVEN'], $decision['eligible_pots']);
+        $this->assertContains($settled->winning_pot, ['DOWN', 'SEVEN']);
+        $this->assertNotSame('UP', $settled->winning_pot);
+        $this->assertArrayNotHasKey('single_pot_win_probability_percent', $decision);
+    }
+
+    public function test_treasury_affordable_uses_empty_pot_when_no_occupied_pot_is_affordable(): void
+    {
+        config()->set('games.seven_up_down.winning_strategy_mode', 'treasury_affordable');
+
+        $downUser = $this->fundedUser();
+        $sevenUser = $this->fundedUser();
+        $round = $this->openRound();
+        $service = app(SevenUpDownService::class);
+        $service->placeBet($downUser, 'DOWN', 100, 'sud-none-affordable-down');
+        $service->placeBet($sevenUser, 'SEVEN', 100, 'sud-none-affordable-seven');
+        SevenUpDownFinancialAccount::query()
+            ->where('game_key', 'seven_up_down')
+            ->update(['treasury_balance_coins' => 1]);
+
+        $round->forceFill(['locks_at' => now()->subSeconds(2), 'ends_at' => now()->subSecond()])->save();
+        $settled = $service->settleRound($round->fresh());
+
+        $this->assertSame('UP', $settled->winning_pot);
+        $this->assertSame([], $settled->meta['winning_decision']['eligible_pots']);
+        $this->assertSame('no_eligible_pot', $settled->meta['winning_decision']['reason']);
+    }
+
+    public function test_treasury_affordable_uses_minimum_real_bet_when_all_pots_are_unaffordable(): void
+    {
+        config()->set('games.seven_up_down.winning_strategy_mode', 'treasury_affordable');
+
+        $downUser = $this->fundedUser();
+        $sevenUser = $this->fundedUser();
+        $upUser = $this->fundedUser();
+        $round = $this->openRound();
+        $service = app(SevenUpDownService::class);
+        $service->placeBet($downUser, 'DOWN', 50, 'sud-overdraft-down');
+        $service->placeBet($sevenUser, 'SEVEN', 100, 'sud-overdraft-seven');
+        $service->placeBet($upUser, 'UP', 150, 'sud-overdraft-up');
+        SevenUpDownFinancialAccount::query()
+            ->where('game_key', 'seven_up_down')
+            ->update(['treasury_balance_coins' => 1]);
+
+        $round->forceFill(['locks_at' => now()->subSeconds(2), 'ends_at' => now()->subSecond()])->save();
+        $settled = $service->settleRound($round->fresh());
+
+        $this->assertSame('DOWN', $settled->winning_pot);
+        $this->assertSame('treasury_overdraft_minimum_bet', $settled->meta['winning_decision']['reason']);
+    }
+
+    public function test_treasury_affordable_uses_minimum_real_bet_while_treasury_is_in_recovery(): void
+    {
+        config()->set('games.seven_up_down.winning_strategy_mode', 'treasury_affordable');
+
+        $downUser = $this->fundedUser();
+        $sevenUser = $this->fundedUser();
+        $round = $this->openRound();
+        $service = app(SevenUpDownService::class);
+        $service->placeBet($downUser, 'DOWN', 50, 'sud-recovery-down');
+        $service->placeBet($sevenUser, 'SEVEN', 100, 'sud-recovery-seven');
+        SevenUpDownFinancialAccount::query()
+            ->where('game_key', 'seven_up_down')
+            ->update(['treasury_balance_coins' => -1]);
+
+        $round->forceFill(['locks_at' => now()->subSeconds(2), 'ends_at' => now()->subSecond()])->save();
+        $settled = $service->settleRound($round->fresh());
+
+        $this->assertSame('DOWN', $settled->winning_pot);
+        $this->assertSame('treasury_recovery_minimum_bet', $settled->meta['winning_decision']['reason']);
+    }
+
     public function test_admin_can_open_game_dashboard_and_settings_surface(): void
     {
         $admin = User::factory()->create();
