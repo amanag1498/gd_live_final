@@ -286,6 +286,31 @@ class AgencyReportingTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_agency_login_destination_renders_for_ready_and_pending_agencies(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('agency');
+        Agency::query()->create([
+            'owner_user_id' => $owner->id,
+            'name' => 'Orbit Agency',
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('agency.dashboard'))
+            ->assertOk()
+            ->assertSee('Agency Dashboard')
+            ->assertSee('Host Reports')
+            ->assertSee('Orbit Agency');
+
+        $pendingOwner = User::factory()->create();
+        $pendingOwner->assignRole('agency');
+
+        $this->actingAs($pendingOwner)
+            ->get(route('agency.dashboard'))
+            ->assertOk()
+            ->assertSee('Agency not ready');
+    }
+
     public function test_avatar_media_route_serves_public_avatar_files(): void
     {
         Storage::fake('public');
