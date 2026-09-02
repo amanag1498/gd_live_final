@@ -64,11 +64,6 @@ class BannerController extends Controller
             $banners = $ordered((clone $baseQuery))->get();
         }
 
-        // Final fallback: if platform/role filters are too strict, return visible banners.
-        if ($banners->isEmpty()) {
-            $banners = $ordered(Banner::query()->visible())->get();
-        }
-
         // Normalize image URL for mobile clients: always return a usable absolute URL.
         return $banners->map(function ($banner) use ($request) {
             $banner->image_url = $this->normalizeImageUrl(

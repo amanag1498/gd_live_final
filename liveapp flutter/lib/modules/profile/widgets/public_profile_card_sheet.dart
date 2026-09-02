@@ -49,10 +49,7 @@ Future<void> showPublicProfileCardSheet(
       return FadeTransition(
         opacity: curved,
         child: ScaleTransition(
-          scale: Tween<double>(
-            begin: 0.94,
-            end: 1,
-          ).animate(curved),
+          scale: Tween<double>(begin: 0.94, end: 1).animate(curved),
           child: child,
         ),
       );
@@ -67,9 +64,7 @@ class _PremiumProfileOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = getBrandTokens(
-      'midnight',
-    );
+    final tokens = getBrandTokens('midnight');
 
     return Material(
       color: Colors.transparent,
@@ -144,7 +139,8 @@ class _PublicProfileCardSheet extends StatefulWidget {
   final String? initialAvatarUrl;
 
   @override
-  State<_PublicProfileCardSheet> createState() => _PublicProfileCardSheetState();
+  State<_PublicProfileCardSheet> createState() =>
+      _PublicProfileCardSheetState();
 }
 
 class _PublicProfileCardSheetState extends State<_PublicProfileCardSheet> {
@@ -288,7 +284,7 @@ class _PublicProfileCardSheetState extends State<_PublicProfileCardSheet> {
                             horizontal: 12,
                             vertical: 7,
                           ),
-                        decoration: BoxDecoration(
+                          decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(999),
                             border: Border.all(
@@ -329,7 +325,10 @@ class _PublicProfileCardSheetState extends State<_PublicProfileCardSheet> {
                             if (_loading && profile == null)
                               const _ProfileCardLoading()
                             else if (_error != null && profile == null)
-                              _ProfileCardError(message: _error!, onRetry: _load)
+                              _ProfileCardError(
+                                message: _error!,
+                                onRetry: _load,
+                              )
                             else ...[
                               _ProfileHero(
                                 userId: profile?.id ?? widget.userId,
@@ -355,9 +354,12 @@ class _PublicProfileCardSheetState extends State<_PublicProfileCardSheet> {
                                 tokens: tokens,
                                 followers: followerCount,
                                 level: level,
-                                city: profile?.hostProfile?.city ?? profile?.city,
+                                city:
+                                    profile?.hostProfile?.city ?? profile?.city,
                               ),
-                              if ((profile?.bio ?? profile?.hostProfile?.bio ?? '')
+                              if ((profile?.bio ??
+                                      profile?.hostProfile?.bio ??
+                                      '')
                                   .trim()
                                   .isNotEmpty) ...[
                                 const SizedBox(height: 14),
@@ -366,18 +368,24 @@ class _PublicProfileCardSheetState extends State<_PublicProfileCardSheet> {
                                   icon: Icons.notes_rounded,
                                   title: 'About',
                                   body:
-                                      (profile?.hostProfile?.bio ?? profile?.bio ?? '')
+                                      (profile?.hostProfile?.bio ??
+                                              profile?.bio ??
+                                              '')
                                           .trim(),
                                 ),
                               ],
-                              if (profile?.hostProfile?.agency?.name?.trim().isNotEmpty ==
+                              if (profile?.hostProfile?.agency?.name
+                                      ?.trim()
+                                      .isNotEmpty ==
                                   true) ...[
                                 const SizedBox(height: 12),
                                 _ProfileInfoPanel(
                                   tokens: tokens,
                                   icon: Icons.apartment_rounded,
                                   title: 'Agency',
-                                  body: profile!.hostProfile!.agency!.name!.trim(),
+                                  body:
+                                      profile!.hostProfile!.agency!.name!
+                                          .trim(),
                                 ),
                               ],
                               if (_loading && profile != null) ...[
@@ -386,7 +394,10 @@ class _PublicProfileCardSheetState extends State<_PublicProfileCardSheet> {
                               ],
                               if (_error != null && profile != null) ...[
                                 const SizedBox(height: 12),
-                                _ProfileInlineError(tokens: tokens, message: _error!),
+                                _ProfileInlineError(
+                                  tokens: tokens,
+                                  message: _error!,
+                                ),
                               ],
                             ],
                           ],
@@ -405,10 +416,13 @@ class _PublicProfileCardSheetState extends State<_PublicProfileCardSheet> {
 
   String _subtitleFor(ProfileDto? profile) {
     final fallback = widget.initialSubtitle?.trim();
-    if (profile == null) return fallback?.isNotEmpty == true ? fallback! : 'Room participant';
+    if (profile == null)
+      return fallback?.isNotEmpty == true ? fallback! : 'Room participant';
     if (profile.isHost) {
       final stageName = profile.hostProfile?.stageName?.trim();
-      if (stageName != null && stageName.isNotEmpty && stageName != profile.name) {
+      if (stageName != null &&
+          stageName.isNotEmpty &&
+          stageName != profile.name) {
         return stageName;
       }
       return 'Host';
@@ -560,10 +574,7 @@ class _ProfileHero extends StatelessWidget {
 }
 
 class _HostFollowSection extends StatelessWidget {
-  const _HostFollowSection({
-    required this.profile,
-    required this.follows,
-  });
+  const _HostFollowSection({required this.profile, required this.follows});
 
   final ProfileDto profile;
   final HostFollowController follows;
@@ -588,9 +599,7 @@ class _HostFollowSection extends StatelessWidget {
         fallback: profile.followersCount ?? 0,
       );
       final busy = follows.isBusy(hostId);
-      final tokens = getBrandTokens(
-        'midnight',
-      );
+      final tokens = getBrandTokens('midnight');
 
       return Row(
         children: [
@@ -605,79 +614,81 @@ class _HostFollowSection extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          if (isFollowing)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          InkWell(
+            onTap:
+                busy
+                    ? null
+                    : () => follows.toggleForHost(
+                      hostId: hostId,
+                      current: isFollowing,
+                      currentCount: followerCount,
+                    ),
+            borderRadius: BorderRadius.circular(999),
+            child: Ink(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
-                color: tokens.glassColor.withOpacity(.16),
+                color: isFollowing ? tokens.glassColor.withOpacity(.16) : null,
+                gradient:
+                    isFollowing
+                        ? null
+                        : LinearGradient(colors: tokens.primaryButtonGradient),
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: tokens.borderColor.withOpacity(.18)),
-              ),
-              child: Text(
-                'Following',
-                style: TextStyle(
-                  color: tokens.textPrimary,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            )
-          else
-            InkWell(
-              onTap:
-                  busy
-                      ? null
-                      : () => follows.toggleForHost(
-                        hostId: hostId,
-                        current: isFollowing,
-                        currentCount: followerCount,
-                      ),
-              borderRadius: BorderRadius.circular(999),
-              child: Ink(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: tokens.primaryButtonGradient),
-                  borderRadius: BorderRadius.circular(999),
-                  boxShadow: [
-                    BoxShadow(
-                      color: tokens.glowColor.withOpacity(.20),
-                      blurRadius: 16,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (busy)
-                      SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            tokens.textPrimary,
+                border:
+                    isFollowing
+                        ? Border.all(color: tokens.borderColor.withOpacity(.22))
+                        : null,
+                boxShadow:
+                    isFollowing
+                        ? null
+                        : [
+                          BoxShadow(
+                            color: tokens.glowColor.withOpacity(.20),
+                            blurRadius: 16,
+                            offset: const Offset(0, 8),
                           ),
+                        ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (busy)
+                    SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          tokens.textPrimary,
                         ),
-                      )
-                    else ...[
-                      Icon(
-                        Icons.add_rounded,
-                        size: 16,
-                        color: tokens.textPrimary,
                       ),
-                      const SizedBox(width: 6),
-                    ],
-                    Text(
-                      'Follow Host',
-                      style: TextStyle(
-                        color: tokens.textPrimary,
-                        fontWeight: FontWeight.w900,
-                      ),
+                    )
+                  else ...[
+                    Icon(
+                      isFollowing
+                          ? Icons.person_remove_alt_1_rounded
+                          : Icons.add_rounded,
+                      size: 16,
+                      color:
+                          isFollowing
+                              ? tokens.textSecondary
+                              : tokens.textPrimary,
                     ),
+                    const SizedBox(width: 6),
                   ],
-                ),
+                  Text(
+                    isFollowing ? 'Unfollow' : 'Follow Host',
+                    style: TextStyle(
+                      color:
+                          isFollowing
+                              ? tokens.textSecondary
+                              : tokens.textPrimary,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
               ),
             ),
+          ),
         ],
       );
     });
@@ -931,10 +942,7 @@ class _ProfileCardLoading extends StatelessWidget {
 }
 
 class _ProfileCardError extends StatelessWidget {
-  const _ProfileCardError({
-    required this.message,
-    required this.onRetry,
-  });
+  const _ProfileCardError({required this.message, required this.onRetry});
 
   final String message;
   final VoidCallback onRetry;
@@ -945,7 +953,11 @@ class _ProfileCardError extends StatelessWidget {
       child: Column(
         children: [
           const SizedBox(height: 20),
-          const Icon(Icons.error_outline_rounded, color: Colors.white70, size: 28),
+          const Icon(
+            Icons.error_outline_rounded,
+            color: Colors.white70,
+            size: 28,
+          ),
           const SizedBox(height: 10),
           Text(
             message,
@@ -996,10 +1008,7 @@ class _RefreshingStrip extends StatelessWidget {
 }
 
 class _ProfileInlineError extends StatelessWidget {
-  const _ProfileInlineError({
-    required this.tokens,
-    required this.message,
-  });
+  const _ProfileInlineError({required this.tokens, required this.message});
 
   final BrandTokens tokens;
   final String message;

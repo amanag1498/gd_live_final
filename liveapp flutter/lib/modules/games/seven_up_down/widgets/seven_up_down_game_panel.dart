@@ -323,15 +323,16 @@ class _SevenUpDownGamePanelState extends State<SevenUpDownGamePanel>
       return const [];
     }
     final durationMs = max(1000, locksAt.difference(startsAt).inMilliseconds);
+    final minStep = max(1, _snapshot?.settings.minBet ?? 50);
     final scheduled = <_ScheduledLuckyBet>[];
     for (final pot in const ['DOWN', 'SEVEN', 'UP']) {
-      final total = round.fakeTotals[pot] ?? 0;
+      final total = _snapToBetStep(round.fakeTotals[pot] ?? 0, minStep);
       if (total <= 0) continue;
       final random = Random(
-        Object.hash(round.roundKey, pot, total, durationMs),
+        Object.hash(round.roundKey, pot, total, durationMs, minStep),
       );
       final count = _fakeBetChunkCount(total);
-      final chunks = _splitFakeBetTotal(total, count, random);
+      final chunks = _splitFakeBetTotal(total, count, random, minStep);
       final minOffset = min(700, max(0, durationMs - 300));
       final maxOffset = max(minOffset + 1, durationMs - 550);
       for (var index = 0; index < chunks.length; index++) {
@@ -367,28 +368,42 @@ class _SevenUpDownGamePanelState extends State<SevenUpDownGamePanel>
     return 5;
   }
 
-  List<int> _splitFakeBetTotal(int total, int count, Random random) {
+  List<int> _splitFakeBetTotal(
+    int total,
+    int count,
+    Random random,
+    int minStep,
+  ) {
+    total = _snapToBetStep(total, minStep);
     if (count <= 1) return [total];
-    final minimum = total <= 500 ? 50 : (total <= 2000 ? 200 : 500);
-    var remaining = total;
+    final totalUnits = max(1, total ~/ minStep);
+    final minimumUnits = max(1, total <= 500 ? 1 : (total <= 2000 ? 4 : 10));
+    count = min(count, max(1, totalUnits ~/ minimumUnits));
+    var remainingUnits = totalUnits;
     final chunks = <int>[];
     for (var index = 0; index < count; index++) {
       final left = count - index;
       if (left == 1) {
-        chunks.add(remaining);
+        chunks.add(remainingUnits * minStep);
         break;
       }
-      final reserve = minimum * (left - 1);
-      final average = ((remaining - reserve) / left).round();
+      final reserve = minimumUnits * (left - 1);
+      final average = ((remainingUnits - reserve) / left).round();
       final jitter = max(1, average ~/ 3);
-      final amount =
+      final amountUnits =
           (average + random.nextInt((jitter * 2) + 1) - jitter)
-              .clamp(minimum, remaining - reserve)
+              .clamp(minimumUnits, remainingUnits - reserve)
               .toInt();
-      chunks.add(amount);
-      remaining -= amount;
+      chunks.add(amountUnits * minStep);
+      remainingUnits -= amountUnits;
     }
     return chunks.where((value) => value > 0).toList(growable: false);
+  }
+
+  int _snapToBetStep(int amount, int step) {
+    if (amount <= 0) return 0;
+    final safeStep = max(1, step);
+    return max(safeStep, (amount / safeStep).round() * safeStep);
   }
 
   void _processDueFakeBets() {
@@ -639,6 +654,9 @@ class _SevenUpDownGamePanelState extends State<SevenUpDownGamePanel>
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final compactHeight = constraints.maxHeight < 720;
+        final tightHeight = constraints.maxHeight < 640;
+        final sectionGap = compactHeight ? 8.0 : 14.0;
         return Stack(
           key: _panelKey,
           clipBehavior: Clip.hardEdge,
@@ -712,59 +730,29 @@ class _SevenUpDownGamePanelState extends State<SevenUpDownGamePanel>
               child: SafeArea(
                 top: false,
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(14, 8, 14, 28),
+                  padding: EdgeInsets.fromLTRB(
+                    compactHeight ? 12 : 14,
+                    compactHeight ? 4 : 8,
+                    compactHeight ? 12 : 14,
+                    compactHeight ? 16 : 28,
+                  ),
                   children: [
-                    _header(snapshot.walletBalance),
-                    const SizedBox(height: 8),
+                    _header(snapshot.walletBalance, compact: compactHeight),
+                    SizedBox(height: compactHeight ? 5 : 8),
                     _phaseBanner(round, revealed),
-                    const SizedBox(height: 10),
-                    _diceStage(round, revealed),
+                    SizedBox(height: compactHeight ? 6 : 10),
+                    _diceStage(round, revealed, compact: compactHeight),
                     if (revealed) ...[
-                      const SizedBox(height: 8),
+                      SizedBox(height: compactHeight ? 6 : 8),
                       _resultBanner(round),
                     ],
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _pot(
-                            _potKeys[0],
-                            round,
-                            'DOWN',
-                            '7 DOWN',
-                            'TOTAL 2 - 6',
-                            revealed,
-                          ),
-                        ),
-                        const SizedBox(width: 7),
-                        Expanded(
-                          child: _pot(
-                            _potKeys[1],
-                            round,
-                            'SEVEN',
-                            'EXACT 7',
-                            'TOTAL 7',
-                            revealed,
-                          ),
-                        ),
-                        const SizedBox(width: 7),
-                        Expanded(
-                          child: _pot(
-                            _potKeys[2],
-                            round,
-                            'UP',
-                            '7 UP',
-                            'TOTAL 8 - 12',
-                            revealed,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    _chipTray(chips, round),
+                    SizedBox(height: sectionGap),
+                    _bettingArena(round, revealed, compact: compactHeight),
+                    SizedBox(height: sectionGap),
+                    _chipTray(chips, round, compact: compactHeight),
                     if (_betFeedback != null)
                       Padding(
-                        padding: const EdgeInsets.only(top: 10),
+                        padding: EdgeInsets.only(top: compactHeight ? 6 : 10),
                         child: Text(
                           _betFeedback!,
                           textAlign: TextAlign.center,
@@ -776,7 +764,7 @@ class _SevenUpDownGamePanelState extends State<SevenUpDownGamePanel>
                       ),
                     if (_error != null)
                       Padding(
-                        padding: const EdgeInsets.only(top: 10),
+                        padding: EdgeInsets.only(top: compactHeight ? 6 : 10),
                         child: Text(
                           _error!,
                           textAlign: TextAlign.center,
@@ -784,8 +772,10 @@ class _SevenUpDownGamePanelState extends State<SevenUpDownGamePanel>
                         ),
                       ),
                     if (snapshot.history.isNotEmpty) ...[
-                      const SizedBox(height: 18),
-                      _history(snapshot.history),
+                      SizedBox(
+                        height: tightHeight ? 8 : (compactHeight ? 10 : 18),
+                      ),
+                      _history(snapshot.history, compact: compactHeight),
                     ],
                   ],
                 ),
@@ -814,15 +804,15 @@ class _SevenUpDownGamePanelState extends State<SevenUpDownGamePanel>
     );
   }
 
-  Widget _header(int walletBalance) => SizedBox(
-    height: 68,
+  Widget _header(int walletBalance, {required bool compact}) => SizedBox(
+    height: compact ? 56 : 68,
     child: Stack(
       alignment: Alignment.center,
       children: [
         Image.asset(
           'assets/games/seven_up_down/lucky_7_logo.png',
-          width: 176,
-          height: 66,
+          width: compact ? 148 : 176,
+          height: compact ? 54 : 66,
           fit: BoxFit.contain,
           filterQuality: FilterQuality.high,
         ),
@@ -932,7 +922,11 @@ class _SevenUpDownGamePanelState extends State<SevenUpDownGamePanel>
     );
   }
 
-  Widget _diceStage(SevenUpDownRound round, bool revealed) {
+  Widget _diceStage(
+    SevenUpDownRound round,
+    bool revealed, {
+    required bool compact,
+  }) {
     return AnimatedBuilder(
       animation: Listenable.merge([
         _idleController,
@@ -947,8 +941,10 @@ class _SevenUpDownGamePanelState extends State<SevenUpDownGamePanel>
         final lock = Curves.easeOutBack.transform(_lockController.value);
         final resultPulse = sin(_resultController.value * pi);
         final diceScale = 1 + (resultPulse * .12);
+        final stageHeight = compact ? 136.0 : 170.0;
+        final dieSize = compact ? 66.0 : 82.0;
         return SizedBox(
-          height: 170,
+          height: stageHeight,
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -979,9 +975,9 @@ class _SevenUpDownGamePanelState extends State<SevenUpDownGamePanel>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _animatedDie(_shownDiceOne, roll, idle, false),
-                      const SizedBox(width: 22),
-                      _animatedDie(_shownDiceTwo, roll, -idle, true),
+                      _animatedDie(_shownDiceOne, roll, idle, false, dieSize),
+                      SizedBox(width: compact ? 17 : 22),
+                      _animatedDie(_shownDiceTwo, roll, -idle, true, dieSize),
                     ],
                   ),
                 ),
@@ -1046,7 +1042,13 @@ class _SevenUpDownGamePanelState extends State<SevenUpDownGamePanel>
     );
   }
 
-  Widget _animatedDie(int value, double roll, double idle, bool second) {
+  Widget _animatedDie(
+    int value,
+    double roll,
+    double idle,
+    bool second,
+    double size,
+  ) {
     final direction = second ? -1.0 : 1.0;
     final spinning = _rolling;
     final settling = _lastVisualPhase == 'settling';
@@ -1062,7 +1064,7 @@ class _SevenUpDownGamePanelState extends State<SevenUpDownGamePanel>
             ..rotateX(tilt)
             ..rotateY(rotation * .8)
             ..rotateZ(rotation),
-      child: _ThreeDDice(value: value, size: 82),
+      child: _ThreeDDice(value: value, size: size),
     );
   }
 
@@ -1079,41 +1081,174 @@ class _SevenUpDownGamePanelState extends State<SevenUpDownGamePanel>
         scale: Tween(begin: .88, end: 1.0).animate(
           CurvedAnimation(parent: _resultController, curve: Curves.easeOutBack),
         ),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [color.withValues(alpha: .24), const Color(0xCC11132B)],
-            ),
-            border: Border.all(color: color.withValues(alpha: .75)),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                won > 0 ? Icons.emoji_events_rounded : Icons.casino_rounded,
-                color: color,
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  won > 0
-                      ? 'YOU WON $won COINS · ${round.winningPot}'
-                      : userHadBet
-                      ? '${round.winningPot} WINS · BETTER LUCK NEXT ROUND'
-                      : '${round.winningPot} WINS · ${round.diceOne} + ${round.diceTwo} = ${round.diceTotal}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
+        child: AnimatedBuilder(
+          animation: Listenable.merge([
+            _idleController,
+            _celebrationController,
+          ]),
+          builder: (context, _) {
+            final shine = sin(_idleController.value * pi * 2).abs();
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    color.withValues(alpha: won > 0 ? .42 : .26),
+                    const Color(0xEE11132B),
+                    const Color(0xDD07091E),
+                  ],
+                ),
+                border: Border.all(
+                  color: color.withValues(alpha: .75 + (.2 * shine)),
+                  width: won > 0 ? 1.8 : 1.2,
+                ),
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withValues(alpha: won > 0 ? .36 : .18),
+                    blurRadius: won > 0 ? 26 + (shine * 10) : 18,
+                    spreadRadius: won > 0 ? 1 : 0,
                   ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: color.withValues(alpha: .16),
+                      border: Border.all(color: color.withValues(alpha: .7)),
+                    ),
+                    child: Icon(
+                      won > 0
+                          ? Icons.emoji_events_rounded
+                          : Icons.casino_rounded,
+                      color: color,
+                      size: 19,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          won > 0
+                              ? 'YOU WON $won COINS'
+                              : userHadBet
+                              ? 'BETTER LUCK NEXT ROUND'
+                              : '${round.winningPot} WINS',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${round.winningPot} · ${round.diceOne} + ${round.diceTwo} = ${round.diceTotal}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _bettingArena(
+    SevenUpDownRound round,
+    bool revealed, {
+    required bool compact,
+  }) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(9, compact ? 8 : 11, 9, compact ? 9 : 12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xD4141834), Color(0xEE07091C)],
+        ),
+        border: Border.all(color: const Color(0x66FFD45E), width: 1.1),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x99000000),
+            blurRadius: 24,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          AnimatedBuilder(
+            animation: _idleController,
+            builder:
+                (context, _) => SizedBox(
+                  height: 18,
+                  child: CustomPaint(
+                    painter: _ArenaRailPainter(_idleController.value),
+                    child: const SizedBox.expand(),
+                  ),
+                ),
+          ),
+          SizedBox(height: compact ? 3 : 6),
+          Row(
+            children: [
+              Expanded(
+                child: _pot(
+                  _potKeys[0],
+                  round,
+                  'DOWN',
+                  '7 DOWN',
+                  'TOTAL 2 - 6',
+                  revealed,
+                ),
+              ),
+              const SizedBox(width: 7),
+              Expanded(
+                child: _pot(
+                  _potKeys[1],
+                  round,
+                  'SEVEN',
+                  'EXACT 7',
+                  'TOTAL 7',
+                  revealed,
+                ),
+              ),
+              const SizedBox(width: 7),
+              Expanded(
+                child: _pot(
+                  _potKeys[2],
+                  round,
+                  'UP',
+                  '7 UP',
+                  'TOTAL 8 - 12',
+                  revealed,
                 ),
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -1135,166 +1270,223 @@ class _SevenUpDownGamePanelState extends State<SevenUpDownGamePanel>
         !_placingBet;
     final yourAmount = _viewerAmount(round, pot);
     final pulsing = _betPulsePot == pot && _placingBet;
-    return GestureDetector(
-      key: potKey,
-      onTap:
-          bettingOpen
-              ? () {
-                unawaited(Haptics.selection());
-                setState(() => _selectedPot = selected ? null : pot);
-              }
-              : null,
-      child: AnimatedScale(
-        scale:
-            pulsing
-                ? .96
-                : winner
-                ? 1.035
-                : 1,
-        duration: const Duration(milliseconds: 180),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 280),
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 12),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors:
-                  winner
-                      ? [
-                        color.withValues(alpha: .46),
-                        color.withValues(alpha: .18),
-                      ]
-                      : [
-                        Colors.white.withValues(alpha: .11),
-                        const Color(0x9910132D),
-                      ],
-            ),
-            border: Border.all(
-              color: winner || selected ? color : color.withValues(alpha: .48),
-              width: winner ? 2.5 : (selected ? 2 : 1),
-            ),
-            borderRadius: BorderRadius.circular(17),
-            boxShadow:
-                winner || selected
-                    ? [
-                      BoxShadow(
-                        color: color.withValues(alpha: winner ? .5 : .28),
-                        blurRadius: winner ? 22 : 16,
-                      ),
-                    ]
-                    : null,
-          ),
-          child: Column(
-            children: [
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 13,
+    return AnimatedBuilder(
+      animation: Listenable.merge([_idleController, _resultController]),
+      builder: (context, _) {
+        final glow =
+            winner
+                ? .72 + (.28 * sin(_idleController.value * pi * 4).abs())
+                : selected
+                ? .45 + (.15 * sin(_idleController.value * pi * 2).abs())
+                : .0;
+        return GestureDetector(
+          key: potKey,
+          onTap:
+              bettingOpen
+                  ? () {
+                    unawaited(Haptics.selection());
+                    setState(() => _selectedPot = selected ? null : pot);
+                  }
+                  : null,
+          child: AnimatedScale(
+            scale:
+                pulsing
+                    ? .96
+                    : winner
+                    ? 1.04
+                    : selected
+                    ? 1.015
+                    : 1,
+            duration: const Duration(milliseconds: 180),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 280),
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment.topCenter,
+                  radius: 1.12,
+                  colors:
+                      winner
+                          ? [
+                            color.withValues(alpha: .58),
+                            color.withValues(alpha: .2),
+                            const Color(0xEE090B22),
+                          ]
+                          : selected
+                          ? [
+                            color.withValues(alpha: .28),
+                            const Color(0xDD11142E),
+                            const Color(0xF0060819),
+                          ]
+                          : [
+                            Colors.white.withValues(alpha: .1),
+                            const Color(0xDD11142E),
+                            const Color(0xEE060817),
+                          ],
                 ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                range,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white60,
-                  fontSize: 8,
-                  fontWeight: FontWeight.w700,
+                border: Border.all(
+                  color:
+                      winner || selected ? color : color.withValues(alpha: .42),
+                  width: winner ? 2.4 : (selected ? 1.8 : 1),
                 ),
-              ),
-              const SizedBox(height: 7),
-              Text(
-                '${round.multipliers[pot] ?? 0}x',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 21,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 5),
-              _potCoinStack(_displayTotals[pot] ?? 0),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.paid_rounded,
-                    color: Color(0xFFFFD45E),
-                    size: 12,
-                  ),
-                  const SizedBox(width: 3),
-                  Flexible(
-                    child: Text(
-                      '${_displayTotals[pot] ?? 0}',
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withValues(alpha: .12 + (.32 * glow)),
+                    blurRadius: 12 + (22 * glow),
+                    spreadRadius: winner ? 1.5 : 0,
                   ),
                 ],
               ),
-              if (yourAmount > 0) ...[
-                const SizedBox(height: 5),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: .17),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    'YOU $yourAmount',
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
+              child: Column(
+                children: [
+                  Container(
+                    height: 4,
+                    width: 34,
+                    decoration: BoxDecoration(
+                      color: color.withValues(
+                        alpha: winner || selected ? .95 : .45,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
                     ),
                   ),
-                ),
-              ],
-              if (selected && bettingOpen) ...[
-                const SizedBox(height: 5),
-                Text(
-                  'SELECTED',
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: .7,
+                  const SizedBox(height: 7),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                    ),
                   ),
-                ),
-              ],
-              if (!bettingOpen && !winner) ...[
-                const SizedBox(height: 5),
-                const Icon(
-                  Icons.lock_outline_rounded,
-                  color: Colors.white38,
-                  size: 13,
-                ),
-              ],
-            ],
+                  const SizedBox(height: 3),
+                  Text(
+                    range,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white60,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: .25),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: color.withValues(alpha: .34)),
+                    ),
+                    child: Text(
+                      '${round.multipliers[pot] ?? 0}x',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 19,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  _potCoinStack(_displayTotals[pot] ?? 0, pot),
+                  const SizedBox(height: 5),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.paid_rounded,
+                        color: Color(0xFFFFD45E),
+                        size: 12,
+                      ),
+                      const SizedBox(width: 3),
+                      Flexible(
+                        child: Text(
+                          '${_displayTotals[pot] ?? 0}',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (yourAmount > 0) ...[
+                    const SizedBox(height: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: .18),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: color.withValues(alpha: .3)),
+                      ),
+                      child: Text(
+                        'YOU $yourAmount',
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (selected && bettingOpen) ...[
+                    const SizedBox(height: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: .16),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        'SELECTED',
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: .7,
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (!bettingOpen && !winner) ...[
+                    const SizedBox(height: 5),
+                    const Icon(
+                      Icons.lock_outline_rounded,
+                      color: Colors.white38,
+                      size: 13,
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _chipTray(Iterable<int> chips, SevenUpDownRound round) {
+  Widget _chipTray(
+    Iterable<int> chips,
+    SevenUpDownRound round, {
+    required bool compact,
+  }) {
     final enabled = _visualPhase(round) == 'betting' && _countdown(round) > 0;
     return AnimatedOpacity(
       opacity: enabled ? 1 : .5,
       duration: const Duration(milliseconds: 220),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
+        padding: EdgeInsets.fromLTRB(10, compact ? 7 : 9, 10, compact ? 7 : 10),
         decoration: BoxDecoration(
           color: const Color(0xCC090B21),
           border: Border.all(color: Colors.white.withValues(alpha: .12)),
@@ -1315,7 +1507,7 @@ class _SevenUpDownGamePanelState extends State<SevenUpDownGamePanel>
                 letterSpacing: 1,
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: compact ? 5 : 8),
             Row(
               key: _chipRowKey,
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -1346,6 +1538,7 @@ class _SevenUpDownGamePanelState extends State<SevenUpDownGamePanel>
                         value: chip,
                         selected: chip == _selectedChip,
                         imagePath: _chipAssets[chip]!,
+                        compact: compact,
                       ),
                     ),
                   ),
@@ -1357,26 +1550,33 @@ class _SevenUpDownGamePanelState extends State<SevenUpDownGamePanel>
     );
   }
 
-  Widget _potCoinStack(int total) {
+  Widget _potCoinStack(int total, String pot) {
     final count =
-        total <= 0 ? 0 : min(4, 1 + (log(total + 1) / log(8)).floor());
+        total <= 0 ? 0 : min(5, 2 + (log(total + 1) / log(9)).floor());
     return SizedBox(
-      height: 25,
+      height: 31,
       child:
           count == 0
-              ? const SizedBox.shrink()
+              ? Icon(
+                Icons.add_circle_outline_rounded,
+                color: Colors.white.withValues(alpha: .22),
+                size: 22,
+              )
               : Stack(
                 alignment: Alignment.center,
                 children: [
                   for (var index = 0; index < count; index++)
                     Transform.translate(
-                      offset: Offset((index - ((count - 1) / 2)) * 10, 0),
+                      offset: Offset(
+                        (index - ((count - 1) / 2)) * 9,
+                        index.isEven ? 0 : 3,
+                      ),
                       child: Transform.rotate(
-                        angle: (index.isEven ? -1 : 1) * .08,
+                        angle: (index.isEven ? -1 : 1) * (.07 + index * .015),
                         child: Image.asset(
-                          _assetForAmount(total ~/ max(1, count)),
-                          width: 27,
-                          height: 27,
+                          _assetForStackIndex(total, pot, index),
+                          width: 29,
+                          height: 29,
                           filterQuality: FilterQuality.high,
                         ),
                       ),
@@ -1386,50 +1586,68 @@ class _SevenUpDownGamePanelState extends State<SevenUpDownGamePanel>
     );
   }
 
-  Widget _history(List<SevenUpDownRound> rounds) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const Text(
-        'RECENT RESULTS',
-        style: TextStyle(
-          color: Colors.white60,
-          fontSize: 9,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1,
+  String _assetForStackIndex(int total, String pot, int index) {
+    final rotation = switch (pot) {
+      'DOWN' => [50, 500, 200, 1000, 5000],
+      'SEVEN' => [500, 50, 1000, 200, 5000],
+      _ => [200, 1000, 50, 5000, 500],
+    };
+    if (total >= 5000 && index == rotation.length - 1) {
+      return _chipAssets[5000]!;
+    }
+    return _chipAssets[rotation[index % rotation.length]]!;
+  }
+
+  Widget _history(List<SevenUpDownRound> rounds, {required bool compact}) {
+    final visibleRounds = rounds.take(compact ? 6 : 8);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'RECENT RESULTS',
+          style: TextStyle(
+            color: Colors.white60,
+            fontSize: 9,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1,
+          ),
         ),
-      ),
-      const SizedBox(height: 7),
-      SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            for (final item in rounds.take(8))
-              Container(
-                margin: const EdgeInsets.only(right: 7),
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-                decoration: BoxDecoration(
-                  color: (_potColors[item.winningPot] ?? Colors.white)
-                      .withValues(alpha: .12),
-                  border: Border.all(
+        const SizedBox(height: 7),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final item in visibleRounds)
+                Container(
+                  margin: const EdgeInsets.only(right: 7),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
                     color: (_potColors[item.winningPot] ?? Colors.white)
-                        .withValues(alpha: .35),
+                        .withValues(alpha: .12),
+                    border: Border.all(
+                      color: (_potColors[item.winningPot] ?? Colors.white)
+                          .withValues(alpha: .35),
+                    ),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '${item.diceOne ?? '—'} + ${item.diceTwo ?? '—'} = ${item.diceTotal ?? '—'} · ${item.winningPot ?? '—'}',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
+                  child: Text(
+                    '${item.diceOne ?? '—'} + ${item.diceTwo ?? '—'} = ${item.diceTotal ?? '—'} · ${item.winningPot ?? '—'}',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 
   Widget _pill(String text, Color color, IconData icon) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
@@ -1515,20 +1733,27 @@ class _GameChip extends StatelessWidget {
     required this.value,
     required this.selected,
     required this.imagePath,
+    this.compact = false,
     this.large = false,
   });
 
   final int value;
   final bool selected;
   final String imagePath;
+  final bool compact;
   final bool large;
 
   @override
   Widget build(BuildContext context) {
-    final size = large ? 50.0 : 43.0;
+    final size =
+        large
+            ? 50.0
+            : compact
+            ? 37.0
+            : 43.0;
     return SizedBox(
       width: size,
-      height: size + 14,
+      height: size + (compact ? 11 : 14),
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.topCenter,
@@ -1568,7 +1793,7 @@ class _GameChip extends StatelessWidget {
                 _compact(value),
                 style: TextStyle(
                   color: selected ? const Color(0xFF2E1800) : Colors.white,
-                  fontSize: value >= 1000 ? 9 : 10,
+                  fontSize: compact ? 8 : (value >= 1000 ? 9 : 10),
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -1581,6 +1806,45 @@ class _GameChip extends StatelessWidget {
 
   static String _compact(int value) =>
       value >= 1000 && value % 1000 == 0 ? '${value ~/ 1000}K' : '$value';
+}
+
+class _ArenaRailPainter extends CustomPainter {
+  const _ArenaRailPainter(this.progress);
+
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final centerY = size.height * .55;
+    final railPaint =
+        Paint()
+          ..strokeWidth = 1.2
+          ..strokeCap = StrokeCap.round
+          ..shader = const LinearGradient(
+            colors: [Color(0x00FFD45E), Color(0xAAFFD45E), Color(0x00FFD45E)],
+          ).createShader(Offset.zero & size);
+    canvas.drawLine(
+      Offset(8, centerY),
+      Offset(size.width - 8, centerY),
+      railPaint,
+    );
+
+    for (var index = 0; index < 3; index++) {
+      final x = size.width * (.18 + index * .32);
+      final pulse = .45 + (.35 * sin((progress * pi * 2) + index).abs());
+      canvas.drawCircle(
+        Offset(x, centerY),
+        2.2,
+        Paint()
+          ..color = const Color(0xFFFFD45E).withValues(alpha: pulse)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ArenaRailPainter oldDelegate) =>
+      oldDelegate.progress != progress;
 }
 
 class _ThreeDDice extends StatelessWidget {

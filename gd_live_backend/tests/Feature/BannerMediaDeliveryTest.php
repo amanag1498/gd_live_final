@@ -77,4 +77,40 @@ class BannerMediaDeliveryTest extends TestCase
                 'image_url' => 'https://cdn.example/banner.webp',
             ]);
     }
+
+    public function test_platform_filtered_request_never_falls_back_to_other_platform_banners(): void
+    {
+        $android = Banner::query()->create([
+            'title' => 'Android only',
+            'image_url' => 'https://cdn.example/android.webp',
+            'placement' => 'home',
+            'action_type' => 'none',
+            'platforms' => ['android'],
+            'target_roles' => [],
+            'is_active' => true,
+        ]);
+        $ios = Banner::query()->create([
+            'title' => 'iOS only',
+            'image_url' => 'https://cdn.example/ios.webp',
+            'placement' => 'home',
+            'action_type' => 'none',
+            'platforms' => ['ios'],
+            'target_roles' => [],
+            'is_active' => true,
+        ]);
+
+        $this->getJson('/api/banners?placement=home&platform=ios&role=user')
+            ->assertOk()
+            ->assertJsonFragment(['id' => $ios->id])
+            ->assertJsonMissing(['id' => $android->id]);
+
+        $this->getJson('/api/banners?placement=missing&platform=ios&role=user')
+            ->assertOk()
+            ->assertJsonFragment(['id' => $ios->id])
+            ->assertJsonMissing(['id' => $android->id]);
+
+        $this->getJson('/api/banners?placement=missing&platform=web&role=user')
+            ->assertOk()
+            ->assertJsonCount(0);
+    }
 }

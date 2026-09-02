@@ -273,6 +273,7 @@ class SevenUpDownGameTest extends TestCase
     public function test_fake_bet_targets_stay_stable_when_round_locks(): void
     {
         config()->set('games.seven_up_down.fake_bets_enabled', true);
+        config()->set('games.seven_up_down.min_bet', 50);
         $round = $this->openRound();
         $service = app(SevenUpDownService::class);
 
@@ -288,6 +289,9 @@ class SevenUpDownGameTest extends TestCase
         $this->assertSame('locked', data_get($lockedSnapshot, 'round.phase'));
         $this->assertSame($bettingFakeTotals, data_get($lockedSnapshot, 'round.fake_totals'));
         $this->assertGreaterThan(0, array_sum($bettingFakeTotals));
+        foreach ($bettingFakeTotals as $total) {
+            $this->assertSame(0, $total % 50);
+        }
     }
 
     private function fundedUser(): User

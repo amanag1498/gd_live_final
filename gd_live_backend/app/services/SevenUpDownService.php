@@ -1168,7 +1168,9 @@ class SevenUpDownService
     {
         $hash = abs(crc32($seed));
         $multiplier = 3 + ($hash % 10);
-        $step = max($this->minBet(), (int) floor($band / 7));
+        $minBet = $this->minBet();
+        $step = max($minBet, (int) floor($band / 7));
+        $step = max($minBet, (int) (ceil($step / $minBet) * $minBet));
 
         return $multiplier * $step;
     }
