@@ -270,6 +270,26 @@ class SevenUpDownGameTest extends TestCase
             ->assertJsonPath('data.settings.pot_multipliers.SEVEN', 4);
     }
 
+    public function test_fake_bet_targets_stay_stable_when_round_locks(): void
+    {
+        config()->set('games.seven_up_down.fake_bets_enabled', true);
+        $round = $this->openRound();
+        $service = app(SevenUpDownService::class);
+
+        $bettingSnapshot = $service->publicRoundSnapshot();
+        $bettingFakeTotals = data_get($bettingSnapshot, 'round.fake_totals');
+
+        $round->forceFill([
+            'locks_at' => now()->subSecond(),
+            'ends_at' => now()->addMinute(),
+        ])->save();
+        $lockedSnapshot = $service->publicRoundSnapshot();
+
+        $this->assertSame('locked', data_get($lockedSnapshot, 'round.phase'));
+        $this->assertSame($bettingFakeTotals, data_get($lockedSnapshot, 'round.fake_totals'));
+        $this->assertGreaterThan(0, array_sum($bettingFakeTotals));
+    }
+
     private function fundedUser(): User
     {
         $user = User::factory()->create();

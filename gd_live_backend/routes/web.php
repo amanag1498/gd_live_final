@@ -23,9 +23,9 @@ use App\Http\Controllers\Admin\NotificationController as AdminNotificationContro
 use App\Http\Controllers\Admin\PresenceController;
 use App\Http\Controllers\Admin\RechargeAuditAdminController;
 use App\Http\Controllers\Admin\RechargePlanAdminController;
-use App\Http\Controllers\Admin\SevenUpDownAdminController;
 use App\Http\Controllers\Admin\ReportsController;
 use App\Http\Controllers\Admin\SettingsController as AdminSettingsController;
+use App\Http\Controllers\Admin\SevenUpDownAdminController;
 use App\Http\Controllers\Admin\SubscriptionPlanController;
 use App\Http\Controllers\Admin\TeenPattiAdminController;
 use App\Http\Controllers\Admin\UserAdminController;
@@ -35,6 +35,7 @@ use App\Http\Controllers\Admin\WalletAdminController;
 use App\Http\Controllers\Admin\WalletTransactionAdminController;
 use App\Http\Controllers\Agency\CallReportController as AgencyCallReportController;
 use App\Http\Controllers\Agency\HostController as AgencyHostController;
+use App\Http\Controllers\Agency\HostReportController as AgencyHostReportController;
 use App\Http\Controllers\Agency\LiveRoomController as AgencyLiveRoomController;
 use App\Http\Controllers\Agency\PayoutReportController as AgencyPayoutReportController;
 use App\Http\Controllers\Agency\PkBattleController as AgencyPkBattleController;
@@ -86,6 +87,9 @@ Route::middleware(['auth', 'not_blocked', 'role:agency'])->prefix('agency')->nam
     Route::get('/', [\App\Http\Controllers\Agency\DashboardController::class, 'index'])->name('dashboard');
     Route::get('/hosts', [AgencyHostController::class, 'index'])->name('hosts.index');
     Route::get('/hosts/{host}', [AgencyHostController::class, 'show'])->name('hosts.show');
+    Route::get('/reports/hosts', [AgencyHostReportController::class, 'hosts'])->name('reports.hosts');
+    Route::get('/reports/hosts.csv', [AgencyHostReportController::class, 'hostsCsv'])->name('reports.hosts.csv');
+    Route::get('/reports/hosts/{host}', [AgencyHostReportController::class, 'hostShow'])->name('reports.hosts.show');
     Route::get('/calls', [AgencyCallReportController::class, 'index'])->name('calls.index');
     Route::get('/calls/export', [AgencyCallReportController::class, 'export'])->name('calls.export');
     Route::get('/video-rooms', [AgencyLiveRoomController::class, 'index'])->defaults('roomType', 'video')->name('video-rooms.index');

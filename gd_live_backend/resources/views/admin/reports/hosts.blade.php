@@ -1,4 +1,4 @@
-@extends('layouts.admin-tailadmin')
+@extends($reportLayout ?? 'layouts.admin-tailadmin')
 @section('title', 'Host Reports')
 
 @php
@@ -6,7 +6,7 @@
 @endphp
 
 @section('page_actions')
-  <x-ui.button variant="outline" size="sm" href="{{ route('admin.reports.hosts.csv', request()->query()) }}">Export CSV</x-ui.button>
+  <x-ui.button variant="outline" size="sm" href="{{ route($hostReportsCsvRouteName ?? 'admin.reports.hosts.csv', request()->query()) }}">Export CSV</x-ui.button>
 @endsection
 
 @section('content')
@@ -33,7 +33,7 @@
           <input type="date" name="to" class="{{ $inputClass }}" value="{{ $to->format('Y-m-d') }}">
           <div class="flex items-center gap-3">
             <x-ui.button type="submit" size="sm">Apply</x-ui.button>
-            <x-ui.button variant="outline" size="sm" href="{{ route('admin.reports.hosts') }}">Reset</x-ui.button>
+            <x-ui.button variant="outline" size="sm" href="{{ route($hostReportsRouteName ?? 'admin.reports.hosts') }}">Reset</x-ui.button>
           </div>
         </form>
       </div>
@@ -59,7 +59,7 @@
           <tr class="bg-white dark:bg-gray-900">
             <td class="px-4 py-4 text-gray-600 dark:text-gray-300">{{ $range==='weekly' ? \Carbon\Carbon::parse($r['week_start'])->format('d M Y') : \Carbon\Carbon::parse($r['date'])->format('d M Y') }}</td>
             <td class="px-4 py-4">
-              <a href="{{ route('admin.reports.hosts.show', ['host' => $r['host_id'], 'from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')]) }}" class="font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-300">
+              <a href="{{ route($hostReportShowRouteName ?? 'admin.reports.hosts.show', ['host' => $r['host_id'], 'from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')]) }}" class="font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-300">
                 {{ $reportHost?->user?->name ?? $reportHost?->stage_name ?? 'Unknown host' }}
               </a>
               <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">User ID: {{ $reportHost?->user_id ?? '—' }} · {{ $reportHost?->agency?->name ?? 'Independent' }}</div>

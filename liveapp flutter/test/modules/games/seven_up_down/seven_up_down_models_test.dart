@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-
-import '../../../../lib/modules/games/seven_up_down/models/seven_up_down_models.dart';
+import 'package:gd_live/modules/games/seven_up_down/models/seven_up_down_models.dart';
 
 void main() {
   test('parses backend dice result, pots, multipliers, and viewer bets', () {
@@ -8,6 +7,7 @@ void main() {
       'settings': {
         'display_name': 'Lucky 7',
         'enabled': true,
+        'fake_bets_enabled': true,
         'min_bet': 10,
         'max_bet': 5000,
         'pot_multipliers': {'DOWN': 3, 'SEVEN': 4, 'UP': 3},
@@ -34,6 +34,8 @@ void main() {
         'dice_two': 4,
         'dice_total': 7,
         'totals': {'DOWN': 100, 'SEVEN': 200, 'UP': 300},
+        'real_totals': {'DOWN': 50, 'SEVEN': 125, 'UP': 200},
+        'fake_totals': {'DOWN': 50, 'SEVEN': 75, 'UP': 100},
         'pot_multipliers': {'DOWN': 3, 'SEVEN': 4, 'UP': 3},
         'viewer_bets': [
           {
@@ -51,6 +53,7 @@ void main() {
 
     expect(snapshot.walletBalance, 900);
     expect(snapshot.settings.displayName, 'Lucky 7');
+    expect(snapshot.settings.fakeBetsEnabled, isTrue);
     expect(snapshot.settings.rules['SEVEN']!.diceCombinations, 6);
     expect(snapshot.settings.payoutType, 'total_return_including_stake');
     expect(snapshot.round.diceOne, 3);
@@ -58,6 +61,8 @@ void main() {
     expect(snapshot.round.diceTotal, 7);
     expect(snapshot.round.winningPot, 'SEVEN');
     expect(snapshot.round.multipliers['SEVEN'], 4);
+    expect(snapshot.round.realTotals['SEVEN'], 125);
+    expect(snapshot.round.fakeTotals['SEVEN'], 75);
     expect(snapshot.round.viewerBets.single.payoutCoins, 200);
     expect(snapshot.round.displayUntil, DateTime.utc(2026, 9, 1, 10, 0, 36));
   });

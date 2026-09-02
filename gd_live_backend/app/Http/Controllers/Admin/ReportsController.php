@@ -16,6 +16,7 @@ use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use DateInterval;
 use DatePeriod;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -32,12 +33,16 @@ class ReportsController extends Controller
         $from = $from->copy()->startOfDay();
         $to = $to->copy()->endOfDay();
 
-        $hosts = Host::with(['user', 'agency'])
+        $hosts = $this->hostReportQuery($request)
+            ->with(['user', 'agency'])
             ->when($hostId, fn ($query) => $query->whereKey($hostId))
             ->orderBy('id', 'desc')
             ->when(! $hostId, fn ($query) => $query->limit(500))
             ->get();
         $hostsById = $hosts->keyBy('id');
+        if ($hostId && ! $hostsById->has($hostId)) {
+            abort(404);
+        }
         $reportHostIds = $hostId
             ? collect([$hostId])
             : $hosts->pluck('id')->unique()->values();
@@ -201,6 +206,7 @@ class ReportsController extends Controller
             'range' => $range,
             'from' => $from,
             'to' => $to,
+            ...$this->hostReportViewData(),
         ]);
     }
 
@@ -269,6 +275,8 @@ class ReportsController extends Controller
 
     public function hostShow(Host $host, Request $request)
     {
+        $this->authorizeHostReport($request, $host);
+
         $timezone = (string) config('app.timezone', 'Asia/Kolkata');
         $from = $request->date('from', null, $timezone) ?: now($timezone)->subDays(6)->startOfDay();
         $to = $request->date('to', null, $timezone) ?: now($timezone)->endOfDay();
@@ -376,7 +384,29 @@ class ReportsController extends Controller
             'followers' => $host->followers()->with('user')->latest('id')->limit(20)->get(),
         ];
 
-        return view('admin.reports.host-show', compact('report'));
+        return view('admin.reports.host-show', [
+            'report' => $report,
+            ...$this->hostReportViewData($host),
+        ]);
+    }
+
+    protected function hostReportQuery(Request $request): Builder
+    {
+        return Host::query();
+    }
+
+    protected function authorizeHostReport(Request $request, Host $host): void {}
+
+    protected function hostReportViewData(?Host $host = null): array
+    {
+        return [
+            'reportLayout' => 'layouts.admin-tailadmin',
+            'hostReportsRouteName' => 'admin.reports.hosts',
+            'hostReportsCsvRouteName' => 'admin.reports.hosts.csv',
+            'hostReportShowRouteName' => 'admin.reports.hosts.show',
+            'hostActionRoute' => $host ? route('admin.hosts.edit', $host) : null,
+            'hostActionLabel' => 'Edit Host',
+        ];
     }
 
     public function levels(Request $request)

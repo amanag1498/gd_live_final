@@ -109,6 +109,7 @@ class PanelNavigation
                 'title' => 'Operations',
                 'items' => [
                     self::item('Hosts', 'agency.hosts.index', 'users', ['agency.hosts.*']),
+                    self::item('Host Reports', 'agency.reports.hosts', 'chart', ['agency.reports.hosts*']),
                     self::item('Calls', 'agency.calls.index', 'phone', ['agency.calls.*']),
                     self::item('Video Rooms', 'agency.video-rooms.index', 'video', ['agency.video-rooms.*']),
                     self::item('PK Battles', 'agency.pk-battles.index', 'sparkles', ['agency.pk-battles.*']),

@@ -223,6 +223,69 @@ class AgencyReportingTest extends TestCase
             ->assertSee('Recent Live Rooms');
     }
 
+    public function test_agency_host_reports_are_limited_to_its_own_hosts(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('agency');
+        $agency = Agency::query()->create([
+            'owner_user_id' => $owner->id,
+            'name' => 'Orbit Agency',
+        ]);
+        $ownHostUser = User::factory()->create(['name' => 'Orbit Host']);
+        $ownHost = Host::query()->create([
+            'user_id' => $ownHostUser->id,
+            'agency_id' => $agency->id,
+            'stage_name' => 'Orbit Nova',
+        ]);
+
+        $otherOwner = User::factory()->create();
+        $otherAgency = Agency::query()->create([
+            'owner_user_id' => $otherOwner->id,
+            'name' => 'Other Agency',
+        ]);
+        $otherHostUser = User::factory()->create(['name' => 'Other Host']);
+        $otherHost = Host::query()->create([
+            'user_id' => $otherHostUser->id,
+            'agency_id' => $otherAgency->id,
+            'stage_name' => 'Other Nova',
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('agency.reports.hosts', ['range' => 'weekly']))
+            ->assertOk()
+            ->assertSee('Host Reports')
+            ->assertSee('Orbit Host')
+            ->assertDontSee('Other Host');
+
+        $csv = $this->actingAs($owner)
+            ->get(route('agency.reports.hosts.csv', ['range' => 'weekly']))
+            ->assertOk()
+            ->streamedContent();
+        $exportedHostUserIds = collect(preg_split('/\r\n|\r|\n/', trim($csv)))
+            ->skip(1)
+            ->filter()
+            ->map(fn (string $line) => str_getcsv($line)[1] ?? null)
+            ->filter()
+            ->map(fn (string $id) => (int) $id)
+            ->values();
+        $this->assertContains($ownHostUser->id, $exportedHostUserIds);
+        $this->assertNotContains($otherHostUser->id, $exportedHostUserIds);
+
+        $this->actingAs($owner)
+            ->get(route('agency.reports.hosts.show', $ownHost))
+            ->assertOk()
+            ->assertSee('Orbit Host')
+            ->assertSee('Weekly Breakdown');
+
+        $this->actingAs($owner)
+            ->get(route('agency.reports.hosts.show', $otherHost))
+            ->assertNotFound();
+
+        $this->actingAs($owner)
+            ->get(route('agency.reports.hosts', ['host_id' => $otherHost->id]))
+            ->assertNotFound();
+    }
+
     public function test_avatar_media_route_serves_public_avatar_files(): void
     {
         Storage::fake('public');

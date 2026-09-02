@@ -46,6 +46,7 @@ class SevenUpDownSettings {
   const SevenUpDownSettings({
     required this.displayName,
     required this.enabled,
+    required this.fakeBetsEnabled,
     required this.minBet,
     required this.maxBet,
     required this.roundDurationSeconds,
@@ -59,6 +60,7 @@ class SevenUpDownSettings {
 
   final String displayName;
   final bool enabled;
+  final bool fakeBetsEnabled;
   final int minBet;
   final int maxBet;
   final int roundDurationSeconds;
@@ -75,6 +77,7 @@ class SevenUpDownSettings {
     return SevenUpDownSettings(
       displayName: (json['display_name'] ?? 'Lucky 7').toString(),
       enabled: _bool(json['enabled']),
+      fakeBetsEnabled: _bool(json['fake_bets_enabled']),
       minBet: _int(json['min_bet'], 10),
       maxBet: _int(json['max_bet'], 5000),
       roundDurationSeconds: _int(json['round_duration_seconds'], 30),
@@ -151,6 +154,8 @@ class SevenUpDownRound {
     required this.diceTwo,
     required this.diceTotal,
     required this.totals,
+    required this.realTotals,
+    required this.fakeTotals,
     required this.multipliers,
     required this.viewerBets,
   });
@@ -168,11 +173,15 @@ class SevenUpDownRound {
   final int? diceTwo;
   final int? diceTotal;
   final Map<String, int> totals;
+  final Map<String, int> realTotals;
+  final Map<String, int> fakeTotals;
   final Map<String, int> multipliers;
   final List<SevenUpDownBet> viewerBets;
 
   factory SevenUpDownRound.fromJson(Map<String, dynamic> json) {
     final totals = _map(json['totals']);
+    final realTotals = _map(json['real_totals']);
+    final fakeTotals = _map(json['fake_totals']);
     final multipliers = _map(json['pot_multipliers']);
     return SevenUpDownRound(
       id: _int(json['id']),
@@ -191,6 +200,16 @@ class SevenUpDownRound {
         'DOWN': _int(totals['DOWN']),
         'SEVEN': _int(totals['SEVEN']),
         'UP': _int(totals['UP']),
+      },
+      realTotals: {
+        'DOWN': _int(realTotals['DOWN'], _int(totals['DOWN'])),
+        'SEVEN': _int(realTotals['SEVEN'], _int(totals['SEVEN'])),
+        'UP': _int(realTotals['UP'], _int(totals['UP'])),
+      },
+      fakeTotals: {
+        'DOWN': _int(fakeTotals['DOWN']),
+        'SEVEN': _int(fakeTotals['SEVEN']),
+        'UP': _int(fakeTotals['UP']),
       },
       multipliers: {
         'DOWN': _int(multipliers['DOWN'], 3),
@@ -223,6 +242,8 @@ class SevenUpDownRound {
       diceTwo: diceTwo,
       diceTotal: diceTotal,
       totals: totals,
+      realTotals: realTotals,
+      fakeTotals: fakeTotals,
       multipliers: multipliers,
       viewerBets: viewerBets ?? this.viewerBets,
     );

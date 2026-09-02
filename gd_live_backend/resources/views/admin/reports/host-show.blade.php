@@ -1,4 +1,4 @@
-@extends('layouts.admin-tailadmin')
+@extends($reportLayout ?? 'layouts.admin-tailadmin')
 @section('title', ($report['host']->user?->name ?? $report['host']->stage_name ?? ('User #'.$report['host']->user_id)) . ' Report')
 
 @php
@@ -10,8 +10,10 @@
 
 @section('page_actions')
   <div class="flex gap-3">
-    <x-ui.button variant="outline" size="sm" href="{{ route('admin.reports.hosts', ['from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')]) }}">Back to Host Reports</x-ui.button>
-    <x-ui.button size="sm" href="{{ route('admin.hosts.edit', $host) }}">Edit Host</x-ui.button>
+    <x-ui.button variant="outline" size="sm" href="{{ route($hostReportsRouteName ?? 'admin.reports.hosts', ['from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')]) }}">Back to Host Reports</x-ui.button>
+    @if(!empty($hostActionRoute))
+      <x-ui.button size="sm" href="{{ $hostActionRoute }}">{{ $hostActionLabel ?? 'View Host' }}</x-ui.button>
+    @endif
   </div>
 @endsection
 

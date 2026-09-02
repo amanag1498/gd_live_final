@@ -1029,7 +1029,7 @@ class SevenUpDownService
             'UP' => (int) $round->total_bet_up,
         ];
         $fakeTotals = $this->fakeBetsEnabled()
-            ? $this->fakeTotalsForRound($round, $phase)
+            ? $this->fakeTotalsForRound($round)
             : ['DOWN' => 0, 'SEVEN' => 0, 'UP' => 0];
         $displayTotals = [
             'DOWN' => $realTotals['DOWN'] + $fakeTotals['DOWN'],
@@ -1152,9 +1152,9 @@ class SevenUpDownService
         ];
     }
 
-    private function fakeTotalsForRound(SevenUpDownRound $round, string $phase): array
+    private function fakeTotalsForRound(SevenUpDownRound $round): array
     {
-        $seed = sprintf('%s|%s|%s', $round->round_key, $round->starts_at?->timestamp ?? 0, $phase);
+        $seed = sprintf('%s|%s', $round->round_key, $round->starts_at?->timestamp ?? 0);
         $band = max($this->minBet(), (int) floor(max($this->minBet(), $this->maxBet()) * 1.8));
 
         return [
