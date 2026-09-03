@@ -39,6 +39,8 @@ class AdminAppSettingsTest extends TestCase
             ->assertOk()
             ->assertSee('App Settings')
             ->assertSee('Maintenance Mode')
+            ->assertSee('Demo Account Login')
+            ->assertSee('Demo Account Email')
             ->assertSee('Android Feature Flags')
             ->assertSee('iOS Feature Flags');
     }
@@ -95,6 +97,8 @@ class AdminAppSettingsTest extends TestCase
         ])->getJson('/api/app-config')
             ->assertOk()
             ->assertJsonPath('data.force_app_upgrade_enabled', true)
+            ->assertJsonPath('data.demo_login_enabled', false)
+            ->assertJsonMissingPath('data.demo_login_email')
             ->assertJsonPath('data.platform', 'ios')
             ->assertJsonPath('data.features.wallet_recharge_enabled', true)
             ->assertJsonStructure([
@@ -102,6 +106,7 @@ class AdminAppSettingsTest extends TestCase
                 'data' => [
                     'maintenance_mode_enabled',
                     'force_app_upgrade_enabled',
+                    'demo_login_enabled',
                     'android_min_version_code',
                     'android_min_version_name',
                     'android_update_message',
@@ -127,6 +132,48 @@ class AdminAppSettingsTest extends TestCase
                     ],
                 ],
             ]);
+    }
+
+    public function test_admin_can_enable_demo_login_for_an_existing_user(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        $demoUser = User::factory()->create(['email' => 'reviewer@gdlive.test']);
+
+        $payload = $this->validAppSettingsPayload([
+            'app_features.demo_login_enabled' => 1,
+            'app_features.demo_login_email' => $demoUser->email,
+        ]);
+
+        $this->actingAs($admin)
+            ->put(route('admin.settings.app.update'), $payload)
+            ->assertRedirect(route('admin.settings.app.edit'));
+
+        $this->assertDatabaseHas('app_settings', [
+            'key' => 'app_features.demo_login_enabled',
+            'value' => '1',
+        ]);
+        $this->assertDatabaseHas('app_settings', [
+            'key' => 'app_features.demo_login_email',
+            'value' => $demoUser->email,
+        ]);
+    }
+
+    public function test_admin_cannot_enable_demo_login_without_an_existing_email(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+
+        $payload = $this->validAppSettingsPayload([
+            'app_features.demo_login_enabled' => 1,
+            'app_features.demo_login_email' => '',
+        ]);
+
+        $this->actingAs($admin)
+            ->from(route('admin.settings.app.edit'))
+            ->put(route('admin.settings.app.update'), $payload)
+            ->assertRedirect(route('admin.settings.app.edit'))
+            ->assertSessionHasErrors('app_features.demo_login_email');
     }
 
     public function test_legacy_app_config_request_defaults_to_android_shape(): void

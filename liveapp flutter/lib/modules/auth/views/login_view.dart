@@ -94,7 +94,25 @@ class _GdLoginView extends GetView<AuthController> {
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 const SizedBox(height: 8),
-                                const GdLiveLogo(size: 58, showWordmark: false),
+                                GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: () {
+                                    if (controller.registerLogoTap()) {
+                                      _showDemoLoginDialog(
+                                        context,
+                                        controller,
+                                        tokens,
+                                      );
+                                    }
+                                  },
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(8),
+                                    child: GdLiveLogo(
+                                      size: 58,
+                                      showWordmark: false,
+                                    ),
+                                  ),
+                                ),
                                 const SizedBox(height: 18),
                                 Text(
                                   'GD Live',
@@ -148,6 +166,72 @@ class _GdLoginView extends GetView<AuthController> {
         ),
       ),
     );
+  }
+}
+
+Future<void> _showDemoLoginDialog(
+  BuildContext context,
+  AuthController controller,
+  BrandTokens tokens,
+) async {
+  final emailController = TextEditingController();
+  final formKey = GlobalKey<FormState>();
+  final email = await showDialog<String>(
+    context: context,
+    builder:
+        (dialogContext) => AlertDialog(
+          title: const Text('Reviewer sign in'),
+          content: Form(
+            key: formKey,
+            child: TextFormField(
+              controller: emailController,
+              autofocus: true,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.done,
+              autocorrect: false,
+              decoration: const InputDecoration(
+                labelText: 'Demo account email',
+                hintText: 'reviewer@example.com',
+              ),
+              validator: (value) {
+                final normalized = value?.trim() ?? '';
+                if (!RegExp(
+                  r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+                ).hasMatch(normalized)) {
+                  return 'Enter a valid email address.';
+                }
+                return null;
+              },
+              onFieldSubmitted: (_) {
+                if (formKey.currentState?.validate() ?? false) {
+                  Navigator.of(dialogContext).pop(emailController.text.trim());
+                }
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: tokens.primaryButtonGradient.first,
+              ),
+              onPressed: () {
+                if (formKey.currentState?.validate() ?? false) {
+                  Navigator.of(dialogContext).pop(emailController.text.trim());
+                }
+              },
+              child: const Text('Sign in'),
+            ),
+          ],
+        ),
+  );
+  emailController.dispose();
+
+  if (email != null && email.isNotEmpty) {
+    await controller.loginWithDemo(email);
   }
 }
 

@@ -11,7 +11,7 @@ class AppSettingsService
 {
     private const SETTINGS_CACHE_KEY = 'app_settings:all:v1';
 
-    private const PUBLIC_APP_CONFIG_CACHE_KEY = 'app_config:public:v4';
+    private const PUBLIC_APP_CONFIG_CACHE_KEY = 'app_config:public:v5';
 
     public const APP_DEFINITIONS = [
         'app_features.maintenance_mode_enabled' => [
@@ -27,6 +27,21 @@ class AppSettingsService
             'group' => 'general',
             'default' => false,
             'hint' => 'Signals clients that a mandatory upgrade flow should be enforced.',
+        ],
+        'app_features.demo_login_enabled' => [
+            'label' => 'Demo Account Login',
+            'type' => 'boolean',
+            'group' => 'general',
+            'default' => false,
+            'hint' => 'Allows the configured review account to sign in from the hidden triple-tap logo flow.',
+        ],
+        'app_features.demo_login_email' => [
+            'label' => 'Demo Account Email',
+            'type' => 'string',
+            'input_type' => 'email',
+            'group' => 'general',
+            'default' => '',
+            'hint' => 'Must match an existing user. This email is never included in the public app settings payload.',
         ],
         'app_features.android_min_version_code' => [
             'label' => 'Android Min Version Code',
@@ -700,6 +715,7 @@ class AppSettingsService
             return [
                 'maintenance_mode_enabled' => (bool) config('app_features.maintenance_mode_enabled', false),
                 'force_app_upgrade_enabled' => (bool) config('app_features.force_app_upgrade_enabled', false),
+                'demo_login_enabled' => (bool) config('app_features.demo_login_enabled', false),
                 'android_min_version_code' => $this->minimumAndroidVersionCode(),
                 'android_min_version_name' => $this->minimumAndroidVersionName(),
                 'android_update_message' => $this->androidUpdateMessage(),

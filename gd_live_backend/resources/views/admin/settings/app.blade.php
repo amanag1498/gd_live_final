@@ -53,7 +53,7 @@
                   @endforeach
                 </select>
               @elseif(($definition['type'] ?? 'boolean') === 'csv_integer_list' || ($definition['type'] ?? 'boolean') === 'string')
-                <input type="text" class="{{ $inputClass }}" name="{{ $inputName }}" value="{{ old($key, $values[$key] ?? $definition['default'] ?? '') }}">
+                <input type="{{ $definition['input_type'] ?? 'text' }}" class="{{ $inputClass }}" name="{{ $inputName }}" value="{{ old($key, $values[$key] ?? $definition['default'] ?? '') }}">
               @elseif(($definition['type'] ?? 'boolean') === 'integer')
                 <input
                   type="number"

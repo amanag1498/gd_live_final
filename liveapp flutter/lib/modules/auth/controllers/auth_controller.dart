@@ -17,6 +17,7 @@ class AuthController extends GetxController {
   final RxBool loading = false.obs;
   final RxString activeProvider = ''.obs;
   final RxString error = ''.obs;
+  final DemoLogoTapTracker _demoLogoTapTracker = DemoLogoTapTracker();
 
   bool get isLoggedIn => auth.isLoggedIn;
 
@@ -34,6 +35,19 @@ class AuthController extends GetxController {
 
   Future<void> loginWithApple() async {
     await _login('apple', auth.signInWithAppleAndBackend);
+  }
+
+  Future<void> loginWithDemo(String email) async {
+    await _login('demo', () => auth.signInWithDemoEmail(email));
+  }
+
+  bool registerLogoTap({DateTime? at}) {
+    if (!Get.isRegistered<AppSettingsService>() ||
+        !Get.find<AppSettingsService>().demoLoginEnabled) {
+      _demoLogoTapTracker.clear();
+      return false;
+    }
+    return _demoLogoTapTracker.register(at ?? DateTime.now());
   }
 
   Future<void> _login(
@@ -114,4 +128,22 @@ String friendlyAuthError(Object error) {
   return message
       .replaceFirst(RegExp(r'^Exception:\s*'), '')
       .replaceFirst(RegExp(r'^FirebaseAuthException:\s*'), '');
+}
+
+@visibleForTesting
+class DemoLogoTapTracker {
+  final List<DateTime> _taps = <DateTime>[];
+
+  bool register(DateTime at) {
+    _taps.removeWhere(
+      (tap) => at.difference(tap) > const Duration(milliseconds: 1200),
+    );
+    _taps.add(at);
+    if (_taps.length < 3) return false;
+
+    clear();
+    return true;
+  }
+
+  void clear() => _taps.clear();
 }

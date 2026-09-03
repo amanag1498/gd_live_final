@@ -142,6 +142,8 @@ class AppSettingsService extends GetxService with WidgetsBindingObserver {
   bool get forceAppUpgradeEnabled =>
       payload.value?.forceAppUpgradeEnabled ?? false;
 
+  bool get demoLoginEnabled => payload.value?.demoLoginEnabled ?? false;
+
   bool get shouldForceUpgrade {
     final config = payload.value;
     if (config == null || !config.forceAppUpgradeEnabled) {
@@ -203,6 +205,7 @@ class AppSettingsPayload {
   const AppSettingsPayload({
     required this.maintenanceModeEnabled,
     required this.forceAppUpgradeEnabled,
+    required this.demoLoginEnabled,
     required this.minimumVersionCode,
     required this.minimumVersionName,
     required this.updateMessage,
@@ -211,6 +214,7 @@ class AppSettingsPayload {
 
   final bool maintenanceModeEnabled;
   final bool forceAppUpgradeEnabled;
+  final bool demoLoginEnabled;
   final int minimumVersionCode;
   final String minimumVersionName;
   final String updateMessage;
@@ -220,6 +224,7 @@ class AppSettingsPayload {
     return AppSettingsPayload(
       maintenanceModeEnabled: _toBool(json['maintenance_mode_enabled']),
       forceAppUpgradeEnabled: _toBool(json['force_app_upgrade_enabled']),
+      demoLoginEnabled: _toBool(json['demo_login_enabled']),
       minimumVersionCode: _toInt(
         json['minimum_version_code'] ?? json['android_min_version_code'],
         1,

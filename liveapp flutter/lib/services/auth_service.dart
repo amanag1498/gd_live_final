@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:get/get.dart';
+import 'package:get/get.dart' hide Response;
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:dio/dio.dart';
@@ -189,6 +189,19 @@ class AuthService {
     }
   }
 
+  Future<UserModel> signInWithDemoEmail(String email) async {
+    try {
+      final res = await api.post<Map<String, dynamic>>(
+        'auth/demo/login',
+        data: {'email': email.trim(), 'device_name': 'flutter-demo'},
+      );
+      return _completeBackendLogin(res, deviceName: 'flutter-demo');
+    } on DioException catch (e) {
+      await _throwFriendlyBackendError(e);
+      rethrow;
+    }
+  }
+
   Future<UserModel> _completeFirebaseLogin(
     fb.User firebaseUser, {
     required String deviceName,
@@ -201,6 +214,13 @@ class AuthService {
       data: {'idToken': idToken, 'device_name': deviceName},
     );
 
+    return _completeBackendLogin(res, deviceName: deviceName);
+  }
+
+  Future<UserModel> _completeBackendLogin(
+    Response<Map<String, dynamic>> res, {
+    required String deviceName,
+  }) async {
     final status = res.statusCode ?? 0;
     final data = res.data ?? {};
     if (status != 200 || data['ok'] != true) {

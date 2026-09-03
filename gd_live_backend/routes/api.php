@@ -38,6 +38,7 @@ use App\Http\Controllers\Api\UserReportController;
 use App\Http\Controllers\Api\WalletApiController;
 use App\Http\Controllers\Api\WsModerationController;
 use App\Http\Controllers\Auth\FirebaseAuthApiController;
+use App\Http\Controllers\Auth\DemoAuthApiController;
 use App\Models\UserSubscription;
 use App\Services\AppSettingsService;
 use Illuminate\Http\Request;
@@ -218,6 +219,7 @@ Route::middleware('throttle:240,1')->group(function () {
 });
 
 Route::post('/auth/firebase/login', [FirebaseAuthApiController::class, 'login']);
+Route::post('/auth/demo/login', DemoAuthApiController::class)->middleware('throttle:5,1');
 Route::post('/payments/razorpay/webhook', RazorpayWebhookController::class)->middleware('throttle:120,1');
 Route::post('/payments/apple/notifications', AppleIapNotificationController::class)->middleware('throttle:120,1');
 Route::middleware('auth:sanctum')->post('/auth/logout', [FirebaseAuthApiController::class, 'logout']);

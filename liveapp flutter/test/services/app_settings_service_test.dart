@@ -12,6 +12,7 @@ void main() {
       final payload = AppSettingsPayload.fromJson({
         'maintenance_mode_enabled': true,
         'force_app_upgrade_enabled': true,
+        'demo_login_enabled': true,
         'minimum_version_code': 63,
         'minimum_version_name': '1.1.0',
         'update_message': 'Update from the store',
@@ -20,6 +21,7 @@ void main() {
 
       expect(payload.maintenanceModeEnabled, isTrue);
       expect(payload.forceAppUpgradeEnabled, isTrue);
+      expect(payload.demoLoginEnabled, isTrue);
       expect(payload.minimumVersionCode, 63);
       expect(payload.minimumVersionName, '1.1.0');
       expect(payload.updateMessage, 'Update from the store');
@@ -48,6 +50,7 @@ void main() {
 
       expect(payload.maintenanceModeEnabled, isFalse);
       expect(payload.forceAppUpgradeEnabled, isFalse);
+      expect(payload.demoLoginEnabled, isFalse);
       expect(payload.minimumVersionCode, 1);
       expect(payload.features.videoRoomsEnabled, isTrue);
     });

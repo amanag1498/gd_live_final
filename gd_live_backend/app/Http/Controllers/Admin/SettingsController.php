@@ -85,6 +85,11 @@ class SettingsController extends Controller
         $rules = [];
         foreach (AppSettingsService::APP_DEFINITIONS as $key => $definition) {
             $type = $definition['type'] ?? 'boolean';
+            if ($key === 'app_features.demo_login_email') {
+                $rules[$key] = 'nullable|email:rfc|max:255';
+                continue;
+            }
+
             if ($type === 'string' && !empty($definition['options'])) {
                 $options = implode(',', $definition['options'] ?? []);
                 $rules[$key] = 'required|string|in:' . $options;
@@ -117,6 +122,18 @@ class SettingsController extends Controller
         }
 
         $validated = $request->validate($rules);
+        if ((bool) data_get($validated, 'app_features.demo_login_enabled')) {
+            $demoEmail = mb_strtolower(trim((string) data_get($validated, 'app_features.demo_login_email')));
+            $demoUser = \App\Models\User::query()
+                ->whereRaw('LOWER(email) = ?', [$demoEmail])
+                ->first();
+            if (!$demoUser) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'app_features.demo_login_email' => 'Choose an existing user email before enabling demo login.',
+                ]);
+            }
+            data_set($validated, 'app_features.demo_login_email', $demoUser->email);
+        }
         $this->settings->updateAppSettings($validated['app_features']);
 
         return redirect()
