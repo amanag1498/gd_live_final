@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\UserReport;
 use App\Services\AutoModerationService;
 use App\Services\ModerationService;
+use App\Services\UserBlockService;
 use Illuminate\Http\Request;
 
 class WsModerationController extends Controller
@@ -15,6 +16,7 @@ class WsModerationController extends Controller
     public function __construct(
         private ModerationService $moderation,
         private AutoModerationService $autoModeration,
+        private UserBlockService $userBlocks,
     ) {
     }
 
@@ -50,8 +52,20 @@ class WsModerationController extends Controller
         $room = LiveRoom::query()->where('room_id', $data['room_id'])->firstOrFail();
         $hostUserId = $this->moderation->hostUserIdForRoom($room);
         $isBlocked = $this->moderation->isBlockedByHostUserId($hostUserId, $user->id);
-        if (!$isBlocked) {
+        $blockedHost = $hostUserId && $this->userBlocks->hasBlocked($user, $hostUserId);
+        if (!$isBlocked && !$blockedHost) {
             $this->autoModeration->clearChatState($room, $user);
+        }
+
+        if ($blockedHost) {
+            return response()->json([
+                'ok' => true,
+                'allow' => false,
+                'code' => 'YOU_BLOCKED_HOST',
+                'reason' => 'You blocked this host. Unblock them to join this room.',
+                'host_user_id' => $hostUserId,
+                'target_user_id' => (int) $user->id,
+            ]);
         }
 
         return response()->json([

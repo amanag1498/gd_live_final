@@ -40,6 +40,7 @@ import '../../../services/livekit_video_quality.dart';
 import '../../games/fortune_wheel/widgets/fortune_wheel_panel.dart';
 import '../../games/teen_patti/widgets/teen_patti_game_panel.dart';
 import '../../profile/widgets/public_profile_card_sheet.dart';
+import '../../profile/controllers/user_block_controller.dart';
 import '../../wallet/services/wallet_api.dart';
 import '../../wallet/widgets/recharge_bottom_sheet.dart';
 import '../dev/live_room_dev_fixtures.dart';
@@ -663,6 +664,10 @@ class _VideoCallPageState extends State<VideoCallPage>
       l.on<ParticipantConnectedEvent>((event) {
         if (!mounted) return;
         _handleParticipantConnected(event.participant, room);
+        final userId = _participantUserId(event.participant);
+        if (_personalBlocks.isBlocked(userId)) {
+          unawaited(_setParticipantMediaEnabled(userId!, false));
+        }
         _syncHostPresenceWatchdog(room);
         setState(() {});
         unawaited(_refreshSeatSnapshot());
@@ -678,8 +683,12 @@ class _VideoCallPageState extends State<VideoCallPage>
         setState(() {});
         unawaited(_refreshSeatSnapshot());
       });
-      l.on<TrackSubscribedEvent>((_) {
+      l.on<TrackSubscribedEvent>((event) {
         if (!mounted) return;
+        final userId = _participantUserId(event.participant);
+        if (_personalBlocks.isBlocked(userId)) {
+          unawaited(event.publication.disable());
+        }
         setState(() {});
       });
       l.on<TrackUnsubscribedEvent>((_) {
@@ -704,6 +713,11 @@ class _VideoCallPageState extends State<VideoCallPage>
 
       l.on<DataReceivedEvent>((ev) {
         try {
+          final sender = ev.participant;
+          if (sender != null &&
+              _personalBlocks.isBlocked(_participantUserId(sender))) {
+            return;
+          }
           final msg = String.fromCharCodes(ev.data);
           if (msg.startsWith('rx:')) {
             _emojiKey.currentState?.burst(msg.substring(3));
@@ -1117,6 +1131,7 @@ class _VideoCallPageState extends State<VideoCallPage>
             : null;
     final name = event['name']?.toString().trim() ?? '';
     if (userId == null || name.isEmpty) return;
+    if (_personalBlocks.isBlocked(_safeInt(userId))) return;
 
     final request = RoomJoinAnimationRequest(
       userId: userId,
@@ -1170,6 +1185,7 @@ class _VideoCallPageState extends State<VideoCallPage>
     Participant participant,
   ) {
     final metadata = _participantMetadata(participant);
+    if (_personalBlocks.isBlocked(_participantUserId(participant))) return null;
     final name = _joinParticipantName(participant, metadata);
     if (name.isEmpty) return null;
 
@@ -1359,6 +1375,9 @@ class _VideoCallPageState extends State<VideoCallPage>
     if (_isHost) {
       return Get.find<AuthService>().currentUser?.id;
     }
+    if (widget.room.hostUserId != null && widget.room.hostUserId! > 0) {
+      return widget.room.hostUserId;
+    }
     final metaUserId = _safeInt(widget.room.meta?['host_user_id']);
     if (metaUserId != null && metaUserId > 0) {
       return metaUserId;
@@ -1367,8 +1386,7 @@ class _VideoCallPageState extends State<VideoCallPage>
     if (room != null) {
       for (final participant in room.remoteParticipants.values) {
         if (participant.identity.startsWith('host-')) {
-          final metadata = _participantMetadata(participant);
-          final participantUserId = _safeInt(metadata['user_id']);
+          final participantUserId = _participantUserId(participant);
           if (participantUserId != null && participantUserId > 0) {
             return participantUserId;
           }
@@ -1515,6 +1533,7 @@ class _VideoCallPageState extends State<VideoCallPage>
     final canModerate =
         _isHost && _myUserId != null && userId > 0 && userId != _myUserId;
     var isBlocked = false;
+    final personallyBlocked = _personalBlocks.isBlocked(userId);
     if (canModerate) {
       try {
         final rows = await widget.live.fetchHostBlockedUsers();
@@ -1572,6 +1591,29 @@ class _VideoCallPageState extends State<VideoCallPage>
                   );
                 },
               ),
+              if (userId != _myUserId)
+                _videoParticipantActionTile(
+                  icon:
+                      personallyBlocked
+                          ? Icons.lock_open_rounded
+                          : Icons.person_off_rounded,
+                  title: personallyBlocked ? 'Unblock for me' : 'Block for me',
+                  subtitle:
+                      personallyBlocked
+                          ? 'Restore messages and direct interactions'
+                          : isHost
+                          ? 'Leave and hide this host’s rooms'
+                          : 'Hide their messages without removing them',
+                  destructive: !personallyBlocked,
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    if (personallyBlocked) {
+                      _unblockForMe(userId, name);
+                    } else {
+                      _blockForMe(userId, name, isHost);
+                    }
+                  },
+                ),
               _videoParticipantActionTile(
                 icon: Icons.flag_rounded,
                 title: 'Report user',
@@ -1655,7 +1697,130 @@ class _VideoCallPageState extends State<VideoCallPage>
       initialSpeaking: speaking,
       initialLevel: level,
       initialAvatarUrl: avatarUrl,
+    ).then((blocked) async {
+      if (blocked != true) return;
+      await _applyPersonalBlockLocally(userId);
+      if (!_isHost && userId == _hostUserId) {
+        await _forceExitViewerAfterBlock();
+      } else if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  UserBlockController get _personalBlocks => Get.find<UserBlockController>();
+
+  Future<void> _blockForMe(int userId, String name, bool isHost) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            title: Text('Block $name for you?'),
+            content: Text(
+              isHost
+                  ? 'You will leave this room and this host’s rooms will be '
+                      'hidden. The host and other viewers are not affected.'
+                  : 'Their messages and media will be hidden from you. They '
+                      'will remain in this host’s room.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Block'),
+              ),
+            ],
+          ),
     );
+    if (confirmed != true || !mounted) return;
+    try {
+      await _personalBlocks.block(userId);
+      await _applyPersonalBlockLocally(userId);
+      if (!_isHost && userId == _hostUserId) {
+        await _forceExitViewerAfterBlock();
+      } else if (mounted) {
+        setState(() {});
+      }
+    } catch (exception) {
+      _showLiveMessage(
+        'Could not block user',
+        exception.toString().replaceFirst('Exception: ', ''),
+      );
+    }
+  }
+
+  Future<void> _unblockForMe(int userId, String name) async {
+    try {
+      await _personalBlocks.unblock(userId);
+      await _setParticipantMediaEnabled(userId, true);
+      if (mounted) setState(() {});
+      _showLiveMessage('Privacy', '$name was unblocked.');
+    } catch (exception) {
+      _showLiveMessage(
+        'Could not unblock user',
+        exception.toString().replaceFirst('Exception: ', ''),
+      );
+    }
+  }
+
+  Future<void> _setParticipantMediaEnabled(int userId, bool enabled) async {
+    final room = _room;
+    if (room == null) return;
+    for (final targetRoom in <Room?>[room, _opponentRoom]) {
+      if (targetRoom == null) continue;
+      for (final participant in targetRoom.remoteParticipants.values) {
+        if (_participantUserId(participant) != userId) continue;
+        for (final publication in participant.trackPublications.values) {
+          if (enabled) {
+            await publication.enable();
+          } else {
+            await publication.disable();
+          }
+        }
+      }
+    }
+  }
+
+  int? _participantUserId(Participant participant) {
+    final metadataUserId = _safeInt(
+      _participantMetadata(participant)['user_id'],
+    );
+    if (metadataUserId != null && metadataUserId > 0) return metadataUserId;
+
+    final match = RegExp(
+      r'^(?:user:|host-)(\d+)',
+    ).firstMatch(participant.identity);
+    return match == null ? null : int.tryParse(match.group(1)!);
+  }
+
+  Future<void> _applyPersonalBlockLocally(int userId) async {
+    _chatMessages.value = _chatMessages.value
+        .where((message) => message.isSystem || message.senderId != userId)
+        .toList(growable: false);
+    _pkGiftLeadersBySide = <String, Map<int, _PkSupporterStanding>>{
+      for (final entry in _pkGiftLeadersBySide.entries)
+        entry.key: Map<int, _PkSupporterStanding>.from(entry.value)
+          ..remove(userId),
+    };
+    _recentGiftTimer?.cancel();
+    _recentGiftMessage = null;
+    _giftAnimationOverlay.clear();
+    await _setParticipantMediaEnabled(userId, false);
+  }
+
+  Future<void> _forceExitViewerAfterBlock() async {
+    if (_exiting) return;
+    _exiting = true;
+    _giftAnimationOverlay.clear();
+    await _leaveSessionOnce();
+    _leaveSocketRoom();
+    try {
+      await _room?.disconnect();
+    } catch (_) {}
+    _popLivePage();
   }
 
   Future<void> _openPkSupporterProfile(_PkSupporterStanding supporter) {
@@ -3025,7 +3190,7 @@ class _VideoCallPageState extends State<VideoCallPage>
 
     for (final participant in room.remoteParticipants.values) {
       final metadata = _participantMetadata(participant);
-      final userId = _safeInt(metadata['user_id']);
+      final userId = _participantUserId(participant);
       if (userId == null || userId <= 0 || userId == _myUserId) continue;
       if (!seen.add(userId)) continue;
 
@@ -3285,6 +3450,7 @@ class _VideoCallPageState extends State<VideoCallPage>
       if (!touchesCurrentRoom) return;
       if (eventRoomType.isNotEmpty && eventRoomType != expectedRoomType) return;
       final senderId = _safeInt(event['sender_user_id']);
+      if (_personalBlocks.isBlocked(senderId)) return;
       final senderName = (event['sender_name'] ?? 'Someone').toString();
       final giftName = (event['gift_name'] ?? 'a gift').toString();
       final quantity = _safeInt(event['quantity']) ?? 1;
@@ -3345,6 +3511,11 @@ class _VideoCallPageState extends State<VideoCallPage>
     _chatEventsSub = rooms.messageEvents.listen((event) {
       if (!mounted) return;
       if ((event['room_id'] ?? '').toString() != widget.room.roomId) return;
+      if (_personalBlocks.isBlocked(
+        _safeInt(event['sender_id'] ?? event['sender_user_id']),
+      )) {
+        return;
+      }
       _appendChatMessage(LiveRoomChatMessage.fromSocketJson(event));
     });
     _chatErrorsSub = rooms.messageErrors.listen((event) {
@@ -3352,11 +3523,7 @@ class _VideoCallPageState extends State<VideoCallPage>
       if ((event['room_id'] ?? '').toString() != widget.room.roomId) return;
       final message =
           (event['message'] ?? 'Unable to send message.').toString();
-      _showLiveMessage(
-        'Chat',
-        message,
-        duration: const Duration(seconds: 2),
-      );
+      _showLiveMessage('Chat', message, duration: const Duration(seconds: 2));
     });
     _profileEventsSub = rooms.profileEvents.listen((event) {
       if (!mounted) return;
@@ -4479,6 +4646,9 @@ class _VideoCallPageState extends State<VideoCallPage>
     final items =
         (_pkGiftLeadersBySide[side] ?? const <int, _PkSupporterStanding>{})
             .values
+            .where(
+              (supporter) => !_personalBlocks.isBlocked(supporter.senderId),
+            )
             .toList()
           ..sort((a, b) {
             final byCoins = b.totalCoins.compareTo(a.totalCoins);
@@ -4521,10 +4691,16 @@ class _VideoCallPageState extends State<VideoCallPage>
       title = 'Opponent Won';
       winnerSide = -1;
       final winnerHost = battle.opponentHostFor(widget.room.roomId);
-      winnerName = winnerHost?['name']?.toString();
+      final winnerHostBlocked = _personalBlocks.isBlocked(
+        _safeInt(winnerHost?['user_id']),
+      );
+      winnerName =
+          winnerHostBlocked ? 'Blocked host' : winnerHost?['name']?.toString();
       winnerAvatarUrl =
-          winnerHost?['avatar_url']?.toString() ??
-          winnerHost?['avatar']?.toString();
+          winnerHostBlocked
+              ? null
+              : winnerHost?['avatar_url']?.toString() ??
+                  winnerHost?['avatar']?.toString();
       topSupporters = _topPkSupportersFor('right')
           .map(
             (supporter) => PkWinnerSupporter(
@@ -4670,6 +4846,7 @@ class _VideoCallPageState extends State<VideoCallPage>
     final opponentUserId =
         battle?.opponentHostFor(widget.room.roomId)?['user_id'];
     final normalized = _safeInt(opponentUserId);
+    if (_personalBlocks.isBlocked(normalized)) return null;
     for (final participant
         in _opponentRoom?.remoteParticipants.values ??
             const <RemoteParticipant>[]) {
@@ -4696,7 +4873,11 @@ class _VideoCallPageState extends State<VideoCallPage>
   Widget _buildPkVideoStage({required double topInset}) {
     final battle = _pkBattle!;
     final ownHost = battle.ownHostFor(widget.room.roomId);
-    final opponentHost = battle.opponentHostFor(widget.room.roomId);
+    final rawOpponentHost = battle.opponentHostFor(widget.room.roomId);
+    final opponentHostBlocked = _personalBlocks.isBlocked(
+      _safeInt(rawOpponentHost?['user_id']),
+    );
+    final opponentHost = opponentHostBlocked ? null : rawOpponentHost;
     final ownParticipant = _primaryHostParticipant();
     final opponentParticipant = _opponentHostParticipant();
     final opponentTrack =
@@ -4781,7 +4962,10 @@ class _VideoCallPageState extends State<VideoCallPage>
                     (ownHost?['name']?.toString().isNotEmpty == true
                         ? ownHost!['name'].toString()
                         : _hostDisplayName),
-                opponentLabel: opponentHost?['name']?.toString() ?? 'Opponent',
+                opponentLabel:
+                    opponentHostBlocked
+                        ? 'Blocked host'
+                        : opponentHost?['name']?.toString() ?? 'Opponent',
                 ownAvatarUrl:
                     ownHost?['avatar_url']?.toString() ??
                     ownHost?['avatar']?.toString(),
@@ -4791,7 +4975,9 @@ class _VideoCallPageState extends State<VideoCallPage>
                 ownScore: ownScore,
                 opponentScore: opponentScore,
                 opponentUnavailable:
-                    _opponentConnecting || _opponentMediaUnavailable,
+                    opponentHostBlocked ||
+                    _opponentConnecting ||
+                    _opponentMediaUnavailable,
                 canEnd: _isHost,
                 onEnd: _isHost ? _endPkBattle : null,
                 showEmbeddedRail: false,
@@ -4859,10 +5045,14 @@ class _VideoCallPageState extends State<VideoCallPage>
                             )
                             : _PkVideoFallback(
                               name:
-                                  opponentHost?['name']?.toString() ??
-                                  'Opponent',
+                                  opponentHostBlocked
+                                      ? 'Blocked host'
+                                      : opponentHost?['name']?.toString() ??
+                                          'Opponent',
                               subtitle:
-                                  _opponentConnecting
+                                  opponentHostBlocked
+                                      ? 'Hidden for you'
+                                      : _opponentConnecting
                                       ? 'Connecting…'
                                       : 'Opponent video unavailable',
                             ),
@@ -4899,7 +5089,10 @@ class _VideoCallPageState extends State<VideoCallPage>
                     (ownHost?['name']?.toString().isNotEmpty == true
                         ? ownHost!['name'].toString()
                         : _hostDisplayName),
-                opponentLabel: opponentHost?['name']?.toString() ?? 'Opponent',
+                opponentLabel:
+                    opponentHostBlocked
+                        ? 'Blocked host'
+                        : opponentHost?['name']?.toString() ?? 'Opponent',
                 ownSupporters: _topPkSupportersFor('left'),
                 opponentSupporters: _topPkSupportersFor('right'),
                 onSupporterTap: _openPkSupporterProfile,
@@ -5263,6 +5456,9 @@ class _VideoCallPageState extends State<VideoCallPage>
       final track = _firstRemoteVideo(participant, excludeScreenshare: true);
       final metadata = _participantMetadata(participant);
       final userId = _safeInt(metadata['user_id']);
+      if (_personalBlocks.isBlocked(userId)) {
+        continue;
+      }
       final role = metadata['role']?.toString().toLowerCase().trim() ?? '';
       final isHost =
           participant.identity.startsWith('host-') ||

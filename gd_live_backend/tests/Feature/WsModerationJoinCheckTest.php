@@ -6,6 +6,7 @@ use App\Models\Host;
 use App\Models\HostUserBlock;
 use App\Models\LiveRoom;
 use App\Models\User;
+use App\Models\UserBlock;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -62,6 +63,27 @@ class WsModerationJoinCheckTest extends TestCase
             ->assertJsonPath('code', 'HOST_BLOCKED')
             ->assertJsonPath('host_user_id', $hostUser->id)
             ->assertJsonPath('target_user_id', $viewer->id);
+    }
+
+    public function test_viewer_who_blocked_host_must_unblock_before_joining(): void
+    {
+        [$hostUser, $room] = $this->makeLiveRoom();
+        $viewer = User::factory()->create();
+        UserBlock::query()->create([
+            'blocker_user_id' => $viewer->id,
+            'blocked_user_id' => $hostUser->id,
+        ]);
+        Sanctum::actingAs($viewer);
+
+        $this->postJson('/api/ws/rooms/join-check', [
+            'room_id' => $room->room_id,
+        ])->assertOk()
+            ->assertJsonPath('allow', false)
+            ->assertJsonPath('code', 'YOU_BLOCKED_HOST')
+            ->assertJsonPath('host_user_id', $hostUser->id)
+            ->assertJsonPath('target_user_id', $viewer->id);
+
+        $this->assertDatabaseCount('host_user_blocks', 0);
     }
 
     private function makeLiveRoom(): array

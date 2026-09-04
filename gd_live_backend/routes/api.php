@@ -34,11 +34,12 @@ use App\Http\Controllers\Api\SevenUpDownController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\TeenPattiController;
 use App\Http\Controllers\Api\UnblockRequestController;
+use App\Http\Controllers\Api\UserBlockController;
 use App\Http\Controllers\Api\UserReportController;
 use App\Http\Controllers\Api\WalletApiController;
 use App\Http\Controllers\Api\WsModerationController;
-use App\Http\Controllers\Auth\FirebaseAuthApiController;
 use App\Http\Controllers\Auth\DemoAuthApiController;
+use App\Http\Controllers\Auth\FirebaseAuthApiController;
 use App\Models\UserSubscription;
 use App\Services\AppSettingsService;
 use Illuminate\Http\Request;
@@ -111,6 +112,9 @@ Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
     Route::get('/dashboard/leaderboards', [DashboardLeaderboardController::class, 'index'])->withoutMiddleware('throttle:60,1')->middleware('throttle:240,1');
     Route::put('/profile', [ProfileController::class, 'update']);
     Route::post('/profile/avatar', [ProfileController::class, 'avatar']);
+    Route::get('/me/blocked-users', [UserBlockController::class, 'index']);
+    Route::post('/me/blocked-users/{user}', [UserBlockController::class, 'store']);
+    Route::delete('/me/blocked-users/{user}', [UserBlockController::class, 'destroy']);
     Route::post('/app/activity', function (Request $request) {
         $result = app(\App\Services\AppActivityService::class)->recordDailyActivity($request->user());
 
@@ -263,6 +267,7 @@ Route::middleware('auth:sanctum')->get('/ws/verify', function (\Illuminate\Http\
         'is_vip' => $isVip,
         'roles' => method_exists($u, 'getRoleNames') ? $u->getRoleNames()->values()->all() : [],
         'game_access' => app(\App\Services\GameAccessService::class)->userAccessMap($u),
+        'blocked_user_ids' => app(\App\Services\UserBlockService::class)->blockedUserIds($u),
     ];
 });
 Route::middleware('throttle:240,1')->get('/ws/app-config', function (Request $request, AppSettingsService $settings) {

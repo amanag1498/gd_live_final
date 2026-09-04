@@ -161,6 +161,7 @@ class LiveRoomIngestController extends Controller
                 401 => 'login_required',
                 402 => 'subscription_required',
                 403 => 'blocked_by_host',
+                409 => 'blocked_host_by_you',
                 default => 'room_not_joinable',
             };
 

@@ -174,64 +174,83 @@ Future<void> _showDemoLoginDialog(
   AuthController controller,
   BrandTokens tokens,
 ) async {
-  final emailController = TextEditingController();
-  final formKey = GlobalKey<FormState>();
   final email = await showDialog<String>(
     context: context,
-    builder:
-        (dialogContext) => AlertDialog(
-          title: const Text('Reviewer sign in'),
-          content: Form(
-            key: formKey,
-            child: TextFormField(
-              controller: emailController,
-              autofocus: true,
-              keyboardType: TextInputType.emailAddress,
-              textInputAction: TextInputAction.done,
-              autocorrect: false,
-              decoration: const InputDecoration(
-                labelText: 'Demo account email',
-                hintText: 'reviewer@example.com',
-              ),
-              validator: (value) {
-                final normalized = value?.trim() ?? '';
-                if (!RegExp(
-                  r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-                ).hasMatch(normalized)) {
-                  return 'Enter a valid email address.';
-                }
-                return null;
-              },
-              onFieldSubmitted: (_) {
-                if (formKey.currentState?.validate() ?? false) {
-                  Navigator.of(dialogContext).pop(emailController.text.trim());
-                }
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: tokens.primaryButtonGradient.first,
-              ),
-              onPressed: () {
-                if (formKey.currentState?.validate() ?? false) {
-                  Navigator.of(dialogContext).pop(emailController.text.trim());
-                }
-              },
-              child: const Text('Sign in'),
-            ),
-          ],
-        ),
+    builder: (_) => _DemoLoginDialog(tokens: tokens),
   );
-  emailController.dispose();
 
   if (email != null && email.isNotEmpty) {
     await controller.loginWithDemo(email);
+  }
+}
+
+class _DemoLoginDialog extends StatefulWidget {
+  const _DemoLoginDialog({required this.tokens});
+
+  final BrandTokens tokens;
+
+  @override
+  State<_DemoLoginDialog> createState() => _DemoLoginDialogState();
+}
+
+class _DemoLoginDialogState extends State<_DemoLoginDialog> {
+  final _emailController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_formKey.currentState?.validate() ?? false) {
+      Navigator.of(context).pop(_emailController.text.trim());
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Reviewer sign in'),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _emailController,
+          autofocus: true,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.done,
+          autocorrect: false,
+          decoration: const InputDecoration(
+            labelText: 'Demo account email',
+            hintText: 'reviewer@example.com',
+          ),
+          validator: (value) {
+            final normalized = value?.trim() ?? '';
+            if (!RegExp(
+              r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+            ).hasMatch(normalized)) {
+              return 'Enter a valid email address.';
+            }
+            return null;
+          },
+          onFieldSubmitted: (_) => _submit(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: widget.tokens.primaryButtonGradient.first,
+          ),
+          onPressed: _submit,
+          child: const Text('Sign in'),
+        ),
+      ],
+    );
   }
 }
 

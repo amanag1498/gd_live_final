@@ -387,7 +387,7 @@ console.log('[common]  ', nowISO(), `Moderation cache TTL: ${MODERATION_CACHE_TT
 console.log('[common]  ', nowISO(), `Moderation cache poll interval: ${MODERATION_CACHE_POLL_MS}ms`);
 
 // ------------ Auth helpers ------------
-async function verifyUserFromLaravel(token, socket = null) {
+async function verifyUserFromLaravel(token, socket = null, forceRefresh = false) {
   if (!token) return null;
   const publicOrigin = publicApiOriginForSocket(socket);
   const clientPlatform = String(
@@ -419,7 +419,7 @@ async function verifyUserFromLaravel(token, socket = null) {
   ].join('|');
   const cached = verifiedUserCache.get(cacheKey);
   const now = Date.now();
-  if (cached && cached.expiresAt > now) {
+  if (!forceRefresh && cached && cached.expiresAt > now) {
     return cached.user;
   }
   if (cached) {
@@ -449,6 +449,9 @@ async function verifyUserFromLaravel(token, socket = null) {
       game_access: data.game_access && typeof data.game_access === 'object'
         ? data.game_access
         : {},
+      blocked_user_ids: Array.isArray(data.blocked_user_ids)
+        ? data.blocked_user_ids.map(Number).filter(Number.isFinite)
+        : [],
     };
     verifiedUserCache.set(cacheKey, {
       user,
@@ -462,11 +465,15 @@ async function verifyUserFromLaravel(token, socket = null) {
   }
 }
 
-async function refreshSocketUserFromLaravel(socket) {
+async function refreshSocketUserFromLaravel(socket, forceRefresh = false) {
   if (!VERIFY_WITH_LARAVEL || !socket?.authToken) {
     return socket?.user || null;
   }
-  const freshUser = await verifyUserFromLaravel(socket.authToken, socket);
+  const freshUser = await verifyUserFromLaravel(
+    socket.authToken,
+    socket,
+    forceRefresh,
+  );
   if (!freshUser) {
     return socket?.user || null;
   }
@@ -1925,8 +1932,17 @@ roomsNs.on('connection', (socket) => {
       ));
       return;
     }
+    await refreshSocketUserFromLaravel(socket, true);
     console.log('[rooms][API ]', nowISO(), `rooms:subscribe by user=${uid}`);
-    const list = await roomsSnapshot();
+    const blockedUserIds = new Set(
+      Array.isArray(socket.user?.blocked_user_ids)
+        ? socket.user.blocked_user_ids.map(Number)
+        : [],
+    );
+    const list = (await roomsSnapshot()).filter((room) => {
+      const hostUserId = Number(room?.host_id || room?.host_user_id || 0);
+      return !hostUserId || !blockedUserIds.has(hostUserId);
+    });
     console.log('[rooms][API ]', nowISO(), `rooms:subscribe -> send ${list.length} rooms`);
     socket.emit('rooms:snapshot', { rooms: list });
   });
@@ -1955,18 +1971,27 @@ roomsNs.on('connection', (socket) => {
     }
     const hostUserId = Number(roomDoc?.host_id || 0);
     const targetUserId = Number(socket.user?.id || 0);
-    const moderationSnapshot = await getModerationSnapshot();
-    const blockedInSnapshot = moderationSnapshot.available
-      && isUserBlockedByHost(hostUserId, targetUserId);
-    const joinDecision = moderationSnapshot.available
-      ? {
-          allow: !blockedInSnapshot,
-          code: blockedInSnapshot ? 'HOST_BLOCKED' : null,
+    let joinDecision;
+    if (VERIFY_WITH_LARAVEL) {
+      joinDecision = await moderationJoinCheck(socket.authToken, room_id);
+    } else {
+      const moderationSnapshot = await getModerationSnapshot();
+      const blockedInSnapshot = moderationSnapshot.available
+        && isUserBlockedByHost(hostUserId, targetUserId);
+      const cachedPersonalBlock = Array.isArray(socket.user?.blocked_user_ids)
+        && socket.user.blocked_user_ids.map(Number).includes(hostUserId);
+      joinDecision = {
+          allow: !(blockedInSnapshot || cachedPersonalBlock),
+          code: blockedInSnapshot
+            ? 'HOST_BLOCKED'
+            : (cachedPersonalBlock ? 'YOU_BLOCKED_HOST' : null),
           reason: blockedInSnapshot
             ? 'You were blocked by this host.'
-            : null,
-        }
-      : await moderationJoinCheck(socket.authToken, room_id);
+            : (cachedPersonalBlock
+              ? 'You blocked this host. Unblock them to join this room.'
+              : null),
+      };
+    }
     if (joinDecision?.allow === false) {
       socket.emit('room:moderation:error', moderationJoinErrorPayload(joinDecision, {
         roomId: room_id,

@@ -100,7 +100,7 @@ PODS:
     - FlutterMacOS
     - GoogleSignIn (~> 8.0)
     - GTMSessionFetcher (>= 3.4.0)
-  - GoogleDataTransport (10.1.0):
+  - GoogleDataTransport (10.1.1):
     - nanopb (~> 3.30910.0)
     - PromisesObjC (~> 2.4)
   - GoogleSignIn (8.0.0):
@@ -322,7 +322,7 @@ SPEC CHECKSUMS:
   flutter_local_notifications: ad39620c743ea4c15127860f4b5641649a988100
   flutter_webrtc: c3e21fc0dcd9d8eb246ae4d5256fcbeb2f5ecd22
   google_sign_in_ios: b48bb9af78576358a168361173155596c845f0b9
-  GoogleDataTransport: aae35b7ea0c09004c3797d53c8c41f66f219d6a7
+  GoogleDataTransport: a24e58982ab3ba2f64d79613e027fe7f57e88539
   GoogleSignIn: ce8c89bb9b37fb624b92e7514cc67335d1e277e4
   GoogleUtilities: 766ace00c6b10d8148408f329d10c4f051931850
   GTMAppAuth: f69bd07d68cd3b766125f7e072c45d7340dea0de
@@ -347,4 +347,4 @@ SPEC CHECKSUMS:
 
 PODFILE CHECKSUM: 979268bc67e14b0be6b26ad99ea67976406dd89e
 
-COCOAPODS: 1.16.2
+COCOAPODS: 1.17.0

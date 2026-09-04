@@ -7,6 +7,7 @@ import '../../../services/auth_service.dart';
 import '../../../services/app_settings_service.dart';
 import '../../../modules/calls/controllers/call_controller.dart';
 import '../../../modules/home/controllers/live_room_controller.dart';
+import '../../../modules/profile/controllers/user_block_controller.dart';
 import '../../../app/routes/app_routes.dart';
 
 class AuthController extends GetxController {
@@ -67,6 +68,9 @@ class AuthController extends GetxController {
       if (Get.isRegistered<AppCallController>()) {
         await Get.find<AppCallController>().restartSocket();
       }
+      if (Get.isRegistered<UserBlockController>()) {
+        await Get.find<UserBlockController>().refreshForCurrentAuth();
+      }
       if (Get.isRegistered<LiveRoomsController>()) {
         await Get.find<LiveRoomsController>().refreshForCurrentAuth();
       }
@@ -95,6 +99,9 @@ class AuthController extends GetxController {
 
   Future<void> logout() async {
     await auth.logout();
+    if (Get.isRegistered<UserBlockController>()) {
+      await Get.find<UserBlockController>().refreshForCurrentAuth();
+    }
     if (Get.isRegistered<LiveRoomsController>()) {
       await Get.find<LiveRoomsController>().refreshForCurrentAuth();
     }

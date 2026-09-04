@@ -6,28 +6,34 @@ import '../../../services/auth_service.dart';
 import '../../../services/live_rooms_ws_service.dart';
 import '../../Live/services/live_service.dart';
 import '../../home/models/live_room_dto.dart';
+import '../../profile/controllers/user_block_controller.dart';
 
 class LiveRoomsController extends GetxController {
   final RoomsSocketService socket;
   final AuthService auth;
   final LiveService live;
+  final UserBlockController userBlocks;
 
-  LiveRoomsController(this.auth, this.socket, this.live);
+  LiveRoomsController(this.auth, this.socket, this.live, this.userBlocks);
 
   final RxList<LiveRoomModel> liveRooms = <LiveRoomModel>[].obs;
   final RxBool loading = false.obs;
   final RxnString error = RxnString();
   final Map<String, DateTime> _lastRoomUpdateAt = <String, DateTime>{};
+  Worker? _blockWorker;
+  int _loadGeneration = 0;
 
   @override
   void onInit() {
     super.onInit();
+    _blockWorker = ever<int>(userBlocks.revision, (_) => _applyBlockFilter());
     refreshForCurrentAuth();
   }
 
   Future<void> refreshForCurrentAuth() async {
     final token = auth.api.storage.token;
     if (token == null || token.isEmpty) {
+      _loadGeneration++;
       debugPrint('[rooms][CTRL] no token, skipping rooms bootstrap');
       liveRooms.clear();
       loading.value = false;
@@ -42,11 +48,19 @@ class LiveRoomsController extends GetxController {
   }
 
   Future<void> _loadInitialRooms() async {
+    final generation = ++_loadGeneration;
     loading.value = true;
     error.value = null;
     try {
       final rooms = await live.listLiveRooms();
-      final filtered = rooms.where((room) => room.status == 'live').toList();
+      if (generation != _loadGeneration || !auth.isLoggedIn) return;
+      final filtered =
+          rooms
+              .where(
+                (room) =>
+                    room.status == 'live' && !userBlocks.isBlocked(room.hostId),
+              )
+              .toList();
       _sortLiveRooms(filtered);
       for (final room in filtered) {
         final updatedAt =
@@ -57,10 +71,13 @@ class LiveRoomsController extends GetxController {
       }
       liveRooms.assignAll(filtered);
     } catch (e) {
+      if (generation != _loadGeneration) return;
       debugPrint('[rooms][CTRL] initial load failed: $e');
       error.value = e.toString().replaceFirst('Exception: ', '');
     } finally {
-      loading.value = false;
+      if (generation == _loadGeneration) {
+        loading.value = false;
+      }
     }
   }
 
@@ -79,10 +96,13 @@ class LiveRoomsController extends GetxController {
       wsRoomsUrl: AppUrls.wsRooms,
       bearerToken: t,
       onSnapshot: (list) {
-        final mapped = list
-            .map(LiveRoomModel.fromJson)
-            .where((r) => r.status == 'live')
-            .toList();
+        final mapped =
+            list
+                .map(LiveRoomModel.fromJson)
+                .where(
+                  (r) => r.status == 'live' && !userBlocks.isBlocked(r.hostId),
+                )
+                .toList();
         _lastRoomUpdateAt
           ..clear()
           ..addEntries(
@@ -102,15 +122,18 @@ class LiveRoomsController extends GetxController {
       onUpsert: (row) {
         final r = LiveRoomModel.fromJson(row);
         final incomingUpdatedAt =
-            r.updatedAt ?? r.startedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            r.updatedAt ??
+            r.startedAt ??
+            DateTime.fromMillisecondsSinceEpoch(0);
         final knownUpdatedAt = _lastRoomUpdateAt[r.id];
-        if (knownUpdatedAt != null && incomingUpdatedAt.isBefore(knownUpdatedAt)) {
+        if (knownUpdatedAt != null &&
+            incomingUpdatedAt.isBefore(knownUpdatedAt)) {
           debugPrint('[rooms][CTRL] stale upsert ignored ${r.id}');
           return;
         }
         _lastRoomUpdateAt[r.id] = incomingUpdatedAt;
         debugPrint('[rooms][CTRL] upsert ${r.id} status=${r.status}');
-        if (r.status == 'live') {
+        if (r.status == 'live' && !userBlocks.isBlocked(r.hostId)) {
           final i = liveRooms.indexWhere((e) => e.id == r.id);
           if (i >= 0) {
             liveRooms[i] = r;
@@ -133,8 +156,16 @@ class LiveRoomsController extends GetxController {
 
   @override
   void onClose() {
+    _blockWorker?.dispose();
     socket.stop();
     super.onClose();
+  }
+
+  void _applyBlockFilter() {
+    liveRooms.removeWhere((room) => userBlocks.isBlocked(room.hostId));
+    if (auth.isLoggedIn) {
+      _loadInitialRooms();
+    }
   }
 
   void _sortLiveRooms(List<LiveRoomModel> rooms) {

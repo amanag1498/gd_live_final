@@ -167,6 +167,8 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                         ),
                     onApplications: showMyApplicationsSheet,
                   ),
+                  const SizedBox(height: 14),
+                  _PersonalSafetyBoard(tokens: tokens),
                   if (agency != null) ...[
                     const SizedBox(height: 14),
                     _AgencyProfileBoard(tokens: tokens, agency: agency),
@@ -1382,6 +1384,72 @@ class _MiniLedgerRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _PersonalSafetyBoard extends StatelessWidget {
+  const _PersonalSafetyBoard({required this.tokens});
+
+  final BrandTokens tokens;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionLabel(
+          title: 'Privacy & safety',
+          subtitle: 'Control who you see and interact with.',
+        ),
+        const SizedBox(height: 12),
+        InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () => Get.toNamed(Routes.personalBlockedUsers),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(.98),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: tokens.borderColor.withOpacity(.14)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE35D6A).withOpacity(.12),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: const Icon(
+                    Icons.person_off_rounded,
+                    color: Color(0xFFE35D6A),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'People you blocked',
+                        style: TextStyle(
+                          color: Color(0xFF15351C),
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      SizedBox(height: 3),
+                      Text('Review or unblock people privately'),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

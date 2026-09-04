@@ -1,11 +1,11 @@
 abstract class Routes {
   static const login = '/login';
-  static const home  = '/home';
+  static const home = '/home';
   static const liveWaiting = '/live/waiting';
-  static const liveVideo   = '/live/video';
+  static const liveVideo = '/live/video';
   static const devLiveVideo = '/dev/live/video';
   static const devLiveVideoPk = '/dev/live/video-pk';
-  static const notifications  = '/notifications'; // 👈 NEW
+  static const notifications = '/notifications'; // 👈 NEW
   static const incomingCall = '/incoming-call';
   static const outgoingCall = '/outgoing-call';
   static const activeCall = '/active-call';
@@ -13,6 +13,7 @@ abstract class Routes {
   static const profile = '/profile';
   static const editProfile = '/profile/edit';
   static const profileBlockedUsers = '/profile/blocked-users';
+  static const personalBlockedUsers = '/profile/personal-blocked-users';
   static const profileUnblockRequests = '/profile/unblock-requests';
   static const profileModerationHistory = '/profile/moderation-history';
   static const following = '/profile/following';

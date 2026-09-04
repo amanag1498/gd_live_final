@@ -103,6 +103,10 @@ class LiveRoomController extends Controller
 
         $rooms = $this->discoverRoomsQuery()
             ->where('room_type', 'video')
+            ->whereDoesntHave(
+                'host.user.personallyBlockedBy',
+                fn ($query) => $query->where('blocker_user_id', $viewer->id),
+            )
             ->paginate(20);
 
         return response()->json([

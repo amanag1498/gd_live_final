@@ -11,10 +11,18 @@ use InvalidArgumentException;
 
 class HostFollowService
 {
+    public function __construct(private UserBlockService $userBlocks)
+    {
+    }
+
     public function follow(User $user, Host $host, array $preferences = []): HostFollower
     {
         if ((int) $host->user_id === (int) $user->id) {
             throw new InvalidArgumentException('You cannot follow your own host profile.');
+        }
+
+        if ($this->userBlocks->hasBlockBetween($user, (int) $host->user_id)) {
+            throw new InvalidArgumentException('Unblock this user before following.');
         }
 
         return HostFollower::query()->updateOrCreate(
