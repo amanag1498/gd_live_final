@@ -42,13 +42,20 @@ class LiveRoomAdminController extends Controller
             ])
             ->latest();
 
-        if ($s = $request->string('s')->trim()) {
-            $q->where('room_id','like',"%{$s}%")
-              ->orWhere('title','like',"%{$s}%")
-              ->orWhereHas('host.user', fn($u)=>$u->where('name','like',"%{$s}%")->orWhere('email','like',"%{$s}%"));
+        $search = $request->string('s')->trim()->toString();
+        if ($search !== '') {
+            $q->where(function ($query) use ($search) {
+                $query->where('room_id', 'like', "%{$search}%")
+                    ->orWhere('title', 'like', "%{$search}%")
+                    ->orWhereHas('host.user', function ($userQuery) use ($search) {
+                        $userQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    });
+            });
         }
-        if ($st = $request->string('status')->trim()) {
-            $q->where('status', $st);
+        $status = $request->string('status')->trim()->toString();
+        if ($status !== '') {
+            $q->where('status', $status);
         }
         if ($from = $request->date('from')) {
             $q->whereDate('created_at', '>=', $from);

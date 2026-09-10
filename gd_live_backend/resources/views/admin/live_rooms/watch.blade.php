@@ -37,7 +37,7 @@
 
   <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
     <div class="rounded-3xl border border-gray-200 bg-gray-950 p-3 shadow-theme-lg dark:border-gray-800">
-      <div id="observerStage" class="grid min-h-[520px] place-items-center overflow-hidden rounded-2xl bg-black text-center text-sm text-gray-400">
+      <div id="observerStage" class="observer-stage grid place-items-center overflow-hidden rounded-2xl bg-black text-center text-sm text-gray-400">
         <div id="observerEmpty" class="max-w-sm px-6">
           <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-white">
             <i class="ti ti-video text-2xl"></i>
@@ -91,6 +91,73 @@
 </div>
 @endsection
 
+@push('styles')
+<style>
+  .observer-stage {
+    min-height: min(420px, calc(100svh - 220px));
+    max-height: calc(100svh - 220px);
+  }
+
+  .observer-stage.is-active {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    align-content: start;
+    gap: .5rem;
+    overflow-y: auto;
+    padding: .5rem;
+  }
+
+  .observer-track-tile {
+    position: relative;
+    min-height: 132px;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    border-radius: .75rem;
+    background: #111827;
+  }
+
+  .observer-track-media {
+    height: 100%;
+    width: 100%;
+    object-fit: cover;
+  }
+
+  .observer-track-label {
+    position: absolute;
+    bottom: .5rem;
+    left: .5rem;
+    max-width: calc(100% - 1rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-radius: 9999px;
+    background: rgb(0 0 0 / 60%);
+    padding: .2rem .5rem;
+    font-size: .68rem;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  @media (max-width: 640px) {
+    .observer-stage {
+      min-height: min(340px, calc(100svh - 190px));
+      max-height: calc(100svh - 190px);
+    }
+
+    .observer-stage.is-active {
+      grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+      gap: .375rem;
+      padding: .375rem;
+    }
+
+    .observer-track-tile {
+      min-height: 104px;
+      border-radius: .625rem;
+    }
+  }
+</style>
+@endpush
+
 @push('scripts')
 <script
   src="https://cdn.jsdelivr.net/npm/livekit-client@2.5.1/dist/livekit-client.umd.min.js"
@@ -119,10 +186,8 @@
   const syncTrackCount = () => {
     trackCountNode.textContent = String(trackElements.size);
     empty?.classList.toggle('hidden', trackElements.size > 0);
-    if (trackElements.size === 0) {
-      stage.classList.add('place-items-center');
-      stage.classList.remove('grid-cols-1', 'gap-3', 'md:grid-cols-2');
-    }
+    stage.classList.toggle('is-active', trackElements.size > 0);
+    stage.classList.toggle('place-items-center', trackElements.size === 0);
   };
 
   const addTrack = (track, participant) => {
@@ -130,28 +195,23 @@
 
     const wrapper = document.createElement('div');
     wrapper.dataset.trackSid = track.sid;
-    wrapper.className = 'relative min-h-[240px] overflow-hidden rounded-2xl bg-gray-900';
+    wrapper.className = 'observer-track-tile';
 
     const media = track.attach();
     media.autoplay = true;
     media.playsInline = true;
     media.className = track.kind === 'video'
-      ? 'h-full min-h-[240px] w-full object-cover'
+      ? 'observer-track-media'
       : 'hidden';
     wrapper.appendChild(media);
 
     const label = document.createElement('div');
-    label.className = 'absolute bottom-3 left-3 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white';
+    label.className = 'observer-track-label';
     label.textContent = participant?.name || participant?.identity || 'Participant';
     wrapper.appendChild(label);
 
     if (track.kind === 'audio') {
       wrapper.classList.add('hidden');
-    }
-
-    if (stage.classList.contains('place-items-center')) {
-      stage.classList.remove('place-items-center');
-      stage.classList.add('grid-cols-1', 'gap-3', 'md:grid-cols-2');
     }
 
     stage.appendChild(wrapper);

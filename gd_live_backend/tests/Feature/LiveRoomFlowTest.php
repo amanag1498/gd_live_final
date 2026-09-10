@@ -270,6 +270,63 @@ class LiveRoomFlowTest extends TestCase
             ->assertSee('observer-token');
     }
 
+    public function test_admin_live_room_filters_apply_status_dates_and_grouped_search(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+
+        [, $matchingRoom] = $this->makeLiveRoom();
+        $matchingRoom->forceFill([
+            'room_id' => 'filter-live-match',
+            'title' => 'Operations Match',
+            'created_at' => '2026-09-02 10:00:00',
+            'updated_at' => '2026-09-02 10:00:00',
+        ])->save();
+
+        [, $endedRoom] = $this->makeLiveRoom(status: 'ended');
+        $endedRoom->forceFill([
+            'room_id' => 'filter-ended-room',
+            'title' => 'Operations Match',
+            'created_at' => '2026-09-02 11:00:00',
+            'updated_at' => '2026-09-02 11:00:00',
+        ])->save();
+
+        [, $outsideDateRoom] = $this->makeLiveRoom();
+        $outsideDateRoom->forceFill([
+            'room_id' => 'filter-outside-date',
+            'title' => 'Operations Match',
+            'created_at' => '2026-08-20 10:00:00',
+            'updated_at' => '2026-08-20 10:00:00',
+        ])->save();
+
+        [, $nonMatchingRoom] = $this->makeLiveRoom();
+        $nonMatchingRoom->forceFill([
+            'room_id' => 'filter-non-matching',
+            'title' => 'Different Room',
+            'created_at' => '2026-09-02 12:00:00',
+            'updated_at' => '2026-09-02 12:00:00',
+        ])->save();
+
+        $this->actingAs($admin)
+            ->get(route('admin.live-rooms.index', [
+                's' => 'Operations',
+                'status' => 'live',
+                'from' => '2026-09-01',
+                'to' => '2026-09-03',
+            ]))
+            ->assertOk()
+            ->assertSee('filter-live-match')
+            ->assertDontSee('filter-ended-room')
+            ->assertDontSee('filter-outside-date')
+            ->assertDontSee('filter-non-matching');
+
+        $this->actingAs($admin)
+            ->get(route('admin.live-rooms.index', ['status' => 'ended']))
+            ->assertOk()
+            ->assertSee('filter-ended-room')
+            ->assertDontSee('filter-live-match');
+    }
+
     public function test_admin_observer_token_is_hidden_subscribe_only_and_does_not_create_participant(): void
     {
         config([
