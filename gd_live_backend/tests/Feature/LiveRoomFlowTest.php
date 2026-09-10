@@ -267,6 +267,7 @@ class LiveRoomFlowTest extends TestCase
             ->get(route('admin.live-rooms.watch', $room))
             ->assertOk()
             ->assertSee('Start silent watch')
+            ->assertSee('User #${userId}', false)
             ->assertSee('observer-token');
     }
 

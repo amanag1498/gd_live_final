@@ -190,6 +190,31 @@
     stage.classList.toggle('place-items-center', trackElements.size === 0);
   };
 
+  const participantUserId = (participant) => {
+    if (!participant) return null;
+
+    if (typeof participant.metadata === 'string' && participant.metadata.trim() !== '') {
+      try {
+        const metadata = JSON.parse(participant.metadata);
+        const metadataUserId = metadata?.user_id || metadata?.userId;
+        if (metadataUserId) return String(metadataUserId);
+      } catch (error) {
+        // Ignore malformed metadata and fall back to the identity pattern below.
+      }
+    }
+
+    const identity = String(participant.identity || '');
+    const match = identity.match(/^user:(\d+)$/);
+    return match ? match[1] : null;
+  };
+
+  const participantLabel = (participant) => {
+    const displayName = participant?.name || participant?.identity || 'Participant';
+    const userId = participantUserId(participant);
+
+    return userId ? `${displayName} · User #${userId}` : displayName;
+  };
+
   const addTrack = (track, participant) => {
     if (!track || trackElements.has(track.sid)) return;
 
@@ -207,7 +232,7 @@
 
     const label = document.createElement('div');
     label.className = 'observer-track-label';
-    label.textContent = participant?.name || participant?.identity || 'Participant';
+    label.textContent = participantLabel(participant);
     wrapper.appendChild(label);
 
     if (track.kind === 'audio') {
