@@ -4,10 +4,10 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/var/www/gd-live/current/gd-live-backend}"
 BRANCH="${BRANCH:-main}"
-PHP_BIN="${PHP_BIN:-php8.3}"
+PHP_BIN="${PHP_BIN:-php8.4}"
 
 SERVICES=(
-  php8.3-fpm
+  php8.4-fpm
   nginx
   gd-live-queue.service
   gd-live-scheduler.service

@@ -32,7 +32,8 @@ class PanelNavigation
                     self::item('PK Battles', 'admin.pk-battles.index', 'sparkles', ['admin.pk-battles.*']),
                     self::item('Moderation', 'admin.moderation.reports', 'shield', ['admin.moderation.*'], [
                         self::subItem('Review Queue', 'admin.moderation.reports', ['admin.moderation.reports']),
-                        self::subItem('Blocked Users', 'admin.moderation.blocked-users', ['admin.moderation.blocked-users']),
+                        self::subItem('Host Blocks', 'admin.moderation.blocked-users', ['admin.moderation.blocked-users']),
+                        self::subItem('Personal Blocks', 'admin.moderation.personal-blocks', ['admin.moderation.personal-blocks*']),
                         self::subItem('History', 'admin.moderation.history', ['admin.moderation.history']),
                         self::subItem('Auto Rules', 'admin.moderation.rules', ['admin.moderation.rules']),
                         self::subItem('Analytics', 'admin.moderation.analytics', ['admin.moderation.analytics']),

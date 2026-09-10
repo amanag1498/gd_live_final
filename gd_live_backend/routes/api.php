@@ -196,6 +196,8 @@ Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
     Route::get('/host/calls/summary', [CallReportApiController::class, 'hostSummary']);
     Route::get('/admin/blocked-users', [AdminModerationController::class, 'blockedUsers']);
     Route::post('/admin/unblock-user', [AdminModerationController::class, 'unblockUser']);
+    Route::get('/admin/personal-blocks', [AdminModerationController::class, 'personalBlocks']);
+    Route::delete('/admin/personal-blocks/{id}', [AdminModerationController::class, 'destroyPersonalBlock']);
     Route::get('/admin/reports', [AdminModerationController::class, 'reports']);
     Route::post('/admin/reports/{id}/review', [AdminModerationController::class, 'reviewReport']);
     Route::get('/admin/moderation-history', [AdminModerationController::class, 'history']);

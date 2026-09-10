@@ -1601,16 +1601,14 @@ class _VideoCallPageState extends State<VideoCallPage>
                   subtitle:
                       personallyBlocked
                           ? 'Restore messages and direct interactions'
-                          : isHost
-                          ? 'Leave and hide this host’s rooms'
-                          : 'Hide their messages without removing them',
+                          : 'Block this user permanently',
                   destructive: !personallyBlocked,
                   onTap: () {
                     Navigator.of(context).pop();
                     if (personallyBlocked) {
                       _unblockForMe(userId, name);
                     } else {
-                      _blockForMe(userId, name, isHost);
+                      _blockForMe(userId);
                     }
                   },
                 ),
@@ -1710,19 +1708,13 @@ class _VideoCallPageState extends State<VideoCallPage>
 
   UserBlockController get _personalBlocks => Get.find<UserBlockController>();
 
-  Future<void> _blockForMe(int userId, String name, bool isHost) async {
+  Future<void> _blockForMe(int userId) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder:
           (dialogContext) => AlertDialog(
-            title: Text('Block $name for you?'),
-            content: Text(
-              isHost
-                  ? 'You will leave this room and this host’s rooms will be '
-                      'hidden. The host and other viewers are not affected.'
-                  : 'Their messages and media will be hidden from you. They '
-                      'will remain in this host’s room.',
-            ),
+            title: const Text('Block user?'),
+            content: const Text('Do you really want to block this user?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
@@ -3212,6 +3204,7 @@ class _VideoCallPageState extends State<VideoCallPage>
           isVip: _participantIsVip(participant),
           isHost: isHost,
           speaking: isSpeaking,
+          personallyBlocked: _personalBlocks.isBlocked(userId),
           level: _safeInt(metadata['level']),
           avatarUrl:
               metadata['avatar_url']?.toString() ??
@@ -3273,6 +3266,7 @@ class _VideoCallPageState extends State<VideoCallPage>
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (_, i) {
                       final participant = participants[i];
+                      final isPersonallyBlocked = participant.personallyBlocked;
                       return Material(
                         color: Colors.transparent,
                         child: InkWell(
@@ -3344,10 +3338,36 @@ class _VideoCallPageState extends State<VideoCallPage>
                                     ],
                                   ),
                                 ),
-                                Icon(
-                                  Icons.chevron_right_rounded,
-                                  color: tokens.textSecondary.withOpacity(.74),
-                                ),
+                                if (isPersonallyBlocked)
+                                  TextButton.icon(
+                                    onPressed: () {
+                                      Navigator.of(context).pop();
+                                      _unblockForMe(
+                                        participant.userId,
+                                        participant.name,
+                                      );
+                                    },
+                                    icon: const Icon(
+                                      Icons.lock_open_rounded,
+                                      size: 17,
+                                    ),
+                                    label: const Text('Unblock'),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor:
+                                          tokens.primaryButtonGradient.first,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 8,
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  Icon(
+                                    Icons.chevron_right_rounded,
+                                    color: tokens.textSecondary.withOpacity(
+                                      .74,
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
@@ -5422,6 +5442,7 @@ class _VideoCallPageState extends State<VideoCallPage>
           userId: _myUserId ?? currentUser?.id,
           avatarUrl: currentUser?.avatarUrl,
           level: currentUser?.level,
+          personallyBlocked: false,
           onProfileTap:
               (_myUserId ?? currentUser?.id) == null
                   ? null
@@ -5453,12 +5474,13 @@ class _VideoCallPageState extends State<VideoCallPage>
     }
 
     for (final participant in room.remoteParticipants.values) {
-      final track = _firstRemoteVideo(participant, excludeScreenshare: true);
       final metadata = _participantMetadata(participant);
       final userId = _safeInt(metadata['user_id']);
-      if (_personalBlocks.isBlocked(userId)) {
-        continue;
-      }
+      final personallyBlocked = _personalBlocks.isBlocked(userId);
+      final track =
+          personallyBlocked
+              ? null
+              : _firstRemoteVideo(participant, excludeScreenshare: true);
       final role = metadata['role']?.toString().toLowerCase().trim() ?? '';
       final isHost =
           participant.identity.startsWith('host-') ||
@@ -5491,7 +5513,10 @@ class _VideoCallPageState extends State<VideoCallPage>
                   ? _giftAnchors.keyFor(GiftAnchorRegistry.videoHostTile)
                   : null,
           label: name,
-          subtitle: isHost ? 'Host' : 'Speaker',
+          subtitle:
+              personallyBlocked
+                  ? 'Blocked for you'
+                  : (isHost ? 'Host' : 'Speaker'),
           isLocal: false,
           brandKey: brandKey,
           isHost: isHost,
@@ -5500,6 +5525,11 @@ class _VideoCallPageState extends State<VideoCallPage>
           userId: userId,
           avatarUrl: avatarUrl,
           level: level,
+          personallyBlocked: personallyBlocked,
+          onUnblockTap:
+              personallyBlocked && userId != null
+                  ? () => _unblockForMe(userId, name)
+                  : null,
           onProfileTap:
               userId == null
                   ? null
@@ -5519,7 +5549,8 @@ class _VideoCallPageState extends State<VideoCallPage>
                   ? VideoTrackRenderer(track, fit: VideoViewFit.cover)
                   : _PkVideoFallback(
                     name: name,
-                    subtitle: 'Camera off',
+                    subtitle:
+                        personallyBlocked ? 'Blocked for you' : 'Camera off',
                     avatarUrl: avatarUrl,
                     showSubtitle: true,
                   ),
@@ -5559,6 +5590,7 @@ class _VideoCallPageState extends State<VideoCallPage>
             avatarUrl:
                 data['avatar_url']?.toString() ?? data['avatar']?.toString(),
             level: _safeInt(data['level']),
+            personallyBlocked: false,
             onProfileTap:
                 _safeInt(data['user_id']) == null
                     ? null
@@ -5937,6 +5969,8 @@ class _StageTileData {
   final int? userId;
   final String? avatarUrl;
   final int? level;
+  final bool personallyBlocked;
+  final VoidCallback? onUnblockTap;
   final VoidCallback? onProfileTap;
   final Widget child;
 
@@ -5952,6 +5986,8 @@ class _StageTileData {
     this.userId,
     this.avatarUrl,
     this.level,
+    this.personallyBlocked = false,
+    this.onUnblockTap,
     this.onProfileTap,
     required this.child,
   });
@@ -5965,6 +6001,7 @@ class _HostModerationParticipant {
   final bool isVip;
   final bool isHost;
   final bool speaking;
+  final bool personallyBlocked;
   final int? level;
   final String? avatarUrl;
   const _HostModerationParticipant({
@@ -5975,6 +6012,7 @@ class _HostModerationParticipant {
     required this.isVip,
     required this.isHost,
     required this.speaking,
+    this.personallyBlocked = false,
     this.level,
     this.avatarUrl,
   });
@@ -8329,6 +8367,31 @@ class _StageTile extends StatelessWidget {
                       color: Colors.white,
                       fontWeight: FontWeight.w800,
                       fontSize: 11,
+                    ),
+                  ),
+                ),
+              ),
+            if (tile.personallyBlocked && tile.onUnblockTap != null)
+              Positioned(
+                right: 10,
+                top: 10,
+                child: TextButton.icon(
+                  onPressed: tile.onUnblockTap,
+                  icon: const Icon(Icons.lock_open_rounded, size: 15),
+                  label: const Text('Unblock'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: tokens.primaryButtonGradient.first
+                        .withOpacity(.88),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 7,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    textStyle: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),

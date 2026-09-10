@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\HostFollowerReportController as AdminHostFollower
 use App\Http\Controllers\Admin\HostRequestController as AdminHostRequestController;
 use App\Http\Controllers\Admin\LeaderboardReportController as AdminLeaderboardReportController;
 use App\Http\Controllers\Admin\LiveRoomAdminController;
+use App\Http\Controllers\Admin\LiveRoomObserverController;
 use App\Http\Controllers\Admin\LiveRoomPkBattleAdminController;
 use App\Http\Controllers\Admin\MetaAppEventAdminController;
 use App\Http\Controllers\Admin\ModerationController as AdminModerationController;
@@ -239,6 +240,8 @@ Route::middleware(['auth', 'not_blocked', 'role:admin'])->prefix('admin')->name(
     Route::delete('games/fortune-wheel/segments/{segment}', [FortuneWheelAdminController::class, 'destroySegment'])->name('games.fortune-wheel.segments.destroy');
     Route::get('moderation/blocked-users', [AdminModerationController::class, 'blockedUsers'])->name('moderation.blocked-users');
     Route::post('moderation/blocked-users/unblock', [AdminModerationController::class, 'adminUnblock'])->name('moderation.blocked-users.unblock');
+    Route::get('moderation/personal-blocks', [AdminModerationController::class, 'personalBlocks'])->name('moderation.personal-blocks');
+    Route::delete('moderation/personal-blocks/{userBlock}', [AdminModerationController::class, 'destroyPersonalBlock'])->name('moderation.personal-blocks.destroy');
     Route::get('moderation/reports', [AdminModerationController::class, 'reports'])->name('moderation.reports');
     Route::post('moderation/reports/{report}/review', [AdminModerationController::class, 'reviewReport'])->name('moderation.reports.review');
     Route::get('moderation/history', [AdminModerationController::class, 'history'])->name('moderation.history');
@@ -256,6 +259,10 @@ Route::middleware(['auth', 'not_blocked', 'role:admin'])->prefix('admin')->name(
     Route::resource('entry-packs', EntryPackAdminController::class)->except(['show']);
     Route::resource('banners', BannerAdminController::class)->except(['show']);
     Route::resource('live-rooms', LiveRoomAdminController::class)->except(['destroy']);
+    Route::get('live-rooms/{live_room}/watch', [LiveRoomObserverController::class, 'show'])->name('live-rooms.watch');
+    Route::post('live-rooms/{live_room}/observer-token', [LiveRoomObserverController::class, 'token'])
+        ->middleware('throttle:6,1')
+        ->name('live-rooms.observer-token');
     Route::post('live-rooms/{live_room}/end', [LiveRoomAdminController::class, 'endRoom'])->name('live-rooms.end');
     Route::post('live-rooms/{live_room}/seat-requests/{seat_request}/reject', [LiveRoomAdminController::class, 'rejectSeatRequest'])->name('live-rooms.seat-requests.reject');
     Route::post('live-rooms/{live_room}/speakers/{user}/remove', [LiveRoomAdminController::class, 'removeSpeaker'])->name('live-rooms.speakers.remove');

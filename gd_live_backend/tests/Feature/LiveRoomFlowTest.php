@@ -257,6 +257,134 @@ class LiveRoomFlowTest extends TestCase
         $this->assertSame($forceEndedAt->toDateTimeString(), $room->ended_at?->toDateTimeString());
     }
 
+    public function test_admin_can_open_silent_live_room_observer_page(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        [, $room] = $this->makeLiveRoom();
+
+        $this->actingAs($admin)
+            ->get(route('admin.live-rooms.watch', $room))
+            ->assertOk()
+            ->assertSee('Start silent watch')
+            ->assertSee('observer-token');
+    }
+
+    public function test_admin_observer_token_is_hidden_subscribe_only_and_does_not_create_participant(): void
+    {
+        config([
+            'app.url' => 'https://admin.example.test',
+            'services.livekit.api_key' => 'test-livekit-key',
+            'services.livekit.api_secret' => 'test-livekit-secret',
+            'services.livekit.ws_url' => 'wss://livekit.example.test',
+        ]);
+
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        [, $room] = $this->makeLiveRoom();
+        $roomStateBefore = $room->fresh()->getRawOriginal();
+        $beforeParticipants = LiveRoomParticipant::query()
+            ->where('live_room_id', $room->id)
+            ->count();
+
+        $response = $this->actingAs($admin)
+            ->postJson(route('admin.live-rooms.observer-token', $room))
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('room', $room->room_id)
+            ->assertJsonPath('ws_url', 'wss://livekit.example.test')
+            ->assertHeader('Cache-Control', 'no-store, private');
+
+        $payload = $this->decodeJwtPayload($response->json('token'));
+
+        $this->assertStringStartsWith('admin-observer:'.$admin->id.':', $payload['sub']);
+        $this->assertSame($room->room_id, $payload['video']['room']);
+        $this->assertTrue($payload['video']['roomJoin']);
+        $this->assertTrue($payload['video']['canSubscribe']);
+        $this->assertFalse($payload['video']['canPublish']);
+        $this->assertFalse($payload['video']['canPublishData']);
+        $this->assertFalse($payload['video']['canUpdateOwnMetadata']);
+        $this->assertTrue($payload['video']['hidden']);
+        $this->assertArrayNotHasKey('roomCreate', $payload['video']);
+        $this->assertArrayNotHasKey('roomAdmin', $payload['video']);
+
+        $this->assertSame($beforeParticipants, LiveRoomParticipant::query()
+            ->where('live_room_id', $room->id)
+            ->count());
+        $this->assertSame($roomStateBefore, $room->fresh()->getRawOriginal());
+
+        $this->assertDatabaseHas('live_room_admin_audits', [
+            'live_room_id' => $room->id,
+            'admin_id' => $admin->id,
+            'action' => 'admin_observer_token_issued',
+            'reason' => 'silent_watch',
+        ]);
+    }
+
+    public function test_admin_observer_token_fails_closed_when_livekit_is_not_configured(): void
+    {
+        config([
+            'services.livekit.api_key' => '',
+            'services.livekit.api_secret' => '',
+            'services.livekit.ws_url' => '',
+        ]);
+
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        [, $room] = $this->makeLiveRoom();
+
+        $this->actingAs($admin)
+            ->postJson(route('admin.live-rooms.observer-token', $room))
+            ->assertStatus(503)
+            ->assertJsonPath('ok', false);
+
+        $this->assertDatabaseMissing('live_room_admin_audits', [
+            'live_room_id' => $room->id,
+            'action' => 'admin_observer_token_issued',
+        ]);
+    }
+
+    public function test_admin_observer_requires_secure_livekit_url_on_https_admin_portal(): void
+    {
+        config([
+            'app.url' => 'https://admin.example.test',
+            'services.livekit.api_key' => 'test-livekit-key',
+            'services.livekit.api_secret' => 'test-livekit-secret',
+            'services.livekit.ws_url' => 'ws://livekit.example.test',
+            'services.livekit.browser_ws_url' => null,
+        ]);
+
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        [, $room] = $this->makeLiveRoom();
+
+        $this->actingAs($admin);
+        $response = $this->call(
+            'POST',
+            route('admin.live-rooms.observer-token', $room, absolute: false),
+            server: ['HTTPS' => 'on', 'HTTP_ACCEPT' => 'application/json'],
+        );
+
+        $response
+            ->assertStatus(503)
+            ->assertJsonPath(
+                'message',
+                'Silent watch requires LIVEKIT_BROWSER_WS_URL to use wss:// on this HTTPS admin portal.'
+            );
+    }
+
+    public function test_admin_observer_token_rejects_ended_room(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        [, $room] = $this->makeLiveRoom(status: 'ended');
+
+        $this->actingAs($admin)
+            ->postJson(route('admin.live-rooms.observer-token', $room))
+            ->assertStatus(409)
+            ->assertJsonPath('ok', false);
+    }
+
     public function test_cleanup_command_ends_live_room_without_active_host(): void
     {
         [$hostUser, $room] = $this->makeLiveRoom();
@@ -415,5 +543,16 @@ class LiveRoomFlowTest extends TestCase
             'last_purchased_at' => now()->subMinute(),
             'meta' => ['source' => 'test'],
         ]);
+    }
+
+    private function decodeJwtPayload(string $jwt): array
+    {
+        $parts = explode('.', $jwt);
+        $this->assertCount(3, $parts);
+
+        $payload = strtr($parts[1], '-_', '+/');
+        $payload .= str_repeat('=', (4 - strlen($payload) % 4) % 4);
+
+        return json_decode(base64_decode($payload), true, flags: JSON_THROW_ON_ERROR);
     }
 }

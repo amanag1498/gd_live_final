@@ -421,11 +421,7 @@ class _PublicProfileCardSheetState extends State<_PublicProfileCardSheet> {
                                       onPressed:
                                           _blockBusy
                                               ? null
-                                              : () => _toggleBlock(
-                                                displayName,
-                                                isHost,
-                                                blocked,
-                                              ),
+                                              : () => _toggleBlock(blocked),
                                       icon: Icon(
                                         blocked
                                             ? Icons.lock_open_rounded
@@ -473,11 +469,7 @@ class _PublicProfileCardSheetState extends State<_PublicProfileCardSheet> {
     return fallback?.isNotEmpty == true ? fallback! : 'Room participant';
   }
 
-  Future<void> _toggleBlock(
-    String name,
-    bool isHost,
-    bool currentlyBlocked,
-  ) async {
+  Future<void> _toggleBlock(bool currentlyBlocked) async {
     if (currentlyBlocked) {
       setState(() => _blockBusy = true);
       try {
@@ -494,14 +486,8 @@ class _PublicProfileCardSheetState extends State<_PublicProfileCardSheet> {
       context: context,
       builder:
           (dialogContext) => AlertDialog(
-            title: Text('Block $name for you?'),
-            content: Text(
-              isHost
-                  ? 'You will leave their room if you are watching it, and '
-                      'their rooms and direct interactions will be hidden.'
-                  : 'Their messages and direct interactions will be hidden '
-                      'from you. This does not remove them from the room.',
-            ),
+            title: const Text('Block user?'),
+            content: const Text('Do you really want to block this user?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),

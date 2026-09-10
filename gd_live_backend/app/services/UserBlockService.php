@@ -11,6 +11,8 @@ use InvalidArgumentException;
 
 class UserBlockService
 {
+    public function __construct(private AdminAuditService $audits) {}
+
     public function blockedUsersQuery(User $blocker): Builder
     {
         return UserBlock::query()
@@ -106,6 +108,39 @@ class UserBlockService
             ->where('blocker_user_id', $blocker->id)
             ->where('blocked_user_id', $target->id)
             ->delete() > 0;
+    }
+
+    public function removeByAdmin(UserBlock $block, User $admin, ?string $reason = null): void
+    {
+        $block->loadMissing(['blocker', 'blockedUser']);
+
+        DB::transaction(function () use ($block, $admin, $reason) {
+            $blocker = $block->blocker;
+            $blockedUser = $block->blockedUser;
+            $before = [
+                'id' => (int) $block->id,
+                'blocker_user_id' => (int) $block->blocker_user_id,
+                'blocked_user_id' => (int) $block->blocked_user_id,
+                'created_at' => optional($block->created_at)->toIso8601String(),
+            ];
+
+            $block->delete();
+
+            $this->audits->log(
+                area: 'moderation',
+                action: 'personal_block_removed',
+                admin: $admin,
+                targetUser: $blockedUser,
+                entity: $block,
+                before: $before,
+                after: ['deleted' => true],
+                reason: $reason ?: 'Admin support override',
+                meta: [
+                    'blocker_user_id' => $blocker?->id,
+                    'blocker_name' => $blocker?->name,
+                ],
+            );
+        });
     }
 
     public function payload(UserBlock $block): array

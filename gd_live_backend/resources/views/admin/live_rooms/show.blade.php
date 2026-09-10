@@ -7,6 +7,9 @@
 
 @section('page_actions')
   <x-ui.button variant="outline" size="sm" href="{{ route('admin.live-rooms.edit',$live_room) }}">Edit</x-ui.button>
+  @if(($live_room->room_type ?? 'video') === 'video' && $live_room->status === 'live' && !$live_room->ended_at)
+    <x-ui.button variant="secondary" size="sm" href="{{ route('admin.live-rooms.watch',$live_room) }}" target="_blank">Watch silently</x-ui.button>
+  @endif
   @if($live_room->status !== 'ended')
     <form method="post" action="{{ route('admin.live-rooms.end',$live_room) }}" onsubmit="return confirm('Force end this room?')">
       @csrf

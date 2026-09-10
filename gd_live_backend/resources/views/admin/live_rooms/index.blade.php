@@ -137,6 +137,9 @@
               <td class="px-4 py-3">
                 <div class="flex flex-wrap justify-end gap-2">
                   <x-ui.button variant="outline" size="sm" href="{{ route('admin.live-rooms.show', $r) }}">View</x-ui.button>
+                  @if(($r->room_type ?? 'video') === 'video' && $r->status === 'live' && !$r->ended_at)
+                    <x-ui.button variant="secondary" size="sm" href="{{ route('admin.live-rooms.watch', $r) }}" target="_blank">Watch</x-ui.button>
+                  @endif
                   <x-ui.button size="sm" href="{{ route('admin.live-rooms.edit', $r) }}">Edit</x-ui.button>
                   @if($r->status !== 'ended')
                     <form method="post" action="{{ route('admin.live-rooms.end', $r) }}" onsubmit="return confirm('Force end this room?')">

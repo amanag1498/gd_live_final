@@ -62,13 +62,15 @@
     </div>
   </section>
 
-  <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+  <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-8">
     <x-admin.stat-card label="Wallet" :value="number_format($walletSummary['balance'])" meta="Current coin balance" />
     <x-admin.stat-card label="Following" :value="number_format($followingCount)" meta="Accounts followed" tone="dark" />
     <x-admin.stat-card label="Followers" :value="number_format($followersCount)" meta="Followers on profile" tone="brand" />
     <x-admin.stat-card label="Rooms Joined" :value="number_format($overviewStats['live_rooms_joined'])" meta="Live room participation" tone="warning" />
     <x-admin.stat-card label="Calls" :value="number_format($overviewStats['calls_total'])" meta="Call history volume" tone="dark" />
     <x-admin.stat-card label="Gift Spend" :value="number_format($overviewStats['gifts_sent'])" meta="Total coins spent on gifts" tone="danger" />
+    <x-admin.stat-card label="Personal Blocks" :value="number_format($overviewStats['personal_blocks_given'])" meta="Users hidden by this account" tone="warning" />
+    <x-admin.stat-card label="Blocked By" :value="number_format($overviewStats['personal_blocks_received'])" meta="Users who hid this account" tone="dark" />
   </section>
 
   <section class="grid gap-6 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.4fr)]">

@@ -3,8 +3,8 @@
 namespace App\Services;
 
 use Firebase\JWT\JWT;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class LivekitToken
 {
@@ -45,10 +45,11 @@ class LivekitToken
         ?array $publishSources = null,
         bool $canPublishData = true,
         bool $canUpdateOwnMetadata = true,
+        bool $hidden = false,
     ): string {
-        $apiKey    = (string) config('services.livekit.api_key', '');
+        $apiKey = (string) config('services.livekit.api_key', '');
         $apiSecret = (string) config('services.livekit.api_secret', '');
-        $ttl       = $ttlSec ?? (int) config('services.livekit.ttl', 3600);
+        $ttl = $ttlSec ?? (int) config('services.livekit.ttl', 3600);
         Log::info('LIVEKIT_TOKEN_ISSUE_BEGIN', [
             'room_id' => $roomId,
             'identity' => $identity,
@@ -61,7 +62,7 @@ class LivekitToken
         $now = time();
 
         $isPublisher = in_array($role, ['host', 'speaker', 'moderator', 'admin'], true);
-        $isAdmin     = in_array($role, ['moderator', 'admin'], true);
+        $isAdmin = in_array($role, ['moderator', 'admin'], true);
         $resolvedMetadata = array_merge([
             'role' => $role,
             'room_type' => $roomType,
@@ -69,14 +70,17 @@ class LivekitToken
 
         // ✅ TOP-LEVEL video grant (not under "grants")
         $videoGrant = [
-            'room'                 => $roomId,
-            'roomJoin'             => true,
-            'canPublish'           => $isPublisher,
-            'canSubscribe'         => true,
-            'canPublishData'       => $canPublishData,
+            'room' => $roomId,
+            'roomJoin' => true,
+            'canPublish' => $isPublisher,
+            'canSubscribe' => true,
+            'canPublishData' => $canPublishData,
             'canUpdateOwnMetadata' => $canUpdateOwnMetadata,
         ];
-        if ($isPublisher && is_array($publishSources) && !empty($publishSources)) {
+        if ($hidden) {
+            $videoGrant['hidden'] = true;
+        }
+        if ($isPublisher && is_array($publishSources) && ! empty($publishSources)) {
             $videoGrant['canPublishSources'] = array_values($publishSources);
         }
         if ($isPublisher) {
@@ -87,15 +91,15 @@ class LivekitToken
         }
 
         $payload = [
-            'jti'      => (string) Str::uuid(),
-            'iss'      => $apiKey,
-            'sub'      => $identity,
-            'name'     => $name,
-            'nbf'      => $now - 10,
-            'iat'      => $now,
-            'exp'      => $now + $ttl,
+            'jti' => (string) Str::uuid(),
+            'iss' => $apiKey,
+            'sub' => $identity,
+            'name' => $name,
+            'nbf' => $now - 10,
+            'iat' => $now,
+            'exp' => $now + $ttl,
             'metadata' => json_encode($resolvedMetadata),
-            'video'    => $videoGrant, // 👈 this is the key change
+            'video' => $videoGrant, // 👈 this is the key change
         ];
 
         $jwt = JWT::encode($payload, $apiSecret, 'HS256');

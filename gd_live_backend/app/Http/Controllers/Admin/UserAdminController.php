@@ -15,6 +15,7 @@ use App\Models\LiveRoomPkBattle;
 use App\Models\PaymentOrder;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
+use App\Models\UserBlock;
 use App\Models\UserEntryPack;
 use App\Models\UserLevel;
 use App\Models\UserLevelHistory;
@@ -183,6 +184,8 @@ class UserAdminController extends Controller
             'calls_total' => CallSession::query()->where(fn ($query) => $query->where('caller_id', $user->id)->orWhere('receiver_id', $user->id))->count(),
             'gifts_sent' => (int) LiveRoomGift::query()->where('sender_user_id', $user->id)->sum('total_coins'),
             'pk_participation' => $user->host ? LiveRoomPkBattle::query()->where(fn ($query) => $query->where('host_a_id', $user->host->id)->orWhere('host_b_id', $user->host->id))->count() : 0,
+            'personal_blocks_given' => UserBlock::query()->where('blocker_user_id', $user->id)->count(),
+            'personal_blocks_received' => UserBlock::query()->where('blocked_user_id', $user->id)->count(),
         ];
         $gameAccessMap = $this->gameAccess->userAccessMap($user);
 
